@@ -13,6 +13,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.servlet.mvc.support.RedirectAttributes;
 import org.example.dto.UserRegistrationDto;
 import org.example.models.User;
+import java.util.HashMap;
+import java.util.Map;
 import org.example.models.Role;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -199,17 +201,18 @@ public class AdminController {
                 ));
             }
             
-            Map<String, Object> userData = Map.of(
-                "id", user.getId(),
-                "username", user.getUsername(),
-                "name", user.getName() != null ? user.getName() : user.getUsername(),
-                "email", user.getEmail(),
-                "designation", user.getDesignation() != null ? user.getDesignation() : "",
-                "specialization", user.getSpecialization() != null ? user.getSpecialization() : "",
-                "bio", user.getBio() != null ? user.getBio() : "",
-                "enabled", user.isEnabled(),
-                "roles", user.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toList())
-            );
+            Map<String, Object> userData = new HashMap<>();
+            userData.put("id", user.getId());
+            userData.put("username", user.getUsername());
+            userData.put("name", user.getName() != null ? user.getName() : user.getUsername());
+            userData.put("email", user.getEmail());
+            userData.put("designation", user.getDesignation() != null ? user.getDesignation() : "");
+            userData.put("specialization", user.getSpecialization() != null ? user.getSpecialization() : "");
+            userData.put("bio", user.getBio() != null ? user.getBio() : "");
+            userData.put("enabled", user.isEnabled());
+            userData.put("organizationId", user.getOrganization() != null ? user.getOrganization().getId() : null);
+            userData.put("organizationName", user.getOrganization() != null ? user.getOrganization().getName() : null);
+            userData.put("roles", user.getRoles().stream().map(Role::getName).collect(java.util.stream.Collectors.toList()));
             
             return ResponseEntity.ok(Map.of(
                 "success", true,
