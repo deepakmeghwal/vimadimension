@@ -74,35 +74,42 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div className="login-page">
-      <div className="login-container">
-        <div className="login-logo-container text-center mb-4">
+    <div className="glassmorphism-login-page">
+      {/* Meteor showers */}
+      <div className="glassmorphism-meteor1"></div>
+      <div className="glassmorphism-meteor2"></div>
+      <div className="glassmorphism-meteor3"></div>
+      <div className="glassmorphism-meteor4"></div>
+      <div className="glassmorphism-meteor5"></div>
+      
+      <div className="glassmorphism-login-container">
+        {/* Company Logo */}
+        <div className="glassmorphism-logo-container">
           <img 
-                                src="/images/firm-logo.jpg" 
+            src="/images/firm-logo.jpg" 
             alt="VIMA - The Dimension Logo" 
-            style={{ maxHeight: '100px', width: 'auto' }}
-            className="mb-3"
+            className="glassmorphism-logo-img"
           />
-          <h2 className="text-primary mb-4">VIMA - THE DIMENSION</h2>
+          <h2 className="glassmorphism-brand-name">VIMA - THE DIMENSION</h2>
         </div>
 
-        <h1>Login</h1>
-
         {(error || searchParams.get('error')) && (
-          <div className="alert alert-danger">
+          <div className="glassmorphism-error">
             {error || 'Invalid username or password.'}
           </div>
         )}
 
         {searchParams.get('logout') && (
-          <div className="alert alert-success">
+          <div className="glassmorphism-success">
             You have been logged out.
           </div>
         )}
 
-        <form onSubmit={handleSubmit}>
-          <div className="form-group">
-            <label htmlFor="username">Username:</label>
+        <form onSubmit={handleSubmit} className="glassmorphism-form">
+          {/* Username Field */}
+          <div className="glassmorphism-input-group">
+            <i className="fas fa-user glassmorphism-input-icon"></i>
+            <label htmlFor="username" className="glassmorphism-label">Username</label>
             <input
               type="text"
               id="username"
@@ -111,10 +118,14 @@ const Login = ({ onLogin }) => {
               onChange={handleChange}
               required
               autoFocus
+              className="glassmorphism-input"
             />
           </div>
-          <div className="form-group">
-            <label htmlFor="password">Password:</label>
+
+          {/* Password Field */}
+          <div className="glassmorphism-input-group">
+            <i className="fas fa-lock glassmorphism-input-icon"></i>
+            <label htmlFor="password" className="glassmorphism-label">Password</label>
             <input
               type="password"
               id="password"
@@ -122,16 +133,22 @@ const Login = ({ onLogin }) => {
               value={formData.password}
               onChange={handleChange}
               required
+              className="glassmorphism-input"
             />
           </div>
-          <div>
-            <button type="submit" className="btn-primary">Sign In</button>
-          </div>
-        </form>
 
-        <div className="options-link">
-          <p>Don't have an account? Contact your organization administrator to get access.</p>
-        </div>
+          {/* Remember Me and Forgot Password */}
+          <div className="glassmorphism-options">
+            <label className="glassmorphism-remember">
+              <input type="checkbox" defaultChecked />
+              <span>Remember me</span>
+            </label>
+            <a href="#" className="glassmorphism-forgot">Forgot Password?</a>
+          </div>
+
+          {/* Login Button */}
+          <button type="submit" className="glassmorphism-button">LOGIN</button>
+        </form>
       </div>
     </div>
   );

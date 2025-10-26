@@ -1457,7 +1457,7 @@ body {
   display: none;
 }
 
-/* Login Page */
+/* Login Page - Old Styles (kept for backward compatibility) */
 .login-page {
   display: flex;
   justify-content: center;
@@ -1500,6 +1500,454 @@ body {
   margin-bottom: 1.5rem;
   font-size: 1.75rem;
   font-weight: 600;
+}
+
+/* Glassmorphism Login Page */
+.glassmorphism-login-page {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: linear-gradient(135deg, #5e4fa2 0%, #6f5ed4 25%, #7d5fcf 50%, #9465d1 75%, #54397a 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Stars background */
+.glassmorphism-login-page::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-image: 
+    radial-gradient(2px 2px at 20% 30%, #fff, transparent),
+    radial-gradient(1px 1px at 25% 25%, #fff, transparent),
+    radial-gradient(2px 2px at 60% 70%, #fff, transparent),
+    radial-gradient(1px 1px at 65% 65%, #fff, transparent),
+    radial-gradient(2px 2px at 50% 50%, #fff, transparent),
+    radial-gradient(1px 1px at 55% 55%, #fff, transparent),
+    radial-gradient(1px 1px at 80% 10%, #fff, transparent),
+    radial-gradient(2px 2px at 75% 15%, #fff, transparent),
+    radial-gradient(2px 2px at 90% 60%, #fff, transparent),
+    radial-gradient(1px 1px at 85% 65%, #fff, transparent),
+    radial-gradient(1px 1px at 33% 15%, #fff, transparent),
+    radial-gradient(2px 2px at 38% 20%, #fff, transparent),
+    radial-gradient(1px 1px at 15% 80%, #fff, transparent),
+    radial-gradient(2px 2px at 20% 75%, #fff, transparent),
+    radial-gradient(2px 2px at 40% 40%, #fff, transparent),
+    radial-gradient(1px 1px at 45% 45%, #fff, transparent),
+    radial-gradient(1px 1px at 75% 25%, #fff, transparent),
+    radial-gradient(2px 2px at 70% 30%, #fff, transparent),
+    radial-gradient(1px 1px at 10% 50%, #fff, transparent),
+    radial-gradient(2px 2px at 15% 55%, #fff, transparent),
+    radial-gradient(2px 2px at 70% 85%, #fff, transparent),
+    radial-gradient(1px 1px at 65% 80%, #fff, transparent),
+    radial-gradient(1px 1px at 85% 45%, #fff, transparent),
+    radial-gradient(2px 2px at 80% 50%, #fff, transparent),
+    radial-gradient(2px 2px at 5% 20%, #fff, transparent),
+    radial-gradient(1px 1px at 95% 75%, #fff, transparent),
+    radial-gradient(1px 1px at 30% 60%, #fff, transparent),
+    radial-gradient(2px 2px at 35% 55%, #fff, transparent),
+    radial-gradient(1px 1px at 55% 80%, #fff, transparent),
+    radial-gradient(2px 2px at 12% 35%, #fff, transparent),
+    radial-gradient(1px 1px at 88% 40%, #fff, transparent),
+    radial-gradient(2px 2px at 45% 70%, #fff, transparent),
+    radial-gradient(1px 1px at 22% 45%, #fff, transparent),
+    radial-gradient(2px 2px at 92% 20%, #fff, transparent),
+    radial-gradient(1px 1px at 62% 25%, #fff, transparent),
+    radial-gradient(2px 2px at 72% 60%, #fff, transparent),
+    radial-gradient(1px 1px at 28% 70%, #fff, transparent),
+    radial-gradient(2px 2px at 40% 5%, #fff, transparent),
+    radial-gradient(1px 1px at 15% 35%, #fff, transparent),
+    radial-gradient(2px 2px at 85% 95%, #fff, transparent),
+    radial-gradient(1px 1px at 50% 90%, #fff, transparent);
+  background-size: 200% 200%;
+  background-repeat: repeat;
+  animation: twinkle 3s linear infinite;
+  pointer-events: none;
+}
+
+@keyframes twinkle {
+  0%, 100% { opacity: 0.7; }
+  25% { opacity: 1; }
+  50% { opacity: 0.8; }
+  75% { opacity: 1; }
+}
+
+/* Meteors */
+.glassmorphism-meteor1 {
+  position: absolute;
+  top: -100px;
+  right: 10%;
+  width: 2px;
+  height: 100px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.8), transparent);
+  animation: meteor-fall 5s linear infinite;
+  animation-delay: 0s;
+}
+
+.glassmorphism-meteor2 {
+  position: absolute;
+  top: -100px;
+  left: 20%;
+  width: 2px;
+  height: 150px;
+  background: linear-gradient(to bottom, transparent, rgba(200, 150, 255, 0.8), transparent);
+  animation: meteor3 6s linear infinite;
+  animation-delay: 0s;
+}
+
+.glassmorphism-meteor3 {
+  position: absolute;
+  top: -100px;
+  right: 30%;
+  width: 1px;
+  height: 80px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 200, 255, 0.7), transparent);
+  animation: meteor4 3.5s linear infinite;
+  animation-delay: 0s;
+}
+
+.glassmorphism-meteor4 {
+  position: absolute;
+  top: -100px;
+  left: 50%;
+  width: 2px;
+  height: 120px;
+  background: linear-gradient(to bottom, transparent, rgba(255, 255, 255, 0.9), transparent);
+  animation: meteor5 4.5s linear infinite;
+  animation-delay: 0s;
+}
+
+.glassmorphism-meteor5 {
+  position: absolute;
+  top: -100px;
+  right: 60%;
+  width: 1px;
+  height: 90px;
+  background: linear-gradient(to bottom, transparent, rgba(180, 100, 255, 0.8), transparent);
+  animation: meteor6 5.5s linear infinite;
+  animation-delay: 0s;
+}
+
+@keyframes meteor-fall {
+  0% {
+    transform: translateY(-100px) translateX(100px) rotate(45deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(600px) translateX(-600px) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+@keyframes meteor2 {
+  0% {
+    transform: translateY(-100px) translateX(150px) rotate(60deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(800px) translateX(-800px) rotate(60deg);
+    opacity: 0;
+  }
+}
+
+@keyframes meteor3 {
+  0% {
+    transform: translateY(-100px) translateX(200px) rotate(40deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(700px) translateX(-700px) rotate(40deg);
+    opacity: 0;
+  }
+}
+
+@keyframes meteor4 {
+  0% {
+    transform: translateY(-100px) translateX(80px) rotate(55deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(500px) translateX(-500px) rotate(55deg);
+    opacity: 0;
+  }
+}
+
+@keyframes meteor5 {
+  0% {
+    transform: translateY(-100px) translateX(120px) rotate(50deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(650px) translateX(-650px) rotate(50deg);
+    opacity: 0;
+  }
+}
+
+@keyframes meteor6 {
+  0% {
+    transform: translateY(-100px) translateX(100px) rotate(45deg);
+    opacity: 0;
+  }
+  10% {
+    opacity: 1;
+  }
+  100% {
+    transform: translateY(550px) translateX(-550px) rotate(45deg);
+    opacity: 0;
+  }
+}
+
+.glassmorphism-login-container {
+  position: relative;
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(30px) saturate(180%);
+  -webkit-backdrop-filter: blur(30px) saturate(180%);
+  border-radius: 20px;
+  padding: 3rem 2.5rem;
+  width: 100%;
+  max-width: 420px;
+  border: 1px solid rgba(255, 255, 255, 0.18);
+  box-shadow: 0 8px 32px 0 rgba(31, 38, 135, 0.37),
+              inset 0 0 0 1px rgba(255, 255, 255, 0.05),
+              0 0 60px rgba(100, 150, 255, 0.2);
+  overflow: hidden;
+}
+
+.glassmorphism-login-container::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    135deg,
+    rgba(255, 255, 255, 0.1) 0%,
+    transparent 50%,
+    transparent 100%
+  );
+  border-radius: 20px;
+  pointer-events: none;
+  z-index: 1;
+}
+
+.glassmorphism-login-container::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  left: -50%;
+  width: 200%;
+  height: 200%;
+  background: linear-gradient(
+    45deg,
+    transparent 30%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 70%
+  );
+  animation: glossMove 8s infinite;
+  pointer-events: none;
+  z-index: 0;
+}
+
+@keyframes glossMove {
+  0% {
+    transform: translateX(-100%) translateY(-100%) rotate(45deg);
+  }
+  50% {
+    transform: translateX(0%) translateY(0%) rotate(45deg);
+  }
+  100% {
+    transform: translateX(100%) translateY(100%) rotate(45deg);
+  }
+}
+
+.glassmorphism-login-container > * {
+  position: relative;
+  z-index: 2;
+}
+
+.glassmorphism-logo-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 2rem;
+}
+
+.glassmorphism-logo-img {
+  max-width: 120px;
+  height: auto;
+  border-radius: 12px;
+  box-shadow: 0 8px 16px rgba(100, 181, 255, 0.3);
+  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.1);
+  padding: 4px;
+}
+
+.glassmorphism-brand-name {
+  color: #e0d5ff;
+  font-size: 1.25rem;
+  font-weight: 600;
+  margin: 0;
+  text-align: center;
+  letter-spacing: 0.05em;
+  text-shadow: 0 2px 8px rgba(255, 255, 255, 0.2);
+}
+
+.glassmorphism-error {
+  background: rgba(239, 68, 68, 0.25);
+  color: #ffd4d4;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.glassmorphism-success {
+  background: rgba(34, 197, 94, 0.25);
+  color: #c6ffd6;
+  padding: 0.75rem 1rem;
+  border-radius: 8px;
+  margin-bottom: 1rem;
+  font-size: 0.875rem;
+  border: 1px solid rgba(34, 197, 94, 0.4);
+  backdrop-filter: blur(10px);
+}
+
+.glassmorphism-form {
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+}
+
+.glassmorphism-input-group {
+  position: relative;
+}
+
+.glassmorphism-label {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: #d4c8ff;
+  font-size: 0.875rem;
+  font-weight: 500;
+  margin-bottom: 0.5rem;
+}
+
+.glassmorphism-input-icon {
+  font-size: 1rem;
+  color: #c4b0f2;
+}
+
+.glassmorphism-input {
+  width: 100%;
+  padding: 0.875rem 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 0.875rem;
+  transition: all 0.3s ease;
+}
+
+.glassmorphism-input:focus {
+  outline: none;
+  border-color: rgba(212, 200, 255, 0.6);
+  box-shadow: 0 0 0 3px rgba(212, 200, 255, 0.15), 
+              inset 0 0 10px rgba(212, 200, 255, 0.1);
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.glassmorphism-input::placeholder {
+  color: rgba(196, 176, 242, 0.6);
+}
+
+.glassmorphism-options {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: -0.5rem;
+}
+
+.glassmorphism-remember {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  color: #d4c8ff;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.glassmorphism-remember input[type="checkbox"] {
+  width: 18px;
+  height: 18px;
+  accent-color: #b0a5ff;
+  cursor: pointer;
+}
+
+.glassmorphism-forgot {
+  color: #c4b0f2;
+  font-size: 0.875rem;
+  text-decoration: none;
+  transition: color 0.3s ease;
+}
+
+.glassmorphism-forgot:hover {
+  color: #e0d5ff;
+}
+
+.glassmorphism-button {
+  width: 100%;
+  padding: 1rem;
+  background: rgba(212, 200, 255, 0.15);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 10px;
+  color: #ffffff;
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  margin-top: 1rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.glassmorphism-button:hover {
+  background: rgba(212, 200, 255, 0.25);
+  border-color: rgba(255, 255, 255, 0.5);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 20px rgba(212, 200, 255, 0.25),
+              inset 0 0 20px rgba(224, 213, 255, 0.15);
+}
+
+.glassmorphism-button:active {
+  transform: translateY(0);
 }
 
 /* Form Styles */
@@ -3686,6 +4134,25 @@ body {
   
   .login-logo-container h2 {
     font-size: 1.25rem;
+  }
+
+  /* Glassmorphism mobile styles */
+  .glassmorphism-login-container {
+    padding: 2rem 1.5rem;
+    max-width: 95%;
+  }
+
+  .glassmorphism-logo-img {
+    max-width: 100px;
+  }
+
+  .glassmorphism-brand-name {
+    font-size: 1.1rem;
+  }
+
+  .glassmorphism-button {
+    padding: 0.875rem;
+    font-size: 0.9375rem;
   }
   
   .page-title {
