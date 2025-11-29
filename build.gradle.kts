@@ -49,6 +49,29 @@ dependencies {
     // iText for PDF generation
     implementation("com.itextpdf:itext7-core:7.2.5")
     implementation("com.itextpdf:html2pdf:4.0.5")
+    
+    // Email support for Gmail SMTP
+    implementation("org.springframework.boot:spring-boot-starter-mail")
+    
+    // JWT for token-based authentication
+    implementation("io.jsonwebtoken:jjwt-api:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-impl:0.12.3")
+    runtimeOnly("io.jsonwebtoken:jjwt-jackson:0.12.3")
+    
+    // AWS SDK v2 for S3 file storage
+    implementation(platform("software.amazon.awssdk:bom:2.21.0"))
+    implementation("software.amazon.awssdk:s3")
+    implementation("software.amazon.awssdk:sts") // For assuming IAM roles
+    
+    // Spring Cache support for caching dashboard data
+    implementation("org.springframework.boot:spring-boot-starter-cache")
+    
+    // Caffeine cache provider for high-performance in-memory caching
+    implementation("com.github.ben-manes.caffeine:caffeine")
+
+    // Lombok
+    compileOnly("org.projectlombok:lombok")
+    annotationProcessor("org.projectlombok:lombok")
 }
 
 tasks.test {

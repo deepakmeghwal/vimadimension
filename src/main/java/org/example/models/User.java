@@ -5,9 +5,12 @@ import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import java.util.HashSet;
 import java.util.Set;
+import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "users") // Ensure your table name is correct
+@Table(name = "users", indexes = {
+    @Index(name = "idx_user_organization_id", columnList = "organization_id")
+}) // Ensure your table name is correct
 public class User {
 
     @Id
@@ -24,6 +27,7 @@ public class User {
 
     //    @NotBlank(message = "Password is required")
 //    @Size(min = 6, message = "Password must be at least 6 characters long")
+    @JsonIgnore // Never expose password in API responses
     private String password; // Store hashed passwords
 
     //    @Email(message = "Email should be valid")
@@ -57,6 +61,12 @@ public class User {
     @Column(columnDefinition = "TEXT")
     private String bio; // A short professional biography, can be nullable
 
+    @Column(length = 500)
+    private String profileImageUrl; // URL/path to the user's profile image
+
+    @Column(name = "created_at", updatable = false)
+    private LocalDateTime createdAt;
+
     // Salary-related fields
     @Column(name = "daily_salary", precision = 15, scale = 2)
     private java.math.BigDecimal dailySalary; // Daily salary rate
@@ -69,6 +79,16 @@ public class User {
 
     @Column(name = "insurance_deduction", precision = 15, scale = 2)
     private java.math.BigDecimal insuranceDeduction = java.math.BigDecimal.ZERO; // Fixed insurance deduction
+
+    // --- New fields for Resource Planner (Burn Rate Calculation) ---
+    @Column(name = "monthly_salary", precision = 15, scale = 2)
+    private java.math.BigDecimal monthlySalary; // Base monthly salary
+
+    @Column(name = "typical_hours_per_month")
+    private Integer typicalHoursPerMonth = 160; // Default to 160 hours
+
+    @Column(name = "overhead_multiplier", precision = 5, scale = 2)
+    private java.math.BigDecimal overheadMultiplier = new java.math.BigDecimal("2.5"); // Default to 2.5x
 
     // Represents projects the user is allowed to view or is involved with
     @ManyToMany(fetch = FetchType.LAZY) // Use LAZY to load only when needed
@@ -90,6 +110,7 @@ public class User {
     // Assuming a Task is assigned to one User.
     // The 'mappedBy' attribute refers to the field in the Task entity that owns the relationship (e.g., "assignee")
     @OneToMany(mappedBy = "assignee", cascade = CascadeType.ALL, fetch = FetchType.LAZY, orphanRemoval = true)
+    @com.fasterxml.jackson.annotation.JsonIgnore
     private Set<Task> assignedTasks = new HashSet<>();
 
 
@@ -104,6 +125,14 @@ public class User {
         this.username = username;
         this.password = password; // Remember to hash this before saving
         this.email = email;
+        this.createdAt = LocalDateTime.now();
+    }
+
+    @PrePersist
+    protected void onCreate() {
+        if (createdAt == null) {
+            createdAt = LocalDateTime.now();
+        }
     }
 
     // --- Getters and Setters for new fields ---
@@ -148,6 +177,14 @@ public class User {
         this.bio = bio;
     }
 
+    public String getProfileImageUrl() {
+        return profileImageUrl;
+    }
+
+    public void setProfileImageUrl(String profileImageUrl) {
+        this.profileImageUrl = profileImageUrl;
+    }
+
     // Salary-related getters and setters
     public java.math.BigDecimal getDailySalary() {
         return dailySalary;
@@ -179,6 +216,30 @@ public class User {
 
     public void setInsuranceDeduction(java.math.BigDecimal insuranceDeduction) {
         this.insuranceDeduction = insuranceDeduction;
+    }
+
+    public java.math.BigDecimal getMonthlySalary() {
+        return monthlySalary;
+    }
+
+    public void setMonthlySalary(java.math.BigDecimal monthlySalary) {
+        this.monthlySalary = monthlySalary;
+    }
+
+    public Integer getTypicalHoursPerMonth() {
+        return typicalHoursPerMonth;
+    }
+
+    public void setTypicalHoursPerMonth(Integer typicalHoursPerMonth) {
+        this.typicalHoursPerMonth = typicalHoursPerMonth;
+    }
+
+    public java.math.BigDecimal getOverheadMultiplier() {
+        return overheadMultiplier;
+    }
+
+    public void setOverheadMultiplier(java.math.BigDecimal overheadMultiplier) {
+        this.overheadMultiplier = overheadMultiplier;
     }
 
     public Set<Project> getAccessibleProjects() {
@@ -273,5 +334,13 @@ public class User {
 
     public void setRoles(Set<Role> roles) {
         this.roles = roles;
+    }
+
+    public LocalDateTime getCreatedAt() {
+        return createdAt;
+    }
+
+    public void setCreatedAt(LocalDateTime createdAt) {
+        this.createdAt = createdAt;
     }
 }

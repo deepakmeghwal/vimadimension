@@ -1,0 +1,77 @@
+# Docker Compose for Local Development
+version: '3.8'
+
+services:
+  # MySQL Service disabled to use host database
+  # mysql:
+  #   image: mysql:8.0
+  #   container_name: vimadimension-mysql
+  #   environment:
+  #     MYSQL_ROOT_PASSWORD: rootpassword
+  #     MYSQL_DATABASE: project_tracker_db
+  #     MYSQL_USER: tracker_app_user
+  #     MYSQL_PASSWORD: dev_password
+  #   ports:
+  #     # Map container port 3306 to host port 3307 to avoid conflict with local MySQL
+  #     - "3307:3306"
+  #   volumes:
+  #     - mysql_data:/var/lib/mysql
+  #     - ./mysql/init:/docker-entrypoint-initdb.d
+  #   healthcheck:
+  #     test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-prootpassword"]
+  #     interval: 10s
+  #     timeout: 5s
+  #     retries: 5
+  #   networks:
+  #     - vimadimension-network
+
+  # Spring Boot Application
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vimadimension-app
+    # depends_on:
+      # mysql:
+      #   condition: service_healthy
+    environment:
+      # Spring Profile
+      SPRING_PROFILES_ACTIVE: prod
+      
+      # Database Configuration
+      # Connect to host MySQL (Mac/Windows: host.docker.internal, Linux: 172.17.0.1)
+      SPRING_DATASOURCE_URL: jdbc:mysql://host.docker.internal:3306/project_tracker_db?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC
+      SPRING_DATASOURCE_USERNAME: tracker_app_user
+      SPRING_DATASOURCE_PASSWORD: your_strong_password
+      
+      # JPA Configuration
+      SPRING_JPA_HIBERNATE_DDL_AUTO: update
+      
+      # Server Configuration
+      SERVER_ADDRESS: 0.0.0.0
+      SERVER_PORT: 8080
+      
+      # Security (change in production!)
+      SPRING_SECURITY_USER_NAME: admin
+      SPRING_SECURITY_USER_PASSWORD: admin123
+    ports:
+      - "8080:8080"
+    volumes:
+      - app_logs:/app/logs
+      - app_uploads:/app/uploads
+    networks:
+      - vimadimension-network
+    restart: unless-stopped
+
+volumes:
+  mysql_data:
+    driver: local
+  app_logs:
+    driver: local
+  app_uploads:
+    driver: local
+
+networks:
+  vimadimension-network:
+    driver: bridge
+

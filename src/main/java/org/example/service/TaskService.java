@@ -10,6 +10,10 @@ import org.example.repository.ProjectRepository;
 import org.example.repository.TaskRepository;
 import org.example.repository.UserRepository;
 // import org.example.repository.TimeLogRepository; // Keep for when you implement TimeLog deletion logic
+import org.example.models.Phase;
+import org.example.repository.PhaseRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -31,19 +35,27 @@ import java.util.Optional;
 @Service
 public class TaskService {
 
+    private static final Logger logger = LoggerFactory.getLogger(TaskService.class);
+
     private final TaskRepository taskRepository;
     private final ProjectRepository projectRepository;
+    private final PhaseRepository phaseRepository;
     private final UserRepository userRepository;
+    private final AuditService auditService;
     // private final TimeLogRepository timeLogRepository; // For handling related time entries
 
     @Autowired
     public TaskService(TaskRepository taskRepository,
                        ProjectRepository projectRepository,
-                       UserRepository userRepository
+                       PhaseRepository phaseRepository,
+                       UserRepository userRepository,
+                       AuditService auditService
             /*, TimeLogRepository timeLogRepository */) {
         this.taskRepository = taskRepository;
         this.projectRepository = projectRepository;
+        this.phaseRepository = phaseRepository;
         this.userRepository = userRepository;
+        this.auditService = auditService;
         // this.timeLogRepository = timeLogRepository;
     }
 
@@ -69,7 +81,7 @@ public class TaskService {
     }
 
     @Transactional
-    public Task createTask(String name, String description, ProjectStage projectStage, Long projectId, Optional<Long> assigneeIdOpt, Optional<Long> checkedByIdOpt) {
+    public Task createTask(String name, String description, ProjectStage projectStage, Long phaseId, Optional<Long> assigneeIdOpt, Optional<Long> checkedByIdOpt) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Task name cannot be empty.");
         }
@@ -77,10 +89,14 @@ public class TaskService {
             throw new IllegalArgumentException("Project stage cannot be empty.");
         }
 
+        Phase phase = null;
         Project project = null;
-        if (projectId != null) {
-            project = projectRepository.findById(projectId)
-                    .orElseThrow(() -> new IllegalArgumentException("Project with ID " + projectId + " not found. Cannot create task."));
+        if (phaseId != null) {
+            phase = phaseRepository.findById(phaseId)
+                    .orElseThrow(() -> new IllegalArgumentException("Phase with ID " + phaseId + " not found. Cannot create task."));
+            project = phase.getProject();
+        } else {
+             throw new IllegalArgumentException("Phase ID is required to create a task.");
         }
 
         User reporter = getCurrentAuthenticatedUser();
@@ -96,18 +112,106 @@ public class TaskService {
                     .orElseThrow(() -> new IllegalArgumentException("Checker user with ID " + checkedByIdOpt.get() + " not found."));
         }
 
+        // Generate task number BEFORE saving (since task_number is NOT NULL)
+        String taskNumber = generateTaskNumber(project);
+        
         Task newTask = new Task();
         newTask.setName(name.trim());
         newTask.setDescription(description != null ? description.trim() : null);
         newTask.setProjectStage(projectStage);
+        newTask.setPhase(phase);
         newTask.setProject(project);
         newTask.setReporter(reporter);
         newTask.setAssignee(assignee);
         newTask.setCheckedBy(checkedBy);
         newTask.setStatus(TaskStatus.TO_DO); // Default status
+        newTask.setTaskNumber(taskNumber); // Set task number before saving
         // createdAt and updatedAt are handled by @PrePersist in Task entity
 
-        return taskRepository.save(newTask);
+        Task savedTask = taskRepository.save(newTask);
+        auditService.logChange(reporter, "TASK", savedTask.getId(), "CREATE", null, null, "Task created");
+        
+        return savedTask;
+    }
+
+    @Transactional
+    public Task createTaskForProject(String name, String description, ProjectStage projectStage, Long projectId, Optional<Long> phaseIdOpt, Optional<Long> assigneeIdOpt, Optional<Long> checkedByIdOpt) {
+        if (name == null || name.trim().isEmpty()) {
+            throw new IllegalArgumentException("Task name cannot be empty.");
+        }
+        if (projectStage == null) {
+            throw new IllegalArgumentException("Project stage cannot be empty.");
+        }
+        if (projectId == null) {
+            throw new IllegalArgumentException("Project ID is required to create a task.");
+        }
+
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project with ID " + projectId + " not found. Cannot create task."));
+
+        Phase phase = null;
+        if (phaseIdOpt.isPresent() && phaseIdOpt.get() != null) {
+            phase = phaseRepository.findById(phaseIdOpt.get())
+                    .orElseThrow(() -> new IllegalArgumentException("Phase with ID " + phaseIdOpt.get() + " not found. Cannot create task."));
+            // Verify phase belongs to the project
+            if (!phase.getProject().getId().equals(projectId)) {
+                throw new IllegalArgumentException("Phase does not belong to the specified project.");
+            }
+        }
+
+        User reporter = getCurrentAuthenticatedUser();
+        User assignee = null;
+        if (assigneeIdOpt.isPresent() && assigneeIdOpt.get() != null) {
+            assignee = userRepository.findById(assigneeIdOpt.get())
+                    .orElseThrow(() -> new IllegalArgumentException("Assignee user with ID " + assigneeIdOpt.get() + " not found."));
+        }
+
+        User checkedBy = null;
+        if (checkedByIdOpt.isPresent() && checkedByIdOpt.get() != null) {
+            checkedBy = userRepository.findById(checkedByIdOpt.get())
+                    .orElseThrow(() -> new IllegalArgumentException("Checker user with ID " + checkedByIdOpt.get() + " not found."));
+        }
+
+        // Generate task number BEFORE saving (since task_number is NOT NULL)
+        String taskNumber = generateTaskNumber(project);
+        
+        Task newTask = new Task();
+        newTask.setName(name.trim());
+        newTask.setDescription(description != null ? description.trim() : null);
+        newTask.setProjectStage(projectStage);
+        newTask.setPhase(phase);
+        newTask.setProject(project);
+        newTask.setReporter(reporter);
+        newTask.setAssignee(assignee);
+        newTask.setCheckedBy(checkedBy);
+        newTask.setStatus(TaskStatus.TO_DO); // Default status
+        newTask.setTaskNumber(taskNumber); // Set task number before saving
+        
+        Task savedTask = taskRepository.save(newTask);
+        
+        // createdAt and updatedAt are handled by @PrePersist in Task entity
+        auditService.logChange(reporter, "TASK", savedTask.getId(), "CREATE", null, null, "Task created");
+        
+        return savedTask;
+    }
+
+    /**
+     * Generates task number in format: {PROJECT_NUMBER}-TASK-{SEQ}
+     * Uses sequence per project (similar to invoice numbering)
+     */
+    private String generateTaskNumber(Project project) {
+        if (project.getProjectNumber() == null) {
+            throw new IllegalStateException("Project must have a project number before creating tasks");
+        }
+        
+        String prefix = project.getProjectNumber() + "-TASK-";
+        
+        Integer maxSequence = taskRepository.findMaxTaskSequenceByProjectAndPrefix(project, prefix);
+        int nextSequence = (maxSequence != null ? maxSequence : 0) + 1;
+        
+        String taskNumber = prefix + String.format("%04d", nextSequence);
+        logger.info("Generated task number: {} for project: {}", taskNumber, project.getProjectNumber());
+        return taskNumber;
     }
 
     public Optional<Task> findTaskById(Long taskId) {
@@ -119,15 +223,29 @@ public class TaskService {
     }
 
     /**
-     * Retrieves all tasks with pagination.
+     * Retrieves all tasks with pagination filtered by the current user's organization.
      *
      * @param page The page number (0-based)
      * @param size The number of tasks per page
      * @return A map containing paginated tasks and metadata
      */
     public Map<String, Object> getAllTasksPaginated(int page, int size) {
+        User currentUser = getCurrentAuthenticatedUser();
+        
+        if (currentUser.getOrganization() == null) {
+            logger.warn("User {} does not belong to any organization. Returning empty task list.", currentUser.getUsername());
+            Map<String, Object> emptyResponse = new HashMap<>();
+            emptyResponse.put("tasks", List.of());
+            emptyResponse.put("currentPage", 0);
+            emptyResponse.put("totalItems", 0);
+            emptyResponse.put("totalPages", 0);
+            emptyResponse.put("hasNext", false);
+            emptyResponse.put("hasPrevious", false);
+            return emptyResponse;
+        }
+        
         Pageable pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
-        Page<Task> taskPage = taskRepository.findAll(pageable);
+        Page<Task> taskPage = taskRepository.findByProject_Organization_Id(currentUser.getOrganization().getId(), pageable);
         return buildPaginatedTaskResponse(taskPage);
     }
 
@@ -232,12 +350,118 @@ public class TaskService {
         validatePaginationInputs(page, size);
         User currentUser = getCurrentAuthenticatedUser();
         Pageable pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
-        Page<Task> taskPage = taskRepository.findByCheckedByAndStatus(
+        Page<Task> taskPage = taskRepository.findByCheckedByAndStatusIn(
                 currentUser,
-                TaskStatus.DONE,
+                Arrays.asList(TaskStatus.DONE, TaskStatus.IN_REVIEW),
                 pageable
         );
         return buildPaginatedTaskResponse(taskPage);
+    }
+
+    /**
+     * Unified method to get tasks with filtering and pagination
+     * @param filterType Type of filter: "assigned", "reported", "to-check", "all", or null
+     * @param statusList Optional list of statuses to filter by
+     * @param priorityList Optional list of priorities to filter by
+     * @param projectId Optional project ID to filter by
+     * @param page Page number (0-indexed)
+     * @param size Page size
+     * @return Map containing paginated tasks and metadata
+     */
+    public Map<String, Object> getTasksWithFilters(
+            String filterType,
+            Long assigneeIdParam,
+            List<String> statusList,
+            List<String> priorityList,
+            Long projectId,
+            int page,
+            int size) {
+        validatePaginationInputs(page, size);
+        User currentUser = getCurrentAuthenticatedUser();
+        
+        if (currentUser.getOrganization() == null) {
+            logger.warn("User {} does not belong to any organization. Returning empty task list.", currentUser.getUsername());
+            return buildEmptyPaginatedResponse();
+        }
+        
+        Long organizationId = currentUser.getOrganization().getId();
+        Long assigneeId = null;
+        Long reporterId = null;
+        Long checkedById = null;
+        
+        // If assigneeIdParam is provided, use it directly (takes precedence over filterType)
+        if (assigneeIdParam != null) {
+            assigneeId = assigneeIdParam;
+        } else {
+            // Otherwise, determine filter type and set user IDs accordingly
+            if ("assigned".equalsIgnoreCase(filterType)) {
+                assigneeId = currentUser.getId();
+            } else if ("reported".equalsIgnoreCase(filterType)) {
+                reporterId = currentUser.getId();
+            } else if ("to-check".equalsIgnoreCase(filterType)) {
+                checkedById = currentUser.getId();
+            } else if ("all".equalsIgnoreCase(filterType) || filterType == null || filterType.isEmpty()) {
+                // "all" means no user filter - show all tasks in organization
+                // Leave assigneeId, reporterId, checkedById as null
+            }
+        }
+        
+        // Convert status strings to enums
+        List<TaskStatus> statusEnums = null;
+        if (statusList != null && !statusList.isEmpty()) {
+            try {
+                statusEnums = statusList.stream()
+                        .map(String::toUpperCase)
+                        .map(TaskStatus::valueOf)
+                        .collect(java.util.stream.Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                logger.warn("Invalid status values provided: {}", statusList);
+                statusEnums = null;
+            }
+        }
+        
+        // Convert priority strings to enums
+        List<TaskPriority> priorityEnums = null;
+        if (priorityList != null && !priorityList.isEmpty()) {
+            try {
+                priorityEnums = priorityList.stream()
+                        .map(String::toUpperCase)
+                        .map(TaskPriority::valueOf)
+                        .collect(java.util.stream.Collectors.toList());
+            } catch (IllegalArgumentException e) {
+                logger.warn("Invalid priority values provided: {}", priorityList);
+                priorityEnums = null;
+            }
+        }
+        
+        // Ensure empty lists are passed as null to avoid JPQL issues
+        List<TaskStatus> finalStatusList = (statusEnums != null && !statusEnums.isEmpty()) ? statusEnums : null;
+        List<TaskPriority> finalPriorityList = (priorityEnums != null && !priorityEnums.isEmpty()) ? priorityEnums : null;
+        
+        Pageable pageable = PageRequest.of(page, size, Sort.by("updatedAt").descending());
+        Page<Task> taskPage = taskRepository.findTasksWithFilters(
+                organizationId,
+                assigneeId,
+                reporterId,
+                checkedById,
+                finalStatusList,
+                finalPriorityList,
+                projectId,
+                pageable
+        );
+        
+        return buildPaginatedTaskResponse(taskPage);
+    }
+    
+    private Map<String, Object> buildEmptyPaginatedResponse() {
+        Map<String, Object> emptyResponse = new HashMap<>();
+        emptyResponse.put("tasks", List.of());
+        emptyResponse.put("currentPage", 0);
+        emptyResponse.put("totalItems", 0);
+        emptyResponse.put("totalPages", 0);
+        emptyResponse.put("hasNext", false);
+        emptyResponse.put("hasPrevious", false);
+        return emptyResponse;
     }
 
 
@@ -245,7 +469,7 @@ public class TaskService {
     public Optional<Task> updateTask(Long taskId,
                                      Optional<String> newNameOpt,
                                      Optional<String> newDescriptionOpt,
-                                     Optional<Long> newProjectIdOpt,
+                                     Optional<Long> newPhaseIdOpt,
                                      Optional<Long> newAssigneeIdOpt, // Use Optional<Optional<Long>> or a flag for unassigning if null means "no change"
                                      Optional<TaskStatus> newStatusOpt) {
 
@@ -268,10 +492,11 @@ public class TaskService {
             updated = true;
         }
 
-        if (newProjectIdOpt.isPresent()) {
-            Project project = projectRepository.findById(newProjectIdOpt.get())
-                    .orElseThrow(() -> new IllegalArgumentException("Project with ID " + newProjectIdOpt.get() + " not found for task update."));
-            taskToUpdate.setProject(project);
+        if (newPhaseIdOpt.isPresent()) {
+            Phase phase = phaseRepository.findById(newPhaseIdOpt.get())
+                    .orElseThrow(() -> new IllegalArgumentException("Phase with ID " + newPhaseIdOpt.get() + " not found for task update."));
+            taskToUpdate.setPhase(phase);
+            taskToUpdate.setProject(phase.getProject());
             updated = true;
         }
 
@@ -320,6 +545,13 @@ public class TaskService {
         Task taskToUpdate = taskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task with ID " + taskId + " not found."));
 
+        User currentUser = getCurrentAuthenticatedUser();
+
+        String oldName = taskToUpdate.getName();
+        String oldDescription = taskToUpdate.getDescription();
+        ProjectStage oldStage = taskToUpdate.getProjectStage();
+        TaskStatus oldStatus = taskToUpdate.getStatus();
+
         // Parse enums
         ProjectStage projectStageEnum;
         try {
@@ -342,7 +574,22 @@ public class TaskService {
         taskToUpdate.setStatus(statusEnum);
 
         // updatedAt is handled by @PreUpdate in Task entity
-        return taskRepository.save(taskToUpdate);
+        Task savedTask = taskRepository.save(taskToUpdate);
+
+        if (!oldName.equals(savedTask.getName())) {
+            auditService.logChange(currentUser, "TASK", savedTask.getId(), "UPDATE", "name", oldName, savedTask.getName());
+        }
+        if (!java.util.Objects.equals(oldDescription, savedTask.getDescription())) {
+            auditService.logChange(currentUser, "TASK", savedTask.getId(), "UPDATE", "description", oldDescription, savedTask.getDescription());
+        }
+        if (oldStage != savedTask.getProjectStage()) {
+            auditService.logChange(currentUser, "TASK", savedTask.getId(), "UPDATE", "projectStage", oldStage.name(), savedTask.getProjectStage().name());
+        }
+        if (oldStatus != savedTask.getStatus()) {
+            auditService.logChange(currentUser, "TASK", savedTask.getId(), "UPDATE", "status", oldStatus.name(), savedTask.getStatus().name());
+        }
+
+        return savedTask;
     }
 
     private void validatePaginationInputs(int page, int size) {
@@ -368,7 +615,7 @@ public class TaskService {
 
     @Transactional
     public Task updateTaskComplete(Long taskId, String name, String description, String projectStage, 
-                                  String status, String priority, String dueDate, Long assigneeId, Long checkedById) {
+                                  String status, String priority, String dueDate, Long assigneeId, Long checkedById, Long phaseId) {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Task name cannot be empty.");
         }
@@ -444,6 +691,14 @@ public class TaskService {
             taskToUpdate.setCheckedBy(null);
         }
 
+        // Handle phase update
+        if (phaseId != null) {
+            Phase phase = phaseRepository.findById(phaseId)
+                    .orElseThrow(() -> new IllegalArgumentException("Phase with ID " + phaseId + " not found."));
+            taskToUpdate.setPhase(phase);
+            taskToUpdate.setProject(phase.getProject());
+        }
+
         // updatedAt is handled by @PreUpdate in Task entity
         return taskRepository.save(taskToUpdate);
     }
@@ -457,13 +712,19 @@ public class TaskService {
             throw new IllegalArgumentException("New status cannot be null.");
         }
 
-        // Authorization check: User can only update status of tasks they are assigned to, created, or assigned as checker
+        // Authorization check: User can update status of tasks within their organization
         User currentUser = getCurrentAuthenticatedUser();
-        validateTaskEditPermission(taskToUpdate, currentUser);
+        validateTaskOrganizationAccess(taskToUpdate, currentUser);
 
-        taskToUpdate.setStatus(newStatus);
-        // updatedAt is handled by @PreUpdate in Task entity
-        return Optional.of(taskRepository.save(taskToUpdate));
+        TaskStatus oldStatus = taskToUpdate.getStatus();
+        if (oldStatus != newStatus) {
+            taskToUpdate.setStatus(newStatus);
+            // updatedAt is handled by @PreUpdate in Task entity
+            Task savedTask = taskRepository.save(taskToUpdate);
+            auditService.logChange(currentUser, "TASK", savedTask.getId(), "UPDATE", "status", oldStatus.name(), newStatus.name());
+            return Optional.of(savedTask);
+        }
+        return Optional.of(taskToUpdate);
     }
 
     @Transactional
@@ -548,6 +809,28 @@ public class TaskService {
         
         if (!canEdit) {
             throw new IllegalArgumentException("You do not have permission to edit this task. You can only edit tasks that are assigned to you, created by you, or assigned to you for checking.");
+        }
+    }
+
+    /**
+     * Validates if the current user has permission to access tasks within the same organization.
+     * A user can access any task that belongs to a project in their organization.
+     *
+     * @param task The task to check permissions for
+     * @param currentUser The current authenticated user
+     * @throws IllegalArgumentException if the user doesn't have permission
+     */
+    private void validateTaskOrganizationAccess(Task task, User currentUser) {
+        if (currentUser.getOrganization() == null) {
+            throw new IllegalArgumentException("You must belong to an organization to access tasks.");
+        }
+        
+        if (task.getProject() == null || task.getProject().getOrganization() == null) {
+            throw new IllegalArgumentException("Task must belong to a project within an organization.");
+        }
+        
+        if (!task.getProject().getOrganization().getId().equals(currentUser.getOrganization().getId())) {
+            throw new IllegalArgumentException("You can only access tasks within your organization.");
         }
     }
 

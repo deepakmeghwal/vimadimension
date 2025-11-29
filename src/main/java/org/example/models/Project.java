@@ -3,7 +3,7 @@ package org.example.models;
 
 import jakarta.persistence.*;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import org.example.models.enums.ProjectCategory;
+import org.example.models.enums.ProjectChargeType;
 import org.example.models.enums.ProjectStatus;
 import org.example.models.enums.ProjectStage;
 import org.example.models.enums.ProjectPriority;
@@ -12,20 +12,33 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.List;
+import java.util.ArrayList;
 
 @Entity
-@Table(name = "projects")
+@Table(name = "projects", indexes = {
+    @Index(name = "idx_project_status", columnList = "status_value"),
+    @Index(name = "idx_project_client_id", columnList = "client_id"),
+    @Index(name = "idx_project_start_date", columnList = "start_date"),
+    @Index(name = "idx_project_organization_id", columnList = "organization_id")
+})
 public class Project {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "project_number", nullable = false, unique = true)
+    private String projectNumber;
+
     @Column(nullable = false)
     private String name;
 
-    @Column(name = "client_name", nullable = false)
-    private String clientName;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "client_id", nullable = false)
+    @JsonIgnore
+    @com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
+    private Client client;
 
     @Column(name = "start_date", nullable = false)
     private LocalDate startDate;
@@ -37,15 +50,15 @@ public class Project {
     private String location;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "project_category", nullable = false)
-    private ProjectCategory projectCategory;
+    @Column(name = "charge_type_value", nullable = false, length = 50)
+    private ProjectChargeType chargeType;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "project_status", nullable = false)
+    @Column(name = "status_value", nullable = false, length = 50)
     private ProjectStatus status;
 
     @Enumerated(EnumType.STRING)
-    @Column(name = "project_stage", nullable = false)
+    @Column(name = "stage", nullable = false, length = 50)
     private ProjectStage projectStage;
 
     @Column(columnDefinition = "TEXT")
@@ -79,6 +92,10 @@ public class Project {
     @ManyToMany(mappedBy = "accessibleProjects", fetch = FetchType.LAZY)
     @JsonIgnore // Prevent circular reference during JSON serialization
     private Set<User> accessibleByUsers = new HashSet<>();
+
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore // Prevent lazy loading exception during JSON serialization
+    private List<Phase> phases = new ArrayList<>();
 
     // Constructors, Getters, and Setters
 
@@ -171,12 +188,37 @@ public class Project {
         this.name = name;
     }
 
-    public String getClientName() {
-        return clientName;
+    public Client getClient() {
+        return client;
     }
 
-    public void setClientName(String clientName) {
-        this.clientName = clientName;
+    public void setClient(Client client) {
+        this.client = client;
+    }
+
+    // Virtual properties for JSON serialization
+    public String getClientName() {
+        try {
+            return client != null && org.hibernate.Hibernate.isInitialized(client) ? client.getName() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public String getClientBillingAddress() {
+        try {
+            return client != null && org.hibernate.Hibernate.isInitialized(client) ? client.getBillingAddress() : null;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    public Long getClientId() {
+        try {
+            return client != null ? client.getId() : null;
+        } catch (Exception e) {
+            return null;
+        }
     }
 
     public LocalDate getStartDate() {
@@ -203,12 +245,28 @@ public class Project {
         this.location = location;
     }
 
-    public ProjectCategory getProjectCategory() {
-        return projectCategory;
+    public String getProjectNumber() {
+        return projectNumber;
     }
 
-    public void setProjectCategory(ProjectCategory projectCategory) {
-        this.projectCategory = projectCategory;
+    public void setProjectNumber(String projectNumber) {
+        this.projectNumber = projectNumber;
+    }
+
+    public ProjectChargeType getChargeType() {
+        return chargeType;
+    }
+
+    public void setChargeType(ProjectChargeType chargeType) {
+        this.chargeType = chargeType;
+    }
+
+    public List<Phase> getPhases() {
+        return phases;
+    }
+
+    public void setPhases(List<Phase> phases) {
+        this.phases = phases;
     }
 
     public ProjectStatus getStatus() {

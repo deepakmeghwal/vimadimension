@@ -1,13 +1,17 @@
 package org.example.models.enums;
 
+/**
+ * Project Lifecycle Stages based on Council of Architecture (COA) India standards.
+ * These stages align with the standard "Scale of Charges" for architectural services in India.
+ */
 public enum ProjectStage {
-    STAGE_01_PREPARATION_BRIEF("Stage 01: Preparation & Brief"),
-    STAGE_02_CONCEPT_DESIGN("Stage 02: Concept Design"),
-    STAGE_03_DESIGN_DEVELOPMENT("Stage 03: Design Development"),
-    STAGE_04_TECHNICAL_DESIGN("Stage 04: Technical Design"),
-    STAGE_05_CONSTRUCTION("Stage 05: Construction"),
-    STAGE_06_HANDOVER("Stage 06: Handover"),
-    STAGE_07_USE("Stage 07: Use");
+    CONCEPT("Concept Design"),
+    PRELIM("Preliminary Design"),
+    STATUTORY("Statutory Approvals (Liaison)"),
+    TENDER("Working Drawings & Tender"),
+    CONTRACT("Appointment of Contractor"),
+    CONSTRUCTION("Construction Supervision"),
+    COMPLETION("Completion & Handover");
 
     private final String displayName;
 

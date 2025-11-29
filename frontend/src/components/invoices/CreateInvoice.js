@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
+import { PROJECT_STAGES, getStageFeePercentage } from '../../constants/projectEnums';
 
 const CreateInvoice = ({ user }) => {
   const [formData, setFormData] = useState({
@@ -8,8 +9,11 @@ const CreateInvoice = ({ user }) => {
     clientAddress: '',
     clientPhone: '',
     projectId: '',
+    templateId: '',
+    invoiceMode: 'manual', // 'manual' or 'standard'
+    selectedStage: '',
     issueDate: new Date().toISOString().split('T')[0],
-    dueDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 30 days from now
+    dueDate: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0], // 15 days from now
     taxRate: '0',
     notes: '',
     termsAndConditions: '',
@@ -25,6 +29,8 @@ const CreateInvoice = ({ user }) => {
   });
   
   const [projects, setProjects] = useState([]);
+  const [templates, setTemplates] = useState([]);
+  const [selectedProject, setSelectedProject] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
@@ -38,6 +44,7 @@ const CreateInvoice = ({ user }) => {
   useEffect(() => {
     if (canManageInvoices) {
       fetchProjects();
+      fetchTemplates();
       
       // Pre-select project if provided in URL params
       const projectId = searchParams.get('projectId');
@@ -50,15 +57,95 @@ const CreateInvoice = ({ user }) => {
   useEffect(() => {
     // Auto-populate client info when project is selected
     if (formData.projectId && projects.length > 0) {
-      const selectedProject = projects.find(p => p.id.toString() === formData.projectId);
-      if (selectedProject && !formData.clientName) {
+      const project = projects.find(p => p.id.toString() === formData.projectId);
+      if (project) {
+        setSelectedProject(project);
+        // First, populate what we have from the project
         setFormData(prev => ({
           ...prev,
-          clientName: selectedProject.clientName || ''
+          clientName: project.clientName || prev.clientName,
+          clientAddress: project.clientBillingAddress || prev.clientAddress
         }));
+
+        // Then fetch client contacts to get email and phone
+        fetchClientContacts(project);
+      } else {
+        setSelectedProject(null);
       }
+    } else {
+      setSelectedProject(null);
     }
   }, [formData.projectId, projects]);
+
+  // Handle standard invoice calculation when stage is selected
+  useEffect(() => {
+    if (formData.invoiceMode === 'standard' && selectedProject && formData.selectedStage) {
+      const feePercentage = getStageFeePercentage(formData.selectedStage);
+      const projectBudget = parseFloat(selectedProject.budget) || 0;
+      const calculatedAmount = (projectBudget * feePercentage) / 100;
+
+      // Set dates
+      const today = new Date();
+      const dueDate = new Date(today);
+      dueDate.setDate(today.getDate() + 15);
+
+      const stageLabel = PROJECT_STAGES.find(s => s.value === formData.selectedStage)?.label || formData.selectedStage;
+
+      // Update form data
+      setFormData(prev => ({
+        ...prev,
+        issueDate: today.toISOString().split('T')[0],
+        dueDate: dueDate.toISOString().split('T')[0],
+        items: [{
+          description: `${stageLabel} - ${feePercentage}% of Project Budget (₹${projectBudget.toLocaleString('en-IN')})`,
+          itemType: 'FIXED_PRICE',
+          quantity: '1',
+          unitPrice: calculatedAmount.toFixed(2),
+          amount: calculatedAmount.toFixed(2)
+        }]
+      }));
+    } else if (formData.invoiceMode === 'standard' && selectedProject && !formData.selectedStage) {
+      // When switching to standard mode, set dates but wait for stage selection
+      const today = new Date();
+      const dueDate = new Date(today);
+      dueDate.setDate(today.getDate() + 15);
+      
+      setFormData(prev => ({
+        ...prev,
+        issueDate: today.toISOString().split('T')[0],
+        dueDate: dueDate.toISOString().split('T')[0]
+      }));
+    }
+  }, [formData.invoiceMode, formData.selectedStage, selectedProject]);
+
+  const fetchClientContacts = async (project) => {
+    try {
+      // Get client ID from project (if available in the project object)
+      const clientId = project.clientId;
+      
+      if (clientId) {
+        // Fetch client contacts
+        const contactsResponse = await fetch(`/api/clients/${clientId}/contacts`, {
+          credentials: 'include'
+        });
+        if (contactsResponse.ok) {
+          const contacts = await contactsResponse.json();
+          // Use first contact's email and phone if available
+          if (contacts && contacts.length > 0) {
+            const firstContact = contacts[0];
+            setFormData(prev => ({
+              ...prev,
+              clientEmail: firstContact.email || prev.clientEmail,
+              clientPhone: firstContact.phone || prev.clientPhone
+            }));
+          }
+        }
+      }
+    } catch (error) {
+      console.error('Error fetching client contacts:', error);
+      // Don't show error to user, just log it
+    }
+  };
 
   const fetchProjects = async () => {
     try {
@@ -78,6 +165,32 @@ const CreateInvoice = ({ user }) => {
       }
     } catch (error) {
       console.error('Error fetching projects:', error);
+    }
+  };
+
+  const fetchTemplates = async () => {
+    try {
+      const response = await fetch('/api/invoice-templates', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setTemplates(data);
+        // Set default template if available
+        const defaultTemplate = data.find(t => t.isDefault) || data[0];
+        if (defaultTemplate) {
+          setFormData(prev => ({ ...prev, templateId: defaultTemplate.id.toString() }));
+        }
+      } else {
+        console.error('Failed to fetch templates');
+      }
+    } catch (error) {
+      console.error('Error fetching templates:', error);
     }
   };
 
@@ -266,89 +379,97 @@ const CreateInvoice = ({ user }) => {
                   </div>
                 </div>
 
-                <div className="mb-3">
-                  <label htmlFor="projectId" className="form-label">Project (Optional)</label>
-                  <select
-                    className="form-select"
-                    id="projectId"
-                    name="projectId"
-                    value={formData.projectId}
-                    onChange={handleInputChange}
-                  >
-                    <option value="">Select a project (optional)</option>
-                    {projects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.name} - {project.clientName}
-                      </option>
-                    ))}
-                  </select>
+                <div className="row">
+                  <div className="col-md-4">
+                    <div className="mb-3">
+                      <label htmlFor="templateId" className="form-label">Invoice Template *</label>
+                      <select
+                        className="form-select"
+                        id="templateId"
+                        name="templateId"
+                        value={formData.templateId}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select a template</option>
+                        {templates.map(template => (
+                          <option key={template.id} value={template.id}>
+                            {template.name} {template.isDefault ? '(Default)' : ''}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-4">
+                    <div className="mb-3">
+                      <label htmlFor="projectId" className="form-label">Project *</label>
+                      <select
+                        className="form-select"
+                        id="projectId"
+                        name="projectId"
+                        value={formData.projectId}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="">Select a project</option>
+                        {projects.map(project => (
+                          <option key={project.id} value={project.id}>
+                            {project.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="col-md-4">
+                    <div className="mb-3">
+                      <label htmlFor="invoiceMode" className="form-label">Invoice Type *</label>
+                      <select
+                        className="form-select"
+                        id="invoiceMode"
+                        name="invoiceMode"
+                        value={formData.invoiceMode}
+                        onChange={handleInputChange}
+                        required
+                      >
+                        <option value="manual">Manual Invoice</option>
+                        <option value="standard">Standard Invoice (Stage-based)</option>
+                      </select>
+                    </div>
+                  </div>
                 </div>
+
+                {/* Standard Invoice - Stage Selection */}
+                {formData.invoiceMode === 'standard' && selectedProject && (
+                  <div className="row">
+                    <div className="col-md-12">
+                      <div className="mb-3">
+                        <label htmlFor="selectedStage" className="form-label">Project Stage *</label>
+                        <select
+                          className="form-select"
+                          id="selectedStage"
+                          name="selectedStage"
+                          value={formData.selectedStage}
+                          onChange={handleInputChange}
+                          required
+                        >
+                          <option value="">Select a stage</option>
+                          {PROJECT_STAGES.map(stage => (
+                            <option key={stage.value} value={stage.value}>
+                              {stage.label} - {stage.feePercentage}% fee
+                            </option>
+                          ))}
+                        </select>
+                        <small className="form-text text-muted">
+                          Current project stage: <strong>{selectedProject.projectStage || 'Not set'}</strong>
+                          {selectedProject.budget && ` | Project Budget: ₹${parseFloat(selectedProject.budget).toLocaleString('en-IN')}`}
+                        </small>
+                      </div>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Client Information */}
-            <div className="card mb-4">
-              <div className="card-header">
-                <h5 className="mb-0">Client Information</h5>
-              </div>
-              <div className="card-body">
-                <div className="row">
-                  <div className="col-md-6">
-                    <div className="mb-3">
-                      <label htmlFor="clientName" className="form-label">Client Name *</label>
-                      <input
-                        type="text"
-                        className="form-control"
-                        id="clientName"
-                        name="clientName"
-                        value={formData.clientName}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-                  </div>
-                  <div className="col-md-6">
-                    <div className="mb-3">
-                      <label htmlFor="clientEmail" className="form-label">Client Email</label>
-                      <input
-                        type="email"
-                        className="form-control"
-                        id="clientEmail"
-                        name="clientEmail"
-                        value={formData.clientEmail}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="row">
-                  <div className="col-md-6">
-                    <div className="mb-3">
-                      <label htmlFor="clientPhone" className="form-label">Client Phone</label>
-                      <input
-                        type="tel"
-                        className="form-control"
-                        id="clientPhone"
-                        name="clientPhone"
-                        value={formData.clientPhone}
-                        onChange={handleInputChange}
-                      />
-                    </div>
-                  </div>
-                </div>
-                <div className="mb-3">
-                  <label htmlFor="clientAddress" className="form-label">Client Address</label>
-                  <textarea
-                    className="form-control"
-                    id="clientAddress"
-                    name="clientAddress"
-                    rows="3"
-                    value={formData.clientAddress}
-                    onChange={handleInputChange}
-                  ></textarea>
-                </div>
-              </div>
-            </div>
 
             {/* Line Items */}
             <div className="card mb-4">
@@ -368,7 +489,7 @@ const CreateInvoice = ({ user }) => {
                   <div key={index} className="border rounded p-3 mb-3">
                     <div className="d-flex justify-content-between align-items-center mb-2">
                       <h6 className="mb-0">Item {index + 1}</h6>
-                      {formData.items.length > 1 && (
+                      {formData.items.length > 1 && formData.invoiceMode !== 'standard' && (
                         <button
                           type="button"
                           className="btn btn-sm btn-outline-danger"
@@ -388,6 +509,8 @@ const CreateInvoice = ({ user }) => {
                             className="form-control"
                             value={item.description}
                             onChange={(e) => handleItemChange(index, 'description', e.target.value)}
+                            readOnly={formData.invoiceMode === 'standard'}
+                            style={formData.invoiceMode === 'standard' ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
                             required
                           />
                         </div>
@@ -419,6 +542,8 @@ const CreateInvoice = ({ user }) => {
                             className="form-control"
                             value={item.quantity}
                             onChange={(e) => handleItemChange(index, 'quantity', e.target.value)}
+                            readOnly={formData.invoiceMode === 'standard'}
+                            style={formData.invoiceMode === 'standard' ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
                             required
                           />
                         </div>
@@ -432,6 +557,8 @@ const CreateInvoice = ({ user }) => {
                             className="form-control"
                             value={item.unitPrice}
                             onChange={(e) => handleItemChange(index, 'unitPrice', e.target.value)}
+                            readOnly={formData.invoiceMode === 'standard'}
+                            style={formData.invoiceMode === 'standard' ? { backgroundColor: '#f8f9fa', cursor: 'not-allowed' } : {}}
                             required
                           />
                         </div>

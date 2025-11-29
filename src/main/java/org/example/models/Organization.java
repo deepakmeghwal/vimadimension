@@ -7,6 +7,7 @@ import java.util.Set;
 
 @Entity
 @Table(name = "organizations")
+@com.fasterxml.jackson.annotation.JsonIgnoreProperties({"hibernateLazyInitializer", "handler"})
 public class Organization {
     
     @Id
@@ -26,11 +27,61 @@ public class Organization {
     private String address;
     private String website;
     
+    // Indian Invoice Details
+    @Column(name = "logo_url", length = 500)
+    private String logoUrl;
+    
+    @Column(name = "gstin", length = 15)
+    private String gstin; // 15-digit GSTIN
+    
+    @Column(name = "pan", length = 10)
+    private String pan; // 10-character PAN
+    
+    @Column(name = "coa_reg_number", length = 50)
+    private String coaRegNumber; // Council of Architecture Registration Number
+    
+    @Column(name = "address_line1", length = 255)
+    private String addressLine1;
+    
+    @Column(name = "address_line2", length = 255)
+    private String addressLine2;
+    
+    @Column(name = "city", length = 100)
+    private String city;
+    
+    @Column(name = "state", length = 100)
+    private String state;
+    
+    @Column(name = "pincode", length = 10)
+    private String pincode;
+    
+    // Bank Details
+    @Column(name = "bank_name", length = 255)
+    private String bankName;
+    
+    @Column(name = "bank_account_number", length = 50)
+    private String bankAccountNumber;
+    
+    @Column(name = "bank_ifsc", length = 11)
+    private String bankIfsc; // 11-character IFSC code
+    
+    @Column(name = "bank_branch", length = 255)
+    private String bankBranch;
+    
+    @Column(name = "bank_account_name", length = 255)
+    private String bankAccountName;
+    
     @Column(name = "created_at")
     private LocalDateTime createdAt;
     
     @Column(name = "updated_at")
     private LocalDateTime updatedAt;
+    
+    @Column(nullable = false)
+    private boolean verified = false;
+    
+    @Column(name = "verified_at")
+    private LocalDateTime verifiedAt;
     
     @OneToMany(mappedBy = "organization", cascade = CascadeType.ALL)
     @JsonIgnore // Prevent circular reference during JSON serialization
@@ -142,6 +193,143 @@ public class Organization {
         this.projects = projects;
     }
     
+    public boolean isVerified() {
+        return verified;
+    }
+    
+    public void setVerified(boolean verified) {
+        this.verified = verified;
+    }
+    
+    public LocalDateTime getVerifiedAt() {
+        return verifiedAt;
+    }
+    
+    public void setVerifiedAt(LocalDateTime verifiedAt) {
+        this.verifiedAt = verifiedAt;
+    }
+    
+    /**
+     * Marks the organization as verified
+     */
+    public void verify() {
+        this.verified = true;
+        this.verifiedAt = LocalDateTime.now();
+    }
+    
+    // Getters and Setters for new fields
+    public String getLogoUrl() {
+        return logoUrl;
+    }
+
+    public void setLogoUrl(String logoUrl) {
+        this.logoUrl = logoUrl;
+    }
+
+    public String getGstin() {
+        return gstin;
+    }
+
+    public void setGstin(String gstin) {
+        this.gstin = gstin;
+    }
+
+    public String getPan() {
+        return pan;
+    }
+
+    public void setPan(String pan) {
+        this.pan = pan;
+    }
+
+    public String getCoaRegNumber() {
+        return coaRegNumber;
+    }
+
+    public void setCoaRegNumber(String coaRegNumber) {
+        this.coaRegNumber = coaRegNumber;
+    }
+
+    public String getAddressLine1() {
+        return addressLine1;
+    }
+
+    public void setAddressLine1(String addressLine1) {
+        this.addressLine1 = addressLine1;
+    }
+
+    public String getAddressLine2() {
+        return addressLine2;
+    }
+
+    public void setAddressLine2(String addressLine2) {
+        this.addressLine2 = addressLine2;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getPincode() {
+        return pincode;
+    }
+
+    public void setPincode(String pincode) {
+        this.pincode = pincode;
+    }
+
+    public String getBankName() {
+        return bankName;
+    }
+
+    public void setBankName(String bankName) {
+        this.bankName = bankName;
+    }
+
+    public String getBankAccountNumber() {
+        return bankAccountNumber;
+    }
+
+    public void setBankAccountNumber(String bankAccountNumber) {
+        this.bankAccountNumber = bankAccountNumber;
+    }
+
+    public String getBankIfsc() {
+        return bankIfsc;
+    }
+
+    public void setBankIfsc(String bankIfsc) {
+        this.bankIfsc = bankIfsc;
+    }
+
+    public String getBankBranch() {
+        return bankBranch;
+    }
+
+    public void setBankBranch(String bankBranch) {
+        this.bankBranch = bankBranch;
+    }
+
+    public String getBankAccountName() {
+        return bankAccountName;
+    }
+
+    public void setBankAccountName(String bankAccountName) {
+        this.bankAccountName = bankAccountName;
+    }
+
     @PreUpdate
     public void preUpdate() {
         this.updatedAt = LocalDateTime.now();

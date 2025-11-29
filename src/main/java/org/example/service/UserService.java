@@ -206,6 +206,28 @@ public class UserService {
         return userRepository.countByOrganization_Id(organizationId);
     }
 
+    /**
+     * Searches users with pagination.
+     *
+     * @param organizationId The ID of the organization.
+     * @param query The search query.
+     * @param page The page number.
+     * @param size The page size.
+     * @return A page of users.
+     */
+    @Transactional(readOnly = true)
+    public org.springframework.data.domain.Page<User> searchUsersPaginated(Long organizationId, String query, int page, int size) {
+        if (organizationId == null) {
+            throw new IllegalArgumentException("Organization ID cannot be null");
+        }
+        org.springframework.data.domain.Pageable pageable = org.springframework.data.domain.PageRequest.of(page, size);
+        
+        if (query == null || query.trim().isEmpty()) {
+            return userRepository.findByOrganization_Id(organizationId, pageable);
+        }
+        return userRepository.searchUsersPaginated(organizationId, query, pageable);
+    }
+
     @Transactional(readOnly = true) // Good for read operations and managing LAZY loading
     public Optional<User> findByUsernameForProfile(String username) { // Or whatever you call it
         Optional<User> userOptional = userRepository.findByUsername(username.trim().toLowerCase());
@@ -319,31 +341,56 @@ public class UserService {
      * @param name The new full name
      * @param email The new email address
      * @param bio The new bio
+     * @param designation The new designation
+     * @param specialization The new specialization
+     * @param licenseNumber The new license number
+     * @param portfolioLink The new portfolio link
      * @return The updated User object
-     * @throws IllegalArgumentException if user not found or email is already taken
+     * @throws IllegalArgumentException if user not found, email is already taken, or email change is attempted when email already exists
      */
     @Transactional
-    public User updateUserProfile(Long userId, String name, String email, String bio) throws IllegalArgumentException {
+    public User updateUserProfile(Long userId, String name, String email, String bio, 
+                                  String designation, String specialization, String licenseNumber, String portfolioLink) 
+            throws IllegalArgumentException {
         if (name == null || name.trim().isEmpty()) {
             throw new IllegalArgumentException("Name cannot be empty.");
-        }
-        if (email == null || email.trim().isEmpty()) {
-            throw new IllegalArgumentException("Email cannot be empty.");
         }
 
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
 
-        String trimmedEmail = email.trim().toLowerCase();
+        String trimmedEmail = email != null ? email.trim().toLowerCase() : null;
+        String currentEmail = user.getEmail();
         
-        // Check if email is already taken by another user (excluding current user)
-        if (!user.getEmail().equalsIgnoreCase(trimmedEmail) && userRepository.existsByEmail(trimmedEmail)) {
-            throw new IllegalArgumentException("Email already exists: " + email);
+        // If user already has an email, prevent changing it
+        if (currentEmail != null && !currentEmail.trim().isEmpty()) {
+            // Email is already set, check if user is trying to change it
+            if (trimmedEmail == null || trimmedEmail.isEmpty()) {
+                throw new IllegalArgumentException("Email is required. Cannot remove existing email.");
+            }
+            if (!currentEmail.equalsIgnoreCase(trimmedEmail)) {
+                throw new IllegalArgumentException("Email cannot be changed once set. Current email: " + currentEmail);
+            }
+            // Email is the same, allow the update but don't change email
+        } else {
+            // User doesn't have an email yet, allow setting it for the first time
+            if (trimmedEmail == null || trimmedEmail.isEmpty()) {
+                throw new IllegalArgumentException("Email is required.");
+            }
+            // Check if email is already taken by another user
+            if (userRepository.existsByEmail(trimmedEmail)) {
+                throw new IllegalArgumentException("Email already exists: " + email);
+            }
+            // Set email for the first time
+            user.setEmail(trimmedEmail);
         }
 
         user.setName(name.trim());
-        user.setEmail(trimmedEmail);
         user.setBio(bio != null ? bio.trim() : null);
+        user.setDesignation(designation != null ? designation.trim() : null);
+        user.setSpecialization(specialization != null ? specialization.trim() : null);
+        user.setLicenseNumber(licenseNumber != null ? licenseNumber.trim() : null);
+        user.setPortfolioLink(portfolioLink != null ? portfolioLink.trim() : null);
         return userRepository.save(user);
     }
 

@@ -61,6 +61,35 @@ public class Invoice {
     @Column(name = "tax_amount", precision = 15, scale = 2)
     private BigDecimal taxAmount = BigDecimal.ZERO;
 
+    // GST Fields for Indian invoices
+    @Column(name = "cgst_rate", precision = 5, scale = 2)
+    private BigDecimal cgstRate = BigDecimal.ZERO; // Central GST rate (typically 9% if same state)
+
+    @Column(name = "cgst_amount", precision = 15, scale = 2)
+    private BigDecimal cgstAmount = BigDecimal.ZERO;
+
+    @Column(name = "sgst_rate", precision = 5, scale = 2)
+    private BigDecimal sgstRate = BigDecimal.ZERO; // State GST rate (typically 9% if same state)
+
+    @Column(name = "sgst_amount", precision = 15, scale = 2)
+    private BigDecimal sgstAmount = BigDecimal.ZERO;
+
+    @Column(name = "igst_rate", precision = 5, scale = 2)
+    private BigDecimal igstRate = BigDecimal.ZERO; // Integrated GST rate (typically 18% if different state)
+
+    @Column(name = "igst_amount", precision = 15, scale = 2)
+    private BigDecimal igstAmount = BigDecimal.ZERO;
+
+    // Cumulative fee calculation fields
+    @Column(name = "cumulative_fee_percentage", precision = 5, scale = 2)
+    private BigDecimal cumulativeFeePercentage; // Total fee percentage up to this stage
+
+    @Column(name = "cumulative_fee_amount", precision = 15, scale = 2)
+    private BigDecimal cumulativeFeeAmount; // Total fee amount up to this stage
+
+    @Column(name = "previously_billed_amount", precision = 15, scale = 2)
+    private BigDecimal previouslyBilledAmount = BigDecimal.ZERO; // Amount billed in previous invoices
+
     @Column(name = "total_amount", precision = 15, scale = 2, nullable = false)
     private BigDecimal totalAmount = BigDecimal.ZERO;
 
@@ -80,6 +109,11 @@ public class Invoice {
     @JoinColumn(name = "created_by")
     @JsonIgnore
     private User createdBy;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "template_id")
+    @JsonIgnore
+    private InvoiceTemplate template;
 
     @Column(name = "last_payment_date")
     private LocalDate lastPaymentDate;
@@ -128,8 +162,29 @@ public class Invoice {
                 .map(InvoiceItem::getAmount)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
-        // Calculate tax amount
-        taxAmount = subtotal.multiply(taxRate.divide(BigDecimal.valueOf(100), 4, BigDecimal.ROUND_HALF_UP));
+        // Calculate GST amounts
+        BigDecimal taxableValue = subtotal;
+        
+        // If IGST is set (different states), use IGST
+        if (igstRate != null && igstRate.compareTo(BigDecimal.ZERO) > 0) {
+            igstAmount = taxableValue.multiply(igstRate.divide(BigDecimal.valueOf(100), 4, BigDecimal.ROUND_HALF_UP));
+            cgstAmount = BigDecimal.ZERO;
+            sgstAmount = BigDecimal.ZERO;
+            taxAmount = igstAmount;
+        } 
+        // If CGST/SGST are set (same state), use them
+        else if (cgstRate != null && cgstRate.compareTo(BigDecimal.ZERO) > 0) {
+            cgstAmount = taxableValue.multiply(cgstRate.divide(BigDecimal.valueOf(100), 4, BigDecimal.ROUND_HALF_UP));
+            sgstAmount = taxableValue.multiply(sgstRate != null ? sgstRate.divide(BigDecimal.valueOf(100), 4, BigDecimal.ROUND_HALF_UP) : BigDecimal.ZERO);
+            igstAmount = BigDecimal.ZERO;
+            taxAmount = cgstAmount.add(sgstAmount);
+        }
+        // Fall back to simple tax rate if GST not set
+        else if (taxRate != null && taxRate.compareTo(BigDecimal.ZERO) > 0) {
+            taxAmount = taxableValue.multiply(taxRate.divide(BigDecimal.valueOf(100), 4, BigDecimal.ROUND_HALF_UP));
+        } else {
+            taxAmount = BigDecimal.ZERO;
+        }
 
         // Calculate total amount
         totalAmount = subtotal.add(taxAmount);
@@ -364,5 +419,91 @@ public class Invoice {
 
     public String getProjectName() {
         return project != null ? project.getName() : null;
+    }
+
+    public InvoiceTemplate getTemplate() {
+        return template;
+    }
+
+    public void setTemplate(InvoiceTemplate template) {
+        this.template = template;
+    }
+
+    public Long getTemplateId() {
+        return template != null ? template.getId() : null;
+    }
+
+    // GST Getters and Setters
+    public BigDecimal getCgstRate() {
+        return cgstRate;
+    }
+
+    public void setCgstRate(BigDecimal cgstRate) {
+        this.cgstRate = cgstRate;
+    }
+
+    public BigDecimal getCgstAmount() {
+        return cgstAmount;
+    }
+
+    public void setCgstAmount(BigDecimal cgstAmount) {
+        this.cgstAmount = cgstAmount;
+    }
+
+    public BigDecimal getSgstRate() {
+        return sgstRate;
+    }
+
+    public void setSgstRate(BigDecimal sgstRate) {
+        this.sgstRate = sgstRate;
+    }
+
+    public BigDecimal getSgstAmount() {
+        return sgstAmount;
+    }
+
+    public void setSgstAmount(BigDecimal sgstAmount) {
+        this.sgstAmount = sgstAmount;
+    }
+
+    public BigDecimal getIgstRate() {
+        return igstRate;
+    }
+
+    public void setIgstRate(BigDecimal igstRate) {
+        this.igstRate = igstRate;
+    }
+
+    public BigDecimal getIgstAmount() {
+        return igstAmount;
+    }
+
+    public void setIgstAmount(BigDecimal igstAmount) {
+        this.igstAmount = igstAmount;
+    }
+
+    // Cumulative fee Getters and Setters
+    public BigDecimal getCumulativeFeePercentage() {
+        return cumulativeFeePercentage;
+    }
+
+    public void setCumulativeFeePercentage(BigDecimal cumulativeFeePercentage) {
+        this.cumulativeFeePercentage = cumulativeFeePercentage;
+    }
+
+    public BigDecimal getCumulativeFeeAmount() {
+        return cumulativeFeeAmount;
+    }
+
+    public void setCumulativeFeeAmount(BigDecimal cumulativeFeeAmount) {
+        this.cumulativeFeeAmount = cumulativeFeeAmount;
+    }
+
+    public BigDecimal getPreviouslyBilledAmount() {
+        return previouslyBilledAmount;
+    }
+
+    public void setPreviouslyBilledAmount(BigDecimal previouslyBilledAmount) {
+        this.previouslyBilledAmount = previouslyBilledAmount;
     }
 }

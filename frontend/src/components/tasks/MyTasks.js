@@ -1,236 +1,128 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link, useLocation } from 'react-router-dom';
+import LoadingSpinner from '../common/LoadingSpinner';
 
 const MyTasks = ({ user }) => {
-  const createInitialPagination = (pageSize = 10) => ({
+  const location = useLocation();
+  const prevPathnameRef = useRef(location.pathname);
+  const isMyTasks = location.pathname === '/my-tasks';
+
+  // Single state for all tasks
+  const [allTasks, setAllTasks] = useState([]);
+  const [pagination, setPagination] = useState({
     currentPage: 0,
     totalPages: 0,
     totalItems: 0,
     hasNext: false,
     hasPrevious: false,
-    pageSize
+    pageSize: 50 // Larger page size to get more tasks at once
   });
 
-  const [assignedTasks, setAssignedTasks] = useState([]);
-  const [assignedPagination, setAssignedPagination] = useState(() => createInitialPagination());
-  const [reportedTasks, setReportedTasks] = useState([]);
-  const [reportedPagination, setReportedPagination] = useState(() => createInitialPagination());
-  const [tasksToCheck, setTasksToCheck] = useState([]);
-  const [toCheckPagination, setToCheckPagination] = useState(() => createInitialPagination());
-  const [allTasks, setAllTasks] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [activeTab, setActiveTab] = useState('assigned');
+  const [viewMode, setViewMode] = useState('board'); // 'list' or 'board'
   const [showStandaloneForm, setShowStandaloneForm] = useState(false);
-  
-  // Pagination state for All Tasks tab
-  const [allTasksPagination, setAllTasksPagination] = useState(() => createInitialPagination());
+  const [showFilterModal, setShowFilterModal] = useState(false);
+  const [filters, setFilters] = useState({
+    assigneeIds: [], // Array of selected user IDs
+    status: [],
+    priority: []
+  });
 
-  const fetchPaginatedTaskList = async ({ endpoint, page, pageSize, setTasks, setPagination }) => {
+  // Fetch tasks with filters via API call
+  const fetchTasks = async (page = 0, currentFilters = null) => {
     try {
-      const response = await fetch(`${endpoint}?page=${page}&size=${pageSize}`, {
+      setLoading(true);
+      setError('');
+
+      // Use provided filters or current state filters
+      const activeFilters = currentFilters || filters;
+
+      const params = new URLSearchParams({
+        page: page.toString(),
+        size: pagination.pageSize.toString()
+      });
+      
+      // If on /my-tasks route, use the backend endpoint that filters by current user
+      // Otherwise, use the general tasks endpoint with assignee filters if provided
+      let apiEndpoint = '/api/tasks';
+      
+      if (isMyTasks) {
+        // Use the backend endpoint that automatically filters by authenticated user
+        apiEndpoint = '/api/tasks/assigned-to-me';
+      } else if (activeFilters.assigneeIds && activeFilters.assigneeIds.length > 0) {
+        // If assignees are selected, filter by the first assignee (backend supports single assigneeId)
+        params.append('assigneeId', activeFilters.assigneeIds[0].toString());
+      }
+      
+      // Apply status and priority filters to the API call
+      if (activeFilters.status && activeFilters.status.length > 0) {
+        activeFilters.status.forEach(s => params.append('status', s));
+      }
+      if (activeFilters.priority && activeFilters.priority.length > 0) {
+        activeFilters.priority.forEach(p => params.append('priority', p));
+      }
+
+      const response = await fetch(`${apiEndpoint}?${params.toString()}`, {
         credentials: 'include'
       });
 
       if (!response.ok) {
-        console.error(`Failed to load tasks from ${endpoint}:`, response.statusText);
+        setError('Failed to load tasks');
         return false;
       }
 
       const data = await response.json();
-
-      setTasks(data.tasks || []);
+      setAllTasks(data.tasks || []);
       setPagination({
         currentPage: data.currentPage ?? page,
         totalPages: data.totalPages ?? 0,
         totalItems: data.totalItems ?? 0,
         hasNext: data.hasNext ?? false,
         hasPrevious: data.hasPrevious ?? false,
-        pageSize: data.pageSize ?? pageSize
+        pageSize: data.pageSize ?? pagination.pageSize
       });
 
       return true;
     } catch (error) {
-      console.error(`Error fetching tasks from ${endpoint}:`, error);
-      return false;
-    }
-  };
-
-  const fetchAssignedTasksPaginated = async (page = 0) => fetchPaginatedTaskList({
-    endpoint: '/api/tasks/assigned-to-me',
-    page,
-    pageSize: assignedPagination.pageSize,
-    setTasks: setAssignedTasks,
-    setPagination: setAssignedPagination
-  });
-
-  const fetchReportedTasksPaginated = async (page = 0) => fetchPaginatedTaskList({
-    endpoint: '/api/tasks/reported-by-me',
-    page,
-    pageSize: reportedPagination.pageSize,
-    setTasks: setReportedTasks,
-    setPagination: setReportedPagination
-  });
-
-  const fetchToCheckTasksPaginated = async (page = 0) => fetchPaginatedTaskList({
-    endpoint: '/api/tasks/to-check',
-    page,
-    pageSize: toCheckPagination.pageSize,
-    setTasks: setTasksToCheck,
-    setPagination: setToCheckPagination
-  });
-
-  const fetchAllTasksPaginated = async (page = 0) => fetchPaginatedTaskList({
-    endpoint: '/api/tasks/paginated',
-    page,
-    pageSize: allTasksPagination.pageSize,
-    setTasks: setAllTasks,
-    setPagination: setAllTasksPagination
-  });
-
-  const fetchMyTasks = async () => {
-    let loadingTimeout;
-    try {
-      loadingTimeout = setTimeout(() => {
-        setLoading(true);
-      }, 100);
-
-      setError('');
-
-      const results = await Promise.all([
-        fetchAssignedTasksPaginated(0),
-        fetchReportedTasksPaginated(0),
-        fetchToCheckTasksPaginated(0),
-        fetchAllTasksPaginated(0)
-      ]);
-
-      if (!results.every(Boolean)) {
-        setError('Failed to load tasks');
-      }
-    } catch (error) {
       console.error('Error fetching tasks:', error);
       setError('Failed to load tasks');
+      return false;
     } finally {
-      if (loadingTimeout) {
-        clearTimeout(loadingTimeout);
-      }
       setLoading(false);
     }
   };
 
+  // Initial load - fetch tasks based on route
   useEffect(() => {
     if (user) {
-      fetchMyTasks();
+      fetchTasks(0);
     }
-  }, [user]);
+  }, [user, isMyTasks]);
 
-  const handlePageChange = (tabKey, newPage) => {
-    const paginationMap = {
-      assigned: assignedPagination,
-      reported: reportedPagination,
-      toCheck: toCheckPagination,
-      allTasks: allTasksPagination
-    };
-
-    const fetchMap = {
-      assigned: fetchAssignedTasksPaginated,
-      reported: fetchReportedTasksPaginated,
-      toCheck: fetchToCheckTasksPaginated,
-      allTasks: fetchAllTasksPaginated
-    };
-
-    const pagination = paginationMap[tabKey];
-    const fetchFn = fetchMap[tabKey];
-
-    if (!pagination || !fetchFn) {
-      return;
-    }
-
-    if (newPage >= 0 && newPage < pagination.totalPages) {
-      fetchFn(newPage);
-    }
-  };
-
-  const renderPaginationControls = (pagination, tabKey) => {
-    if (!pagination || pagination.totalPages <= 1) {
-      return null;
-    }
-
-    const { currentPage, pageSize, totalItems, totalPages, hasPrevious, hasNext } = pagination;
-    const hasItems = totalItems > 0;
-    const startItem = hasItems ? currentPage * pageSize + 1 : 0;
-    const endItem = hasItems ? Math.min((currentPage + 1) * pageSize, totalItems) : 0;
-
-    const maxButtons = Math.min(5, totalPages);
-    const pageButtons = [];
-
-    for (let i = 0; i < maxButtons; i += 1) {
-      let pageNumber;
-      if (totalPages <= 5) {
-        pageNumber = i;
-      } else if (currentPage <= 2) {
-        pageNumber = i;
-      } else if (currentPage >= totalPages - 3) {
-        pageNumber = totalPages - 5 + i;
-      } else {
-        pageNumber = currentPage - 2 + i;
-      }
-
-      if (pageNumber < 0 || pageNumber >= totalPages) {
-        continue;
-      }
-
-      pageButtons.push(
-        <button
-          key={pageNumber}
-          className={`btn-small ${pageNumber === currentPage ? 'btn-primary' : 'btn-outline'}`}
-          onClick={() => handlePageChange(tabKey, pageNumber)}
-        >
-          {pageNumber + 1}
-        </button>
-      );
-    }
-
-    return (
-      <div className="pagination-controls">
-        <div className="pagination-info">
-          {hasItems ? `Showing ${startItem} to ${endItem} of ${totalItems} tasks` : 'No tasks to display'}
-        </div>
-        <div className="pagination-buttons">
-          <button
-            className="btn-small btn-outline"
-            onClick={() => handlePageChange(tabKey, currentPage - 1)}
-            disabled={!hasPrevious}
-          >
-            ← Previous
-          </button>
-          <div className="page-numbers">
-            {pageButtons}
-          </div>
-          <button
-            className="btn-small btn-outline"
-            onClick={() => handlePageChange(tabKey, currentPage + 1)}
-            disabled={!hasNext}
-          >
-            Next →
-          </button>
-        </div>
-      </div>
-    );
-  };
-
-  const canEditTask = (task) => {
-    if (!user || !task) return false;
+  // Refetch tasks when navigating to this route from another route
+  useEffect(() => {
+    const isTasksRoute = location.pathname === '/my-tasks' || location.pathname === '/tasks';
     
-    // User can edit if they are:
-    // 1. Assigned to the task
-    // 2. Creator of the task  
-    // 3. Assigned as checker of the task
-    return (
-      (task.assignee && task.assignee.id === user.id) ||
-      (task.reporter && task.reporter.id === user.id) ||
-      (task.checkedBy && task.checkedBy.id === user.id)
-    );
+    // Refetch if we're on a tasks route and the pathname changed
+    // This includes switching between /my-tasks and /tasks
+    if (user && isTasksRoute && prevPathnameRef.current !== location.pathname) {
+      fetchTasks(0);
+    }
+    
+    // Update the ref for the next render
+    prevPathnameRef.current = location.pathname;
+  }, [location.pathname, user, isMyTasks]);
+
+  // Don't auto-refetch on filter change - let user click Apply button instead
+
+  // Tasks are already filtered by API, just use them directly
+  const currentTasks = allTasks;
+
+  const handlePageChange = (newPage) => {
+    if (newPage >= 0 && newPage < pagination.totalPages) {
+      fetchTasks(newPage);
+    }
   };
 
   const handleCreateStandaloneTask = async (formData) => {
@@ -246,8 +138,7 @@ const MyTasks = ({ user }) => {
 
       if (response.ok) {
         setShowStandaloneForm(false);
-        // Refresh the tasks
-        fetchMyTasks();
+        fetchTasks(pagination.currentPage);
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Failed to create standalone task');
@@ -258,234 +149,340 @@ const MyTasks = ({ user }) => {
     }
   };
 
-  const getStatusClass = (status) => {
-    if (!status) return 'status-to-do';
-    
-    switch (status.toString().toLowerCase()) {
-      case 'done':
-        return 'status-done';
-      case 'checked':
-        return 'status-checked';
-      case 'in_progress':
-        return 'status-in-progress';
-      case 'in_review':
-        return 'status-in-review';
-      case 'on_hold':
-        return 'status-on-hold';
-      case 'to_do':
-      default:
-        return 'status-to-do';
-    }
+  const formatStatus = (status) => {
+    return status?.toLowerCase().replace(/_/g, '-') || 'to-do';
   };
 
-  const getPriorityClass = (priority) => {
-    if (!priority) return 'priority-medium';
-    
-    switch (priority.toString().toLowerCase()) {
-      case 'high':
-        return 'priority-high';
-      case 'urgent':
-        return 'priority-urgent';
-      case 'low':
-        return 'priority-low';
-      case 'medium':
-      default:
-        return 'priority-medium';
-    }
+  const formatPriority = (priority) => {
+    return priority?.toLowerCase() || 'medium';
   };
 
-  const renderTaskCard = (task) => (
-    <div key={task.id} className="modern-task-card-new">
-      <div className="task-card-header-new">
-        <div className="task-title-section">
-          <h3 className="task-title-new">
-            <Link to={`/tasks/${task.id}/details`}>
-              {task.name}
-            </Link>
-          </h3>
-          <div className="task-badges-new">
-            <span className={`task-status-new ${getStatusClass(task.status)}`}>
-              {task.status?.replace(/_/g, ' ')}
-            </span>
-            {task.priority && (
-              <span className={`priority-badge-new ${getPriorityClass(task.priority)}`}>
-                {task.priority.replace(/_/g, ' ')}
-              </span>
-            )}
-          </div>
-        </div>
-        <div className="task-actions-new">
-          <Link to={`/tasks/${task.id}/details`} className="btn-task-action btn-view">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" stroke="currentColor" strokeWidth="2"/>
-              <circle cx="12" cy="12" r="3" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-            View
-          </Link>
-          {canEditTask(task) && (
-            <Link to={`/tasks/${task.id}/edit`} className="btn-task-action btn-edit">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-              Edit
-            </Link>
-          )}
-          <Link to={`/timelogs/task/${task.id}/new`} className="btn-task-action btn-time">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-              <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-              <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2"/>
-            </svg>
-            Time
-          </Link>
-        </div>
-      </div>
-      
-      <div className="task-card-content-new">
-        {task.description && (
-          <p className="task-description-new">{task.description}</p>
-        )}
-        
-        <div className="task-meta-new">
-          <div className="task-meta-left">
-            {task.project && (
-              <div className="meta-item-new">
-                <div className="meta-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                </div>
-                <div className="meta-content">
-                  <span className="meta-label-new">Project</span>
-                  <Link to={`/projects/${task.project.id}/details`} className="meta-value-new project-link-new">
+  const getInitials = (name) => {
+    if (!name) return '?';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
+  };
+
+  const hasActiveFilters = () => {
+    return filters.assigneeIds.length > 0 || filters.status.length > 0 || filters.priority.length > 0;
+  };
+
+  const clearFilters = () => {
+    const clearedFilters = {
+      assigneeIds: [],
+      status: [],
+      priority: []
+    };
+    setFilters(clearedFilters);
+    // Reset to default view - fetch all tasks
+    fetchTasks(0, clearedFilters);
+  };
+
+  const applyFilters = (newFilters) => {
+    setFilters(newFilters);
+    setShowFilterModal(false);
+    // Fetch tasks with new filters immediately
+    fetchTasks(0, newFilters);
+  };
+
+  const renderListView = (tasks) => (
+    <div className="data-table-container">
+      <table className="data-table">
+        <thead>
+          <tr>
+            <th>Task</th>
+            <th style={{ width: '120px' }}>Priority</th>
+            <th style={{ width: '120px' }}>Status</th>
+            <th style={{ width: '150px' }}>Assignee</th>
+            <th style={{ width: '120px' }}>Due Date</th>
+            <th style={{ width: '100px' }}></th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map(task => (
+            <tr key={task.id}>
+              <td>
+                <Link
+                  to={`/tasks/${task.id}/details`}
+                  className="task-row-title"
+                  style={{ textDecoration: 'none', color: 'inherit' }}
+                >
+                  {task.name}
+                </Link>
+                {task.project && (
+                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
                     {task.project.name}
-                  </Link>
-                </div>
-              </div>
-            )}
-            
-            {task.projectStage && (
-              <div className="meta-item-new">
-                <div className="meta-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 11l3 3L22 4" stroke="currentColor" strokeWidth="2"/>
-                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                </div>
-                <div className="meta-content">
-                  <span className="meta-label-new">Stage</span>
-                  <span className="meta-value-new">
-                    {task.projectStage.replace(/STAGE_\d+_/, '').replace(/_/g, ' ')}
-                  </span>
-                </div>
-              </div>
-            )}
-            
-            {task.dueDate && (
-              <div className="meta-item-new">
-                <div className="meta-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-                    <line x1="16" y1="2" x2="16" y2="6" stroke="currentColor" strokeWidth="2"/>
-                    <line x1="8" y1="2" x2="8" y2="6" stroke="currentColor" strokeWidth="2"/>
-                    <line x1="3" y1="10" x2="21" y2="10" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                </div>
-                <div className="meta-content">
-                  <span className="meta-label-new">Due Date</span>
-                  <span className={`meta-value-new due-date-new ${new Date(task.dueDate) < new Date() ? 'overdue' : ''}`}>
-                    {new Date(task.dueDate).toLocaleDateString()}
-                    {new Date(task.dueDate) < new Date() && (
-                      <span className="overdue-indicator">OVERDUE</span>
-                    )}
-                  </span>
-                </div>
-              </div>
-            )}
-          </div>
-          
-          <div className="task-meta-right">
-            {task.assignee && (
-              <div className="meta-item-new">
-                <div className="meta-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2"/>
-                    <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                </div>
-                <div className="meta-content">
-                  <span className="meta-label-new">Assigned to</span>
-                  <span className="meta-value-new">{task.assignee.name || task.assignee.username}</span>
-                </div>
-              </div>
-            )}
-            
-            {task.checkedBy && (
-              <div className="meta-item-new">
-                <div className="meta-icon">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M9 12l2 2 4-4" stroke="currentColor" strokeWidth="2"/>
-                    <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                  </svg>
-                </div>
-                <div className="meta-content">
-                  <span className="meta-label-new">Checked by</span>
-                  <span className="meta-value-new">{task.checkedBy.name || task.checkedBy.username}</span>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      </div>
+                  </div>
+                )}
+              </td>
+              <td>
+                <span className={`badge badge-priority ${formatPriority(task.priority)}`}>
+                  {task.priority}
+                </span>
+              </td>
+              <td>
+                <span className={`badge badge-status ${formatStatus(task.status)}`}>
+                  {task.status?.replace(/_/g, ' ')}
+                </span>
+              </td>
+              <td>
+                {task.assignee && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div className="avatar avatar-sm">
+                      {getInitials(task.assignee.name || task.assignee.username)}
+                    </div>
+                    <span style={{ fontSize: '0.875rem' }}>
+                      {task.assignee.name || task.assignee.username}
+                    </span>
+                  </div>
+                )}
+              </td>
+              <td>
+                <span className="task-row-date">
+                  {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'}
+                </span>
+              </td>
+              <td>
+                <Link
+                  to={`/tasks/${task.id}/details`}
+                  className="btn-small btn-outline"
+                >
+                  View
+                </Link>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 
-  if (loading) {
+  const handleDragStart = (e, taskId) => {
+    e.dataTransfer.setData('taskId', taskId.toString());
+    e.currentTarget.classList.add('dragging');
+  };
+
+  const handleDragEnd = (e) => {
+    e.currentTarget.classList.remove('dragging');
+  };
+
+  const handleDragOver = (e) => {
+    e.preventDefault();
+    e.currentTarget.classList.add('drag-over');
+  };
+
+  const handleDragLeave = (e) => {
+    e.currentTarget.classList.remove('drag-over');
+  };
+
+  const handleDrop = async (e, newStatus) => {
+    e.preventDefault();
+    e.currentTarget.classList.remove('drag-over');
+
+    const taskId = e.dataTransfer.getData('taskId');
+    if (!taskId) {
+      console.error('No taskId found in drag data');
+      return;
+    }
+
+    const taskToUpdate = allTasks.find(t => t.id.toString() === taskId);
+    if (!taskToUpdate) {
+      console.error('Task not found');
+      return;
+    }
+
+    const oldStatus = taskToUpdate.status;
+    
+    // Optimistically update UI
+    setAllTasks(prev => prev.map(task => 
+      task.id.toString() === taskId ? { ...task, status: newStatus } : task
+    ));
+
+    try {
+      const response = await fetch(`/api/tasks/${taskId}/status`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ status: newStatus })
+      });
+
+      if (!response.ok) {
+        // Rollback on error
+        setAllTasks(prev => prev.map(task => 
+          task.id.toString() === taskId ? { ...task, status: oldStatus } : task
+        ));
+        const errorData = await response.json();
+        setError(errorData.message || 'Failed to update task status');
+      }
+    } catch (error) {
+      console.error('Error updating task status:', error);
+      setAllTasks(prev => prev.map(task => 
+        task.id.toString() === taskId ? { ...task, status: oldStatus } : task
+      ));
+      setError('Failed to update task status');
+    }
+  };
+
+  const renderBoardView = (tasks) => {
+    const statuses = ['TO_DO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE'];
+    const statusLabels = {
+      'TO_DO': 'To Do',
+      'IN_PROGRESS': 'In Progress',
+      'IN_REVIEW': 'In Review',
+      'DONE': 'Done'
+    };
+
+    const tasksByStatus = statuses.reduce((acc, status) => {
+      acc[status] = tasks.filter(task => task.status === status);
+      return acc;
+    }, {});
+
+    return (
+      <div className="kanban-board">
+        {statuses.map(status => (
+          <div
+            key={status}
+            className="kanban-column"
+            onDragOver={handleDragOver}
+            onDragLeave={handleDragLeave}
+            onDrop={(e) => handleDrop(e, status)}
+          >
+            <div className="kanban-column-header">
+              <span className="kanban-column-title">{statusLabels[status]}</span>
+              <span className="kanban-column-count">{tasksByStatus[status].length}</span>
+            </div>
+            <div className="kanban-column-cards">
+              {tasksByStatus[status].map(task => (
+                <Link
+                  key={task.id}
+                  to={`/tasks/${task.id}/details`}
+                  className="kanban-card"
+                  style={{ textDecoration: 'none' }}
+                  draggable
+                  onDragStart={(e) => handleDragStart(e, task.id)}
+                  onDragEnd={handleDragEnd}
+                >
+                  <div className="kanban-card-title">{task.name}</div>
+                  <div className="kanban-card-meta">
+                    <span className={`badge badge-priority ${formatPriority(task.priority)}`}>
+                      {task.priority}
+                    </span>
+                    {task.assignee && (
+                      <div className="avatar avatar-sm">
+                        {getInitials(task.assignee.name || task.assignee.username)}
+                      </div>
+                    )}
+                    {task.dueDate && (
+                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
+                        {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      </span>
+                    )}
+                  </div>
+                </Link>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  };
+
+  const renderPaginationControls = () => {
+    if (!pagination || pagination.totalPages <= 1) {
+      return null;
+    }
+
+    const { currentPage, pageSize, totalItems, totalPages, hasPrevious, hasNext } = pagination;
+    const hasItems = totalItems > 0;
+    const startItem = hasItems ? currentPage * pageSize + 1 : 0;
+    const endItem = hasItems ? Math.min((currentPage + 1) * pageSize, totalItems) : 0;
+
+    return (
+      <div className="pagination-controls">
+        <div className="pagination-info">
+          {hasItems ? `Showing ${startItem} to ${endItem} of ${totalItems} tasks` : 'No tasks to display'}
+        </div>
+        <div className="pagination-buttons">
+          <button
+            className="btn-small btn-outline"
+            onClick={() => handlePageChange(currentPage - 1)}
+            disabled={!hasPrevious}
+          >
+            ← Previous
+          </button>
+          <span style={{ padding: '0 1rem', color: '#64748b', fontSize: '0.875rem' }}>
+            Page {currentPage + 1} of {totalPages}
+          </span>
+          <button
+            className="btn-small btn-outline"
+            onClick={() => handlePageChange(currentPage + 1)}
+            disabled={!hasNext}
+          >
+            Next →
+          </button>
+        </div>
+      </div>
+    );
+  };
+
+  if (loading && allTasks.length === 0) {
     return (
       <div className="main-content">
-        <div className="loading-spinner">Loading your tasks...</div>
+        <LoadingSpinner message="Loading your tasks..." size="large" />
       </div>
     );
   }
 
   return (
     <div className="main-content">
-      {/* Ultra-Compact Header */}
-      <div className="ultra-compact-header">
-        <h1>My Tasks</h1>
-        <div className="header-tabs">
-          <div className="compact-tabs">
-            <button 
-              className={`compact-tab ${activeTab === 'assigned' ? 'active' : ''}`}
-              onClick={() => setActiveTab('assigned')}
+      <div className="projects-header-compact">
+        <div className="projects-header-left">
+          <h1 className="projects-title-compact">
+            {isMyTasks ? 'My Tasks' : 'Tasks'} 
+            <span className="projects-count">({currentTasks.length})</span>
+          </h1>
+        </div>
+        <div className="projects-header-right">
+          <button
+            onClick={() => setShowFilterModal(true)}
+            className={`btn-filter-compact ${hasActiveFilters() ? 'active' : ''}`}
+            title="Filter tasks"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+            </svg>
+            Filter
+            {hasActiveFilters() && <span className="filter-badge"></span>}
+          </button>
+          <div className="view-toggle-compact">
+            <button
+              className={`view-toggle-btn-compact ${viewMode === 'list' ? 'active' : ''}`}
+              onClick={() => setViewMode('list')}
+              title="List view"
             >
-              Assigned to Me ({assignedPagination.totalItems})
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <line x1="8" y1="6" x2="21" y2="6"></line>
+                <line x1="8" y1="12" x2="21" y2="12"></line>
+                <line x1="8" y1="18" x2="21" y2="18"></line>
+                <line x1="3" y1="6" x2="3.01" y2="6"></line>
+                <line x1="3" y1="12" x2="3.01" y2="12"></line>
+                <line x1="3" y1="18" x2="3.01" y2="18"></line>
+              </svg>
             </button>
-            <button 
-              className={`compact-tab ${activeTab === 'reported' ? 'active' : ''}`}
-              onClick={() => setActiveTab('reported')}
+            <button
+              className={`view-toggle-btn-compact ${viewMode === 'board' ? 'active' : ''}`}
+              onClick={() => setViewMode('board')}
+              title="Board view"
             >
-              Created by Me ({reportedPagination.totalItems})
-            </button>
-            <button 
-              className={`compact-tab ${activeTab === 'toCheck' ? 'active' : ''}`}
-              onClick={() => setActiveTab('toCheck')}
-            >
-              To Check ({toCheckPagination.totalItems})
-            </button>
-            <button 
-              className={`compact-tab ${activeTab === 'allTasks' ? 'active' : ''}`}
-              onClick={() => setActiveTab('allTasks')}
-            >
-              All ({allTasksPagination.totalItems})
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="7" height="7"></rect>
+                <rect x="14" y="3" width="7" height="7"></rect>
+                <rect x="14" y="14" width="7" height="7"></rect>
+                <rect x="3" y="14" width="7" height="7"></rect>
+              </svg>
             </button>
           </div>
-          <button 
-            onClick={() => setShowStandaloneForm(true)}
-            className="btn-minimal"
-          >
-            + New Task
-          </button>
         </div>
       </div>
 
@@ -495,95 +492,381 @@ const MyTasks = ({ user }) => {
         </div>
       )}
 
+      {showFilterModal && (
+        <TaskFilterModal
+          filters={filters}
+          onApply={applyFilters}
+          onClose={() => setShowFilterModal(false)}
+          onClear={clearFilters}
+          isMyTasks={isMyTasks}
+        />
+      )}
+
       {showStandaloneForm && (
-        <StandaloneTaskForm 
+        <StandaloneTaskForm
           onSubmit={handleCreateStandaloneTask}
           onCancel={() => setShowStandaloneForm(false)}
         />
       )}
 
-      <div className="tasks-content">
-        {activeTab === 'assigned' && (
-          <div className="tasks-section">
-            {assignedTasks.length === 0 && assignedPagination.totalItems === 0 ? (
-              <div className="empty-state">
-                <span className="empty-icon">✅</span>
-                <h3>No tasks assigned to you</h3>
-                <p>You don't have any tasks assigned at the moment.</p>
-              </div>
-            ) : (
-              <>
-                <div className="tasks-grid">
-                  {assignedTasks.map(renderTaskCard)}
-                </div>
-                {renderPaginationControls(assignedPagination, 'assigned')}
-              </>
-            )}
-          </div>
-        )}
+      {currentTasks.length === 0 ? (
+        <div style={{ textAlign: 'center', padding: '3rem 1rem', color: '#64748b' }}>
+          <p>No tasks found in this category.</p>
+        </div>
+      ) : (
+        <>
+          {viewMode === 'list' ? renderListView(currentTasks) : renderBoardView(currentTasks)}
+          {renderPaginationControls()}
+        </>
+      )}
+    </div>
+  );
+};
 
-        {activeTab === 'reported' && (
-          <div className="tasks-section">
-            {reportedTasks.length === 0 && reportedPagination.totalItems === 0 ? (
-              <div className="empty-state">
-                <span className="empty-icon">📝</span>
-                <h3>No tasks created by you</h3>
-                <p>You haven't created any tasks yet.</p>
-              </div>
-            ) : (
-              <>
-                <div className="tasks-grid">
-                  {reportedTasks.map(renderTaskCard)}
-                </div>
-                {renderPaginationControls(reportedPagination, 'reported')}
-              </>
-            )}
-          </div>
-        )}
+// Task Filter Modal Component
+const TaskFilterModal = ({ filters, onApply, onClose, onClear, isMyTasks = false }) => {
+  const [localFilters, setLocalFilters] = useState(filters);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
+  const [selectedUsers, setSelectedUsers] = useState([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [showResults, setShowResults] = useState(false);
 
-        {activeTab === 'toCheck' && (
-          <div className="tasks-section">
-            {tasksToCheck.length === 0 && toCheckPagination.totalItems === 0 ? (
-              <div className="empty-state">
-                <span className="empty-icon">✅</span>
-                <h3>No tasks assigned for checking</h3>
-                <p>You don't have any tasks assigned to you for verification and approval.</p>
-              </div>
-            ) : (
-              <>
-                <div className="tasks-grid">
-                  {tasksToCheck.map(renderTaskCard)}
-                </div>
-                {renderPaginationControls(toCheckPagination, 'toCheck')}
-              </>
-            )}
-          </div>
-        )}
+  const taskStatuses = [
+    { value: 'TO_DO', label: 'To Do' },
+    { value: 'IN_PROGRESS', label: 'In Progress' },
+    { value: 'IN_REVIEW', label: 'In Review' },
+    { value: 'DONE', label: 'Done' },
+    { value: 'CHECKED', label: 'Checked' },
+    { value: 'ON_HOLD', label: 'On Hold' }
+  ];
 
-        {activeTab === 'allTasks' && (
-          <div className="tasks-section">
-            {allTasks.length === 0 && allTasksPagination.totalItems === 0 ? (
-              <div className="empty-state">
-                <span className="empty-icon">📋</span>
-                <h3>No tasks found</h3>
-                <p>There are no tasks in the system yet.</p>
-              </div>
-            ) : (
-              <>
-                <div className="tasks-grid">
-                  {allTasks.map(renderTaskCard)}
-                </div>
-                {renderPaginationControls(allTasksPagination, 'allTasks')}
-              </>
-            )}
+  const taskPriorities = [
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
+    { value: 'URGENT', label: 'Urgent' }
+  ];
+
+  // Initialize selected users from filters
+  useEffect(() => {
+    const loadUserDetails = async () => {
+      if (filters.assigneeIds && filters.assigneeIds.length > 0) {
+        try {
+          const response = await fetch('/api/tasks/users', {
+            credentials: 'include'
+          });
+          if (response.ok) {
+            const data = await response.json();
+            if (data.success && data.users) {
+              const users = data.users.filter(user => filters.assigneeIds.includes(user.id));
+              setSelectedUsers(users);
+            }
+          }
+        } catch (error) {
+          console.error('Error fetching user details:', error);
+        }
+      } else {
+        setSelectedUsers([]);
+      }
+    };
+    loadUserDetails();
+  }, [filters.assigneeIds]);
+
+
+  const searchUsers = async (query) => {
+    if (!query || query.trim().length < 2) {
+      setSearchResults([]);
+      setShowResults(false);
+      return;
+    }
+
+    setIsSearching(true);
+    try {
+      const response = await fetch('/api/tasks/users', {
+        credentials: 'include'
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success && data.users) {
+          const queryLower = query.toLowerCase().trim();
+          const filtered = data.users.filter(user => {
+            const userId = user.id.toString();
+            const username = (user.username || '').toLowerCase();
+            const name = (user.name || '').toLowerCase();
+            const email = (user.email || '').toLowerCase();
+            
+            return userId.includes(queryLower) || 
+                   username.includes(queryLower) || 
+                   name.includes(queryLower) ||
+                   email.includes(queryLower);
+          });
+          setSearchResults(filtered);
+          setShowResults(true);
+        }
+      }
+    } catch (error) {
+      console.error('Error searching users:', error);
+      setSearchResults([]);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleSearchChange = (e) => {
+    const query = e.target.value;
+    setSearchQuery(query);
+    searchUsers(query);
+  };
+
+  // Close search results when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      if (showResults && !event.target.closest('.user-search-container')) {
+        setShowResults(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [showResults]);
+
+  const handleUserSelect = (user) => {
+    if (!selectedUsers.find(u => u.id === user.id)) {
+      const newUsers = [...selectedUsers, user];
+      setSelectedUsers(newUsers);
+      setLocalFilters(prev => ({
+        ...prev,
+        assigneeIds: newUsers.map(u => u.id)
+      }));
+    }
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowResults(false);
+  };
+
+  const handleUserRemove = (userId) => {
+    const newUsers = selectedUsers.filter(u => u.id !== userId);
+    setSelectedUsers(newUsers);
+    setLocalFilters(prev => ({
+      ...prev,
+      assigneeIds: newUsers.map(u => u.id)
+    }));
+  };
+
+  const handleStatusChange = (value) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      status: prev.status.includes(value)
+        ? prev.status.filter(s => s !== value)
+        : [...prev.status, value]
+    }));
+  };
+
+  const handlePriorityChange = (value) => {
+    setLocalFilters(prev => ({
+      ...prev,
+      priority: prev.priority.includes(value)
+        ? prev.priority.filter(p => p !== value)
+        : [...prev.priority, value]
+    }));
+  };
+
+  const handleApply = () => {
+    onApply(localFilters);
+  };
+
+  const handleClear = () => {
+    const clearedFilters = {
+      assigneeIds: [],
+      status: [],
+      priority: []
+    };
+    setLocalFilters(clearedFilters);
+    setSelectedUsers([]);
+    setSearchQuery('');
+    setSearchResults([]);
+    setShowResults(false);
+    onClear();
+  };
+
+  const hasFilters = localFilters.assigneeIds.length > 0 || localFilters.status.length > 0 || localFilters.priority.length > 0;
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="task-filter-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="task-filter-modal-header">
+          <div className="task-filter-modal-header-content">
+            <div className="task-filter-modal-icon">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"></polygon>
+              </svg>
+            </div>
+            <div>
+              <h2 className="task-filter-modal-title">Filter Tasks</h2>
+              <p className="task-filter-modal-subtitle">Refine your task list by applying filters</p>
+            </div>
           </div>
-        )}
+          <button onClick={onClose} className="modal-close-button">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <div className="task-filter-modal-body">
+          <div className="task-filter-form">
+            {!isMyTasks && (
+              <div className="form-group">
+                <label htmlFor="userSearch">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="12" cy="7" r="4"></circle>
+                  </svg>
+                  Filter by User
+                </label>
+                <div className="user-search-container" style={{ position: 'relative' }}>
+                  <div className="user-search-input-wrapper">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: '#64748b', pointerEvents: 'none' }}>
+                      <circle cx="11" cy="11" r="8"></circle>
+                      <path d="m21 21-4.35-4.35"></path>
+                    </svg>
+                    <input
+                      type="text"
+                      id="userSearch"
+                      className="user-search-input"
+                      placeholder="Search by username, name, email, or user ID..."
+                      value={searchQuery}
+                      onChange={handleSearchChange}
+                      onFocus={() => searchQuery && searchResults.length > 0 && setShowResults(true)}
+                    />
+                    {isSearching && (
+                      <div style={{ position: 'absolute', right: '1rem', top: '50%', transform: 'translateY(-50%)' }}>
+                        <div className="spinner-small"></div>
+                      </div>
+                    )}
+                  </div>
+                  
+                  {showResults && searchResults.length > 0 && (
+                    <div className="user-search-results">
+                      {searchResults.map(user => (
+                        <div
+                          key={user.id}
+                          className="user-search-result-item"
+                          onClick={() => handleUserSelect(user)}
+                        >
+                          <div className="user-search-result-avatar">
+                            {user.name ? user.name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
+                          </div>
+                          <div className="user-search-result-info">
+                            <div className="user-search-result-name">{user.name || user.username}</div>
+                            <div className="user-search-result-meta">
+                              {user.username} {user.email && `• ${user.email}`}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {selectedUsers.length > 0 && (
+                    <div className="selected-users-list">
+                      {selectedUsers.map(user => (
+                        <div key={user.id} className="selected-user-chip">
+                          <div className="selected-user-avatar">
+                            {user.name ? user.name.charAt(0).toUpperCase() : user.username.charAt(0).toUpperCase()}
+                          </div>
+                          <span className="selected-user-name">{user.name || user.username}</span>
+                          <button
+                            type="button"
+                            className="selected-user-remove"
+                            onClick={() => handleUserRemove(user.id)}
+                            aria-label="Remove user"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                              <line x1="18" y1="6" x2="6" y2="18"></line>
+                              <line x1="6" y1="6" x2="18" y2="18"></line>
+                            </svg>
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            <div className="form-group">
+              <label htmlFor="status">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="10"></circle>
+                  <polyline points="12 6 12 12 16 14"></polyline>
+                </svg>
+                Status
+              </label>
+              <div className="checkbox-group">
+                {taskStatuses.map(status => (
+                  <label key={status.value} className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      value={status.value}
+                      checked={localFilters.status.includes(status.value)}
+                      onChange={() => handleStatusChange(status.value)}
+                      className="checkbox-input"
+                    />
+                    <span className="checkbox-text">{status.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="priority">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"></path>
+                </svg>
+                Priority
+              </label>
+              <div className="checkbox-group">
+                {taskPriorities.map(priority => (
+                  <label key={priority.value} className="checkbox-label">
+                    <input
+                      type="checkbox"
+                      value={priority.value}
+                      checked={localFilters.priority.includes(priority.value)}
+                      onChange={() => handlePriorityChange(priority.value)}
+                      className="checkbox-input"
+                    />
+                    <span className="checkbox-text">{priority.label}</span>
+                  </label>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="task-filter-modal-footer">
+          <button
+            onClick={handleClear}
+            className="btn-outline-modern"
+            disabled={!hasFilters}
+          >
+            Clear Filters
+          </button>
+          <button
+            onClick={handleApply}
+            className="btn-primary-modern"
+          >
+            Apply Filters
+          </button>
+        </div>
       </div>
     </div>
   );
 };
 
-// Standalone Task Form Component
+// Standalone Task Form Component (keeping existing implementation)
 const StandaloneTaskForm = ({ onSubmit, onCancel }) => {
   const [formData, setFormData] = useState({
     name: '',
@@ -597,10 +880,10 @@ const StandaloneTaskForm = ({ onSubmit, onCancel }) => {
   const [fetchingUsers, setFetchingUsers] = useState(true);
 
   const taskPriorities = [
-    { value: 'LOW', label: 'Low', cssClass: 'priority-low' },
-    { value: 'MEDIUM', label: 'Medium', cssClass: 'priority-medium' },
-    { value: 'HIGH', label: 'High', cssClass: 'priority-high' },
-    { value: 'URGENT', label: 'Urgent', cssClass: 'priority-urgent' }
+    { value: 'LOW', label: 'Low' },
+    { value: 'MEDIUM', label: 'Medium' },
+    { value: 'HIGH', label: 'High' },
+    { value: 'URGENT', label: 'Urgent' }
   ];
 
   useEffect(() => {
@@ -612,7 +895,7 @@ const StandaloneTaskForm = ({ onSubmit, onCancel }) => {
       const response = await fetch('/api/tasks/users', {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.users) {
@@ -628,13 +911,12 @@ const StandaloneTaskForm = ({ onSubmit, onCancel }) => {
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    
-    // Validate required fields
+
     if (!formData.assigneeId || !formData.checkedById) {
       alert('Please select both Assignee and Checker');
       return;
     }
-    
+
     onSubmit(formData);
   };
 
@@ -649,49 +931,33 @@ const StandaloneTaskForm = ({ onSubmit, onCancel }) => {
     <div className="modal-overlay">
       <div className="modal-content">
         <div className="modal-header">
-          <h3>Create Task</h3>
-          <button onClick={onCancel} className="btn-close">&times;</button>
+          <h2>Create Standalone Task</h2>
+          <button className="modal-close" onClick={onCancel}>×</button>
         </div>
-        
-        <form onSubmit={handleSubmit} className="task-form">
-          <div className="form-group">
-            <label htmlFor="name">Task Name *:</label>
-            <input
-              type="text"
-              id="name"
-              name="name"
-              value={formData.name}
-              onChange={handleChange}
-              required
-              autoFocus
-              placeholder="Enter task name"
-              className="form-control"
-            />
-          </div>
-
-          <div className="form-group">
-            <label htmlFor="description">Acceptance Criteria:</label>
-            <textarea
-              id="description"
-              name="description"
-              value={formData.description}
-              onChange={handleChange}
-              rows="4"
-              placeholder="This task will be done when the following acceptance criteria is completed..."
-              className="form-control"
-            />
-          </div>
-
-          <div className="form-row">
+        <form onSubmit={handleSubmit}>
+          <div className="modal-body">
             <div className="form-group">
-              <label htmlFor="priority">Priority:</label>
-              <select
-                id="priority"
-                name="priority"
-                value={formData.priority}
+              <label>Task Name *</label>
+              <input
+                type="text"
+                name="name"
+                value={formData.name}
                 onChange={handleChange}
-                className="form-control"
-              >
+                required
+              />
+            </div>
+            <div className="form-group">
+              <label>Description</label>
+              <textarea
+                name="description"
+                value={formData.description}
+                onChange={handleChange}
+                rows="4"
+              />
+            </div>
+            <div className="form-group">
+              <label>Priority</label>
+              <select name="priority" value={formData.priority} onChange={handleChange}>
                 {taskPriorities.map(priority => (
                   <option key={priority.value} value={priority.value}>
                     {priority.label}
@@ -699,64 +965,40 @@ const StandaloneTaskForm = ({ onSubmit, onCancel }) => {
                 ))}
               </select>
             </div>
-
             <div className="form-group">
-              <label htmlFor="dueDate">Due Date:</label>
+              <label>Due Date</label>
               <input
                 type="date"
-                id="dueDate"
                 name="dueDate"
                 value={formData.dueDate}
                 onChange={handleChange}
-                className="form-control"
               />
             </div>
-          </div>
-
-          <div className="form-row">
             <div className="form-group">
-              <label htmlFor="assigneeId">Assignee *:</label>
-              <select
-                id="assigneeId"
-                name="assigneeId"
-                value={formData.assigneeId}
-                onChange={handleChange}
-                className="form-control"
-                required
-                disabled={fetchingUsers}
-              >
-                <option value="">{fetchingUsers ? 'Loading users...' : 'Select assignee'}</option>
-                {users.map(user => (
+              <label>Assignee *</label>
+              <select name="assigneeId" value={formData.assigneeId} onChange={handleChange} required>
+                <option value="">Select assignee</option>
+                {!fetchingUsers && users.map(user => (
                   <option key={user.id} value={user.id}>
-                    {user.name || user.username} ({user.email})
+                    {user.name || user.username}
                   </option>
                 ))}
               </select>
             </div>
-
             <div className="form-group">
-              <label htmlFor="checkedById">Checker *:</label>
-              <select
-                id="checkedById"
-                name="checkedById"
-                value={formData.checkedById}
-                onChange={handleChange}
-                className="form-control"
-                required
-                disabled={fetchingUsers}
-              >
-                <option value="">{fetchingUsers ? 'Loading users...' : 'Select checker'}</option>
-                {users.map(user => (
+              <label>Checked By *</label>
+              <select name="checkedById" value={formData.checkedById} onChange={handleChange} required>
+                <option value="">Select checker</option>
+                {!fetchingUsers && users.map(user => (
                   <option key={user.id} value={user.id}>
-                    {user.name || user.username} ({user.email})
+                    {user.name || user.username}
                   </option>
                 ))}
               </select>
             </div>
           </div>
-
-          <div className="form-actions">
-            <button type="button" onClick={onCancel} className="btn-outline">
+          <div className="modal-footer">
+            <button type="button" className="btn-outline" onClick={onCancel}>
               Cancel
             </button>
             <button type="submit" className="btn-primary">

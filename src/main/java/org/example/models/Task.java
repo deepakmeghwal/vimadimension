@@ -5,6 +5,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import org.example.models.enums.TaskStatus;
 import org.example.models.enums.ProjectStage;
 import org.example.models.enums.TaskPriority;
+import org.example.models.ResourceAssignment;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -13,12 +14,21 @@ import java.util.List;
 import java.util.Objects;
 
 @Entity
-@Table(name = "tasks")
+@Table(name = "tasks", indexes = {
+    @Index(name = "idx_task_status", columnList = "status"),
+    @Index(name = "idx_task_priority", columnList = "priority"),
+    @Index(name = "idx_task_due_date", columnList = "due_date"),
+    @Index(name = "idx_task_project_id", columnList = "project_id"),
+    @Index(name = "idx_task_assignee_id", columnList = "assignee_id")
+})
 public class Task {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
+
+    @Column(name = "task_number", nullable = false)
+    private String taskNumber;
 
     @Column(nullable = false)
     private String name;
@@ -39,8 +49,19 @@ public class Task {
     @Column(name = "priority")
     private TaskPriority priority;
 
+    @Column(name = "start_date")
+    private LocalDate startDate;
+
+    @Column(name = "end_date")
+    private LocalDate endDate;
+
     @Column(name = "due_date")
     private LocalDate dueDate;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "phase_id", nullable = true)
+    @JsonIgnore
+    private Phase phase;
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "project_id", nullable = true)
@@ -61,6 +82,16 @@ public class Task {
     @JoinColumn(name = "checked_by_id") // Can be null if no checker is assigned
     @JsonIgnore // Prevent Hibernate proxy serialization issues
     private User checkedBy; // The user responsible for verifying task completion
+
+    /**
+     * Level 2 Reference: Optional link to ResourceAssignment
+     * If set, billing/cost rates flow from the ResourceAssignment.
+     * If not set, task uses default user rates or direct assignment.
+     */
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "resource_assignment_id")
+    @JsonIgnore
+    private ResourceAssignment resourceAssignment;
 
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
@@ -84,6 +115,14 @@ public class Task {
 
     public void setId(Long id) {
         this.id = id;
+    }
+
+    public String getTaskNumber() {
+        return taskNumber;
+    }
+
+    public void setTaskNumber(String taskNumber) {
+        this.taskNumber = taskNumber;
     }
 
     public String getName() {
@@ -126,12 +165,40 @@ public class Task {
         this.priority = priority;
     }
 
+    public LocalDate getStartDate() {
+        return startDate;
+    }
+
+    public void setStartDate(LocalDate startDate) {
+        this.startDate = startDate;
+    }
+
+    public LocalDate getEndDate() {
+        return endDate;
+    }
+
+    public void setEndDate(LocalDate endDate) {
+        this.endDate = endDate;
+    }
+
     public LocalDate getDueDate() {
         return dueDate;
     }
 
     public void setDueDate(LocalDate dueDate) {
         this.dueDate = dueDate;
+    }
+
+    public Phase getPhase() {
+        return phase;
+    }
+
+    public void setPhase(Phase phase) {
+        this.phase = phase;
+        // Optional: set project from phase if needed, or rely on phase.getProject()
+        if (phase != null) {
+            this.project = phase.getProject();
+        }
     }
 
     public Project getProject() {
@@ -164,6 +231,14 @@ public class Task {
 
     public void setCheckedBy(User checkedBy) {
         this.checkedBy = checkedBy;
+    }
+
+    public ResourceAssignment getResourceAssignment() {
+        return resourceAssignment;
+    }
+
+    public void setResourceAssignment(ResourceAssignment resourceAssignment) {
+        this.resourceAssignment = resourceAssignment;
     }
 
     public LocalDateTime getCreatedAt() {

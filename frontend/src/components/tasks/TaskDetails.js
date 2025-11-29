@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
+// import AuditLogList from '../common/AuditLogList';
 
 const TaskDetails = ({ user }) => {
   const { id } = useParams();
@@ -225,11 +226,6 @@ const TaskDetails = ({ user }) => {
 
           <div className="project-info">
             <div className="info-row">
-              <span className="info-label">Task ID:</span>
-              <span className="info-value">#{task.id}</span>
-            </div>
-            
-            <div className="info-row">
               <span className="info-label">Acceptance Criteria:</span>
               <span className="info-value">{task.description || 'No acceptance criteria provided'}</span>
             </div>
@@ -373,6 +369,14 @@ const TaskDetails = ({ user }) => {
             </div>
           )}
         </div>
+
+        {/* Audit Logs Card */}
+        {/* <div className="project-card">
+          <div className="card-header">
+            <h3>Activity History</h3>
+          </div>
+          <AuditLogList entityType="TASK" entityId={id} />
+        </div> */}
       </div>
     </div>
   );

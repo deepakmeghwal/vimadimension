@@ -8,6 +8,8 @@ import org.example.models.User;
 import org.example.repository.ProjectRepository;
 import org.example.repository.TaskRepository; // Import TaskRepository
 import org.example.repository.UserRepository;
+import org.example.repository.ClientRepository;
+import org.example.models.Client;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -15,19 +17,26 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.domain.Sort;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.stream.Collectors;
 import org.example.models.enums.ProjectStatus;
-import org.example.models.enums.ProjectCategory;
+import org.example.models.enums.ProjectStatus;
+import org.example.models.enums.ProjectChargeType;
+import org.example.models.enums.ProjectPriority;
 import org.example.models.enums.ProjectPriority;
 
 @Service
@@ -38,64 +47,104 @@ public class ProjectService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository; // Inject UserRepository
     private final TaskRepository taskRepository; // Added TaskRepository
+    private final ClientRepository clientRepository;
+    private final AuditService auditService;
 
     @Autowired
-    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository) {
+    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository, ClientRepository clientRepository, AuditService auditService) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.taskRepository = taskRepository; // Initialize TaskRepository
+        this.clientRepository = clientRepository;
+        this.auditService = auditService;
+    }
+
+    private User getCurrentAuthenticatedUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication == null || !authentication.isAuthenticated() || authentication.getPrincipal().equals("anonymousUser")) {
+            // Return null or throw exception. Since createProject passes username, this might be used in updateProject.
+            // For updates, we expect authentication.
+            throw new IllegalStateException("No authenticated user found.");
+        }
+        String username;
+        Object principal = authentication.getPrincipal();
+        if (principal instanceof UserDetails) {
+            username = ((UserDetails) principal).getUsername();
+        } else {
+            username = principal.toString();
+        }
+        return userRepository.findByUsername(username)
+                .orElseThrow(() -> new IllegalStateException("Authenticated user '" + username + "' not found in database."));
+    }
+
+    /**
+     * Generates the next project number in format {ORGCODE}-{YEAR}-PRJ-{SEQ}
+     * @param organization The organization this project belongs to
+     * @return Auto-generated project number
+     */
+    private String generateProjectNumber(org.example.models.Organization organization) {
+        String orgCode = generateOrgCode(organization.getName());
+        int year = LocalDate.now().getYear();
+        String prefix = orgCode + "-" + year + "-PRJ-";
+        
+        Optional<Project> latestProject = projectRepository
+                .findTopByOrganization_IdAndProjectNumberStartingWithOrderByProjectNumberDesc(organization.getId(), prefix);
+        
+        int nextNumber = 1;
+        if (latestProject.isPresent()) {
+            String lastProjectNumber = latestProject.get().getProjectNumber();
+            String lastNumberStr = lastProjectNumber.substring(prefix.length());
+            try {
+                nextNumber = Integer.parseInt(lastNumberStr) + 1;
+            } catch (NumberFormatException e) {
+                logger.warn("Could not parse project number: {}. Starting from 1.", lastProjectNumber);
+                nextNumber = 1;
+            }
+        }
+        
+        String generatedNumber = String.format("%s%04d", prefix, nextNumber);
+        logger.info("Generated project number: {} for organization: {}", generatedNumber, organization.getName());
+        return generatedNumber;
+    }
+    
+    /**
+     * Generate organization code from name (4 characters, uppercase)
+     */
+    private String generateOrgCode(String organizationName) {
+        if (organizationName == null || organizationName.trim().isEmpty()) {
+            return "ORG";
+        }
+        
+        // Take first 4 characters of organization name, uppercase, remove spaces and special chars
+        String code = organizationName.trim().toUpperCase().replaceAll("[^A-Z0-9]", "");
+        
+        if (code.length() >= 4) {
+            return code.substring(0, 4);
+        } else if (code.length() > 0) {
+            return code + "ORG".substring(0, 4 - code.length());
+        } else {
+            return "ORG";
+        }
     }
 
     @Transactional
+    @Deprecated
     public Project createProject(ProjectCreateDto projectCreateDto) {
-        if (projectCreateDto == null) {
-            logger.warn("Attempted to create a project with null DTO.");
-            throw new IllegalArgumentException("Project data cannot be null.");
-        }
-        String name = projectCreateDto.getName();
-        if (name == null || name.trim().isEmpty()) {
-            logger.warn("Attempted to create a project with empty name.");
-            throw new IllegalArgumentException("Project name cannot be empty.");
-        }
-
-        String trimmedName = name.trim();
-        if (projectRepository.findByName(trimmedName).isPresent()) {
-            logger.warn("Attempted to create a project with duplicate name: {}", trimmedName);
-            throw new IllegalArgumentException("Project with name '" + trimmedName + "' already exists.");
-        }
-
-        Project newProject = new Project();
-        newProject.setName(trimmedName);
-        newProject.setDescription(projectCreateDto.getDescription() != null ? projectCreateDto.getDescription().trim() : null);
-        // Assuming Project entity handles createdAt/updatedAt via @PrePersist/@PreUpdate
-
-        Project savedProject = projectRepository.save(newProject);
-        logger.info("Project created successfully with ID: {} and name: {}", savedProject.getId(), savedProject.getName());
-        return savedProject;
+        throw new UnsupportedOperationException("This method is deprecated and unsafe. Use createProject(ProjectCreateDto, String) instead.");
     }
 
     public Optional<Project> findById(Long projectId) { // Renamed for consistency
         return projectRepository.findById(projectId);
     }
 
-    public Optional<Project> findByName(String name) { // Renamed for consistency
-        if (name == null || name.trim().isEmpty()) {
-            return Optional.empty();
-        }
-        return projectRepository.findByName(name.trim());
-    }
+    // Removed unsafe findByName and findByNameContaining methods
 
-    public List<Project> findByNameContaining(String nameFragment) { // Renamed for consistency
-        if (nameFragment == null || nameFragment.trim().isEmpty()) {
-            return projectRepository.findAll(); // Or return empty list based on desired behavior
-        }
-        return projectRepository.findByNameContainingIgnoreCase(nameFragment.trim());
-    }
 
     public List<Project> findAllProjects() { // Renamed for consistency
         return projectRepository.findAll();
     }
     
+    @Transactional(readOnly = true)
     public List<Project> findProjectsByOrganization(String username) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
@@ -107,9 +156,18 @@ public class ProjectService {
         
         // This would require adding a method to ProjectRepository
         // For now, let's filter from all projects (not optimal for large datasets)
-        return projectRepository.findAll().stream()
+        List<Project> projects = projectRepository.findAll().stream()
                 .filter(project -> Objects.equals(project.getOrganization(), user.getOrganization()))
                 .collect(Collectors.toList());
+        
+        // Initialize client relationship to avoid lazy loading issues during JSON serialization
+        projects.forEach(project -> {
+            if (project.getClient() != null) {
+                project.getClient().getId(); // Trigger lazy load
+            }
+        });
+        
+        return projects;
     }
 
     /**
@@ -155,8 +213,13 @@ public class ProjectService {
         if (projectCreateDto.getName() == null || projectCreateDto.getName().trim().isEmpty()) {
             throw new IllegalArgumentException("Project name cannot be empty.");
         }
-        if (projectCreateDto.getClientName() == null || projectCreateDto.getClientName().trim().isEmpty()) {
-            throw new IllegalArgumentException("Client name cannot be empty.");
+        
+        // Check for duplicate name within the organization
+        if (projectRepository.findByOrganization_IdAndName(creator.getOrganization().getId(), projectCreateDto.getName().trim()).isPresent()) {
+             throw new IllegalArgumentException("Project with name '" + projectCreateDto.getName().trim() + "' already exists in this organization.");
+        }
+        if (projectCreateDto.getClientId() == null) {
+            throw new IllegalArgumentException("Client must be selected.");
         }
         if (projectCreateDto.getStartDate() == null) {
             throw new IllegalArgumentException("Start date cannot be empty.");
@@ -164,8 +227,8 @@ public class ProjectService {
         if (projectCreateDto.getLocation() == null || projectCreateDto.getLocation().trim().isEmpty()) {
             throw new IllegalArgumentException("Location cannot be empty.");
         }
-        if (projectCreateDto.getProjectCategory() == null) {
-            throw new IllegalArgumentException("Project category cannot be empty.");
+        if (projectCreateDto.getChargeType() == null) {
+            throw new IllegalArgumentException("Project charge type cannot be empty.");
         }
         if (projectCreateDto.getStatus() == null) {
             throw new IllegalArgumentException("Project status cannot be empty.");
@@ -176,21 +239,31 @@ public class ProjectService {
 
         Project project = new Project();
         project.setName(projectCreateDto.getName().trim());
-        project.setClientName(projectCreateDto.getClientName().trim());
+        
+        Client client = clientRepository.findById(projectCreateDto.getClientId())
+                .orElseThrow(() -> new IllegalArgumentException("Client not found with ID: " + projectCreateDto.getClientId()));
+        project.setClient(client);
+        
         project.setStartDate(projectCreateDto.getStartDate());
         project.setEstimatedEndDate(projectCreateDto.getEstimatedEndDate());
         project.setLocation(projectCreateDto.getLocation().trim());
-        project.setProjectCategory(projectCreateDto.getProjectCategory());
+        project.setChargeType(projectCreateDto.getChargeType());
+        
+        // Set organization first (needed for project number generation)
+        project.setOrganization(creator.getOrganization());
+        
+        // Auto-generate project number (includes organization code)
+        String projectNumber = generateProjectNumber(creator.getOrganization());
+        project.setProjectNumber(projectNumber);
+        logger.info("Auto-generated project number: {}", projectNumber);
+        
         project.setStatus(projectCreateDto.getStatus());
         project.setProjectStage(projectCreateDto.getProjectStage());
         project.setDescription(projectCreateDto.getDescription() != null ? projectCreateDto.getDescription().trim() : null);
         
         // --- SET NEW CRITICAL FIELDS ---
         project.setBudget(projectCreateDto.getBudget());
-        project.setActualCost(projectCreateDto.getActualCost());
         project.setPriority(projectCreateDto.getPriority() != null ? projectCreateDto.getPriority() : org.example.models.enums.ProjectPriority.MEDIUM);
-        
-        project.setOrganization(creator.getOrganization()); // Set the organization from the user
         
         logger.info("Creating project '{}' for organization: {}", project.getName(), creator.getOrganization().getName());
 
@@ -206,6 +279,8 @@ public class ProjectService {
 
         logger.info("Project '{}' created successfully for organization '{}' by user '{}'", 
                    savedProject.getName(), creator.getOrganization().getName(), creatorUsername);
+
+        auditService.logChange(creator, "PROJECT", savedProject.getId(), "CREATE", null, null, "Project created");
 
         return savedProject;
     }
@@ -223,6 +298,7 @@ public class ProjectService {
             return Optional.empty(); // Or throw ProjectNotFoundException
         }
 
+        User currentUser = getCurrentAuthenticatedUser();
         Project projectToUpdate = projectOptional.get();
         boolean updated = false;
 
@@ -232,32 +308,34 @@ public class ProjectService {
                 logger.warn("Attempted to update project ID {} with an empty name.", projectId);
                 throw new IllegalArgumentException("Project name cannot be updated to empty.");
             }
-            // Check if the new name conflicts with another existing project
+            // Check if the new name conflicts with another existing project in the same organization
             if (!projectToUpdate.getName().equalsIgnoreCase(newName) &&
-                    projectRepository.findByName(newName).filter(p -> !p.getId().equals(projectId)).isPresent()) {
-                logger.warn("Attempted to update project ID {} to a name '{}' that already exists for another project.", projectId, newName);
+                    projectRepository.findByOrganization_IdAndName(projectToUpdate.getOrganization().getId(), newName)
+                            .filter(p -> !p.getId().equals(projectId)).isPresent()) {
+                logger.warn("Attempted to update project ID {} to a name '{}' that already exists for another project in the same organization.", projectId, newName);
                 throw new IllegalArgumentException("Another project with name '" + newName + "' already exists.");
             }
             if (!projectToUpdate.getName().equals(newName)) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "name", projectToUpdate.getName(), newName);
                 projectToUpdate.setName(newName);
                 updated = true;
             }
         }
 
-        if (projectUpdateDto.getClientName() != null) {
-            String newClientName = projectUpdateDto.getClientName().trim();
-            if (newClientName.isEmpty()) {
-                logger.warn("Attempted to update project ID {} with an empty client name.", projectId);
-                throw new IllegalArgumentException("Client name cannot be updated to empty.");
-            }
-            if (!Objects.equals(projectToUpdate.getClientName(), newClientName)) {
-                projectToUpdate.setClientName(newClientName);
+        if (projectUpdateDto.getClientId() != null) {
+            if (!Objects.equals(projectToUpdate.getClient().getId(), projectUpdateDto.getClientId())) {
+                Client newClient = clientRepository.findById(projectUpdateDto.getClientId())
+                        .orElseThrow(() -> new IllegalArgumentException("Client not found with ID: " + projectUpdateDto.getClientId()));
+                
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "client", projectToUpdate.getClient().getName(), newClient.getName());
+                projectToUpdate.setClient(newClient);
                 updated = true;
             }
         }
 
         if (projectUpdateDto.getStartDate() != null) {
             if (!Objects.equals(projectToUpdate.getStartDate(), projectUpdateDto.getStartDate())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "startDate", String.valueOf(projectToUpdate.getStartDate()), String.valueOf(projectUpdateDto.getStartDate()));
                 projectToUpdate.setStartDate(projectUpdateDto.getStartDate());
                 updated = true;
             }
@@ -265,6 +343,7 @@ public class ProjectService {
 
         if (projectUpdateDto.getEstimatedEndDate() != null) {
             if (!Objects.equals(projectToUpdate.getEstimatedEndDate(), projectUpdateDto.getEstimatedEndDate())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "estimatedEndDate", String.valueOf(projectToUpdate.getEstimatedEndDate()), String.valueOf(projectUpdateDto.getEstimatedEndDate()));
                 projectToUpdate.setEstimatedEndDate(projectUpdateDto.getEstimatedEndDate());
                 updated = true;
             }
@@ -277,20 +356,23 @@ public class ProjectService {
                 throw new IllegalArgumentException("Location cannot be updated to empty.");
             }
             if (!Objects.equals(projectToUpdate.getLocation(), newLocation)) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "location", projectToUpdate.getLocation(), newLocation);
                 projectToUpdate.setLocation(newLocation);
                 updated = true;
             }
         }
 
-        if (projectUpdateDto.getProjectCategory() != null) {
-            if (!Objects.equals(projectToUpdate.getProjectCategory(), projectUpdateDto.getProjectCategory())) {
-                projectToUpdate.setProjectCategory(projectUpdateDto.getProjectCategory());
+        if (projectUpdateDto.getChargeType() != null) {
+            if (!Objects.equals(projectToUpdate.getChargeType(), projectUpdateDto.getChargeType())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "chargeType", String.valueOf(projectToUpdate.getChargeType()), String.valueOf(projectUpdateDto.getChargeType()));
+                projectToUpdate.setChargeType(projectUpdateDto.getChargeType());
                 updated = true;
             }
         }
 
         if (projectUpdateDto.getStatus() != null) {
             if (!Objects.equals(projectToUpdate.getStatus(), projectUpdateDto.getStatus())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "status", String.valueOf(projectToUpdate.getStatus()), String.valueOf(projectUpdateDto.getStatus()));
                 projectToUpdate.setStatus(projectUpdateDto.getStatus());
                 updated = true;
             }
@@ -298,15 +380,16 @@ public class ProjectService {
 
         if (projectUpdateDto.getProjectStage() != null) {
             if (!Objects.equals(projectToUpdate.getProjectStage(), projectUpdateDto.getProjectStage())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "projectStage", String.valueOf(projectToUpdate.getProjectStage()), String.valueOf(projectUpdateDto.getProjectStage()));
                 projectToUpdate.setProjectStage(projectUpdateDto.getProjectStage());
                 updated = true;
             }
         }
 
         if (projectUpdateDto.getDescription() != null) {
-            // Allow setting description to empty or null if desired by passing an empty string or explicit null
-            String newDescription = projectUpdateDto.getDescription(); // No trim here if you want to allow leading/trailing spaces intentionally, or trim if not.
-            if (!Objects.equals(projectToUpdate.getDescription(), newDescription)) { // Check if actually changed
+            String newDescription = projectUpdateDto.getDescription(); 
+            if (!Objects.equals(projectToUpdate.getDescription(), newDescription)) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "description", projectToUpdate.getDescription(), newDescription);
                 projectToUpdate.setDescription(newDescription);
                 updated = true;
             }
@@ -315,20 +398,15 @@ public class ProjectService {
         // --- UPDATE NEW CRITICAL FIELDS ---
         if (projectUpdateDto.getBudget() != null) {
             if (!Objects.equals(projectToUpdate.getBudget(), projectUpdateDto.getBudget())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "budget", String.valueOf(projectToUpdate.getBudget()), String.valueOf(projectUpdateDto.getBudget()));
                 projectToUpdate.setBudget(projectUpdateDto.getBudget());
-                updated = true;
-            }
-        }
-
-        if (projectUpdateDto.getActualCost() != null) {
-            if (!Objects.equals(projectToUpdate.getActualCost(), projectUpdateDto.getActualCost())) {
-                projectToUpdate.setActualCost(projectUpdateDto.getActualCost());
                 updated = true;
             }
         }
 
         if (projectUpdateDto.getPriority() != null) {
             if (!Objects.equals(projectToUpdate.getPriority(), projectUpdateDto.getPriority())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "priority", String.valueOf(projectToUpdate.getPriority()), String.valueOf(projectUpdateDto.getPriority()));
                 projectToUpdate.setPriority(projectUpdateDto.getPriority());
                 updated = true;
             }
@@ -392,8 +470,9 @@ public class ProjectService {
      * @param status Optional project status filter
      * @return A map containing paginated projects and metadata
      */
+    @Transactional(readOnly = true)
     public Map<String, Object> findProjectsPaginatedAndFiltered(String username, int page, int size, 
-                                                                String category, String priority, String status) {
+                                                                String chargeType, String priority, String status) {
         User user = userRepository.findByUsername(username)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found: " + username));
         
@@ -409,16 +488,16 @@ public class ProjectService {
             return emptyResponse;
         }
 
-        // Parse category, priority, and status filters
-        ProjectCategory categoryFilter = null;
+        // Parse chargeType, priority, and status filters
+        ProjectChargeType chargeTypeFilter = null;
         ProjectPriority priorityFilter = null;
         ProjectStatus statusFilter = null;
         
-        if (category != null && !category.trim().isEmpty()) {
+        if (chargeType != null && !chargeType.trim().isEmpty()) {
             try {
-                categoryFilter = ProjectCategory.valueOf(category.toUpperCase());
+                chargeTypeFilter = ProjectChargeType.valueOf(chargeType.toUpperCase());
             } catch (IllegalArgumentException e) {
-                logger.warn("Invalid project category filter: {}", category);
+                logger.warn("Invalid project charge type filter: {}", chargeType);
             }
         }
         
@@ -444,14 +523,25 @@ public class ProjectService {
         // Get paginated and filtered projects
         Page<Project> projectPage = projectRepository.findByOrganizationAndFilters(
             user.getOrganization().getId(), 
-            categoryFilter, 
+            chargeTypeFilter, 
             priorityFilter, 
             statusFilter,
             pageable
         );
 
+        // Initialize lazy-loaded associations within the transaction
+        List<Project> projects = projectPage.getContent();
+        for (Project project : projects) {
+            // Force initialization of client if needed (even though it's @JsonIgnore, 
+            // accessing it here ensures it's loaded within the transaction)
+            if (project.getClient() != null) {
+                project.getClient().getId(); // Access to initialize proxy
+                project.getClient().getName(); // Access to load client name for getClientName() method
+            }
+        }
+
         Map<String, Object> response = new HashMap<>();
-        response.put("projects", projectPage.getContent());
+        response.put("projects", projects);
         response.put("currentPage", projectPage.getNumber());
         response.put("totalItems", projectPage.getTotalElements());
         response.put("totalPages", projectPage.getTotalPages());
@@ -462,5 +552,139 @@ public class ProjectService {
                    projectPage.getContent().size(), username, page + 1, projectPage.getTotalPages());
         
         return response;
+    }
+    @Transactional
+    public Project updateStage(Long projectId, org.example.models.enums.ProjectStage newStage, boolean allowBackward) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found with ID: " + projectId));
+
+        org.example.models.enums.ProjectStage currentStage = project.getProjectStage();
+
+        // Validation: Prevent backward jumps unless overridden
+        if (!allowBackward && currentStage != null && newStage.ordinal() < currentStage.ordinal()) {
+            throw new IllegalArgumentException("Cannot move project stage backwards from " + currentStage + " to " + newStage + " without admin override.");
+        }
+
+        project.setProjectStage(newStage);
+
+        // Automation Logic based on COA India stages
+        switch (newStage) {
+            case COMPLETION:
+                // Project completed, set to inactive
+                project.setStatus(ProjectStatus.INACTIVE);
+                break;
+            case CONCEPT:
+            case PRELIM:
+            case STATUTORY:
+            case TENDER:
+            case CONTRACT:
+            case CONSTRUCTION:
+                // Active stages - ensure project is active
+                project.setStatus(ProjectStatus.ACTIVE);
+                break;
+            default:
+                // Keep current status for any other cases
+                break;
+        }
+        
+        User currentUser = getCurrentAuthenticatedUser();
+        auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "stage", String.valueOf(currentStage), String.valueOf(newStage));
+
+        return projectRepository.save(project);
+    }
+
+    /**
+     * Assigns a user to a project (adds user to project's accessible users).
+     * 
+     * @param projectId The ID of the project
+     * @param userId The ID of the user to assign
+     * @return The updated Project
+     * @throws IllegalArgumentException if project or user not found, or if user doesn't belong to the same organization
+     */
+    @Transactional
+    public Project assignUserToProject(Long projectId, Long userId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found with ID: " + projectId));
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+        
+        // Validate that user belongs to the same organization as the project
+        if (user.getOrganization() == null || project.getOrganization() == null) {
+            throw new IllegalStateException("User and project must belong to an organization");
+        }
+        
+        if (!user.getOrganization().getId().equals(project.getOrganization().getId())) {
+            throw new IllegalArgumentException("User must belong to the same organization as the project");
+        }
+        
+        // Initialize the set if needed
+        if (user.getAccessibleProjects() == null) {
+            user.setAccessibleProjects(new HashSet<>());
+        }
+        
+        // Add project to user's accessible projects
+        if (!user.getAccessibleProjects().contains(project)) {
+            user.getAccessibleProjects().add(project);
+            userRepository.save(user);
+            
+            User currentUser = getCurrentAuthenticatedUser();
+            auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", 
+                    "team_member_added", null, user.getUsername());
+            
+            logger.info("User {} assigned to project {}", user.getUsername(), project.getName());
+        }
+        
+        return project;
+    }
+
+    /**
+     * Removes a user from a project.
+     * 
+     * @param projectId The ID of the project
+     * @param userId The ID of the user to remove
+     * @return The updated Project
+     * @throws IllegalArgumentException if project or user not found
+     */
+    @Transactional
+    public Project removeUserFromProject(Long projectId, Long userId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found with ID: " + projectId));
+        
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalArgumentException("User not found with ID: " + userId));
+        
+        // Remove project from user's accessible projects
+        if (user.getAccessibleProjects() != null && user.getAccessibleProjects().contains(project)) {
+            user.getAccessibleProjects().remove(project);
+            userRepository.save(user);
+            
+            User currentUser = getCurrentAuthenticatedUser();
+            auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", 
+                    "team_member_removed", user.getUsername(), null);
+            
+            logger.info("User {} removed from project {}", user.getUsername(), project.getName());
+        }
+        
+        return project;
+    }
+
+    /**
+     * Gets all users assigned to a project.
+     * 
+     * @param projectId The ID of the project
+     * @return List of users assigned to the project
+     */
+    @Transactional(readOnly = true)
+    public List<User> getProjectTeamMembers(Long projectId) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found with ID: " + projectId));
+        
+        // Initialize the relationship to force loading
+        if (project.getAccessibleByUsers() != null) {
+            project.getAccessibleByUsers().size(); // Force load
+        }
+        
+        return new ArrayList<>(project.getAccessibleByUsers());
     }
 }

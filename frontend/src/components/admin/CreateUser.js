@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const CreateUser = () => {
+const CreateUser = ({ isPeopleContext = false }) => {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     username: '',
@@ -81,6 +81,8 @@ const CreateUser = () => {
           bio: '',
           role: 'ROLE_USER'
         });
+        // Optional: redirect after success?
+        // setTimeout(() => navigate(isPeopleContext ? '/people/directory' : '/admin/users'), 1500);
       } else {
         const errorData = await response.json();
         setError(errorData.error || 'Failed to create user');
@@ -93,16 +95,19 @@ const CreateUser = () => {
     }
   };
 
+  const backPath = isPeopleContext ? '/people/directory' : '/admin/dashboard';
+  const backLabel = isPeopleContext ? 'Back to Directory' : 'Back to Admin Dashboard';
+
   return (
     <div className="main-content">
       <div className="page-header">
-        <h1 className="page-title">Create New User</h1>
+        <h1 className="page-title">Create New Person</h1>
         <div className="page-actions">
           <button 
-            onClick={() => navigate('/admin/dashboard')} 
+            onClick={() => navigate(backPath)} 
             className="btn-outline"
           >
-            Back to Admin Dashboard
+            {backLabel}
           </button>
         </div>
       </div>
@@ -253,12 +258,12 @@ const CreateUser = () => {
               className="btn-primary"
               disabled={loading}
             >
-              {loading ? 'Creating...' : 'Create User'}
+              {loading ? 'Creating...' : 'Create Person'}
             </button>
             <button 
               type="button" 
               className="btn-outline"
-              onClick={() => navigate('/admin/dashboard')}
+              onClick={() => navigate(backPath)}
               disabled={loading}
             >
               Cancel

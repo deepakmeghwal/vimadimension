@@ -1,64 +1,34 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import AsyncSelect from 'react-select/async';
+import { PROJECT_STAGES, PROJECT_CHARGE_TYPES, PROJECT_STATUSES, PROJECT_PRIORITIES } from '../../constants/projectEnums';
 
 const EditProject = ({ user }) => {
   const { id } = useParams();
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     name: '',
-    clientName: '',
+    projectNumber: '',
+    clientId: '',
     startDate: '',
     estimatedEndDate: '',
     location: '',
-    projectCategory: '',
+    chargeType: '',
     status: '',
     projectStage: '',
     description: '',
     budget: '',
-    actualCost: '',
     priority: ''
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
+  const [selectedClient, setSelectedClient] = useState(null);
 
   // Check if user has admin role
   const isAdmin = user?.authorities?.some(auth => auth.authority === 'ROLE_ADMIN') || false;
 
-  const projectCategories = [
-    { value: 'ARCHITECTURE', label: 'Architecture' },
-    { value: 'INTERIOR', label: 'Interior' },
-    { value: 'STRUCTURE', label: 'Structure' },
-    { value: 'URBAN', label: 'Urban' },
-    { value: 'LANDSCAPE', label: 'Landscape' },
-    { value: 'ACOUSTIC', label: 'Acoustic' },
-    { value: 'OTHER', label: 'Other' }
-  ];
-
-  const projectStatuses = [
-    { value: 'IN_DISCUSSION', label: 'In discussion' },
-    { value: 'PROGRESS', label: 'Progress' },
-    { value: 'ON_HOLD', label: 'On hold' },
-    { value: 'COMPLETED', label: 'Completed' },
-    { value: 'ARCHIVED', label: 'Archived' }
-  ];
-
-  const projectStages = [
-    { value: 'STAGE_01_PREPARATION_BRIEF', label: 'Stage 01: Preparation & Brief' },
-    { value: 'STAGE_02_CONCEPT_DESIGN', label: 'Stage 02: Concept Design' },
-    { value: 'STAGE_03_DESIGN_DEVELOPMENT', label: 'Stage 03: Design Development' },
-    { value: 'STAGE_04_TECHNICAL_DESIGN', label: 'Stage 04: Technical Design' },
-    { value: 'STAGE_05_CONSTRUCTION', label: 'Stage 05: Construction' },
-    { value: 'STAGE_06_HANDOVER', label: 'Stage 06: Handover' },
-    { value: 'STAGE_07_USE', label: 'Stage 07: Use' }
-  ];
-
-  const projectPriorities = [
-    { value: 'LOW', label: 'Low', cssClass: 'priority-low' },
-    { value: 'MEDIUM', label: 'Medium', cssClass: 'priority-medium' },
-    { value: 'HIGH', label: 'High', cssClass: 'priority-high' },
-    { value: 'URGENT', label: 'Urgent', cssClass: 'priority-urgent' }
-  ];
+  // Using shared constants from projectEnums.js
 
   useEffect(() => {
     // Redirect non-admin users
@@ -74,25 +44,33 @@ const EditProject = ({ user }) => {
       const response = await fetch(`/api/projects/${id}/edit`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.projectUpdateDto) {
           const dto = data.projectUpdateDto;
           setFormData({
             name: dto.name || '',
-            clientName: dto.clientName || '',
+            projectNumber: dto.projectNumber || '',
+            clientId: dto.clientId || '',
             startDate: dto.startDate ? dto.startDate.substring(0, 10) : '',
             estimatedEndDate: dto.estimatedEndDate ? dto.estimatedEndDate.substring(0, 10) : '',
             location: dto.location || '',
-            projectCategory: dto.projectCategory || '',
+            chargeType: dto.chargeType || '',
             status: dto.status || '',
             projectStage: dto.projectStage || '',
             description: dto.description || '',
             budget: dto.budget ? dto.budget.toString() : '',
-            actualCost: dto.actualCost ? dto.actualCost.toString() : '',
             priority: dto.priority || ''
           });
+
+          if (data.client) {
+            setSelectedClient({
+              value: data.client.id,
+              label: `${data.client.name} (${data.client.code})`,
+              client: data.client
+            });
+          }
         }
       } else {
         setError('Project not found');
@@ -112,6 +90,32 @@ const EditProject = ({ user }) => {
     });
   };
 
+  const loadClientOptions = async (inputValue) => {
+    try {
+      const response = await fetch(`/api/clients/search?query=${encodeURIComponent(inputValue)}`, {
+        credentials: 'include'
+      });
+      if (!response.ok) return [];
+      const clients = await response.json();
+      return clients.map(client => ({
+        value: client.id,
+        label: `${client.name} (${client.code})`,
+        client: client
+      }));
+    } catch (error) {
+      console.error('Error loading clients:', error);
+      return [];
+    }
+  };
+
+  const handleClientChange = (selectedOption) => {
+    setSelectedClient(selectedOption);
+    setFormData({
+      ...formData,
+      clientId: selectedOption ? selectedOption.value : ''
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -123,18 +127,18 @@ const EditProject = ({ user }) => {
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
+        credentials: 'include',
         body: new URLSearchParams({
           'name': formData.name,
-          'clientName': formData.clientName,
+          'clientId': formData.clientId,
           'startDate': formData.startDate,
           'estimatedEndDate': formData.estimatedEndDate,
           'location': formData.location,
-          'projectCategory': formData.projectCategory,
+          'chargeType': formData.chargeType,
           'status': formData.status,
           'projectStage': formData.projectStage,
           'description': formData.description,
           'budget': formData.budget,
-          'actualCost': formData.actualCost,
           'priority': formData.priority
         }),
         credentials: 'include'
@@ -183,16 +187,31 @@ const EditProject = ({ user }) => {
           </div>
 
           <div className="form-group">
-            <label htmlFor="clientName">Client Name *:</label>
+            <label htmlFor="projectNumber">Project Number:</label>
             <input
               type="text"
-              id="clientName"
-              name="clientName"
-              value={formData.clientName}
-              onChange={handleChange}
-              required
-              placeholder="Enter client name"
+              id="projectNumber"
+              name="projectNumber"
+              value={formData.projectNumber || 'Auto-generated'}
+              disabled
+              style={{ backgroundColor: '#f3f4f6', cursor: 'not-allowed' }}
             />
+            <small className="form-help">Auto-generated project identifier (cannot be edited)</small>
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="client">Client *:</label>
+            <AsyncSelect
+              cacheOptions
+              defaultOptions
+              loadOptions={loadClientOptions}
+              onChange={handleClientChange}
+              value={selectedClient}
+              placeholder="Search for a client..."
+              isClearable
+              required
+            />
+            {!formData.clientId && <input tabIndex={-1} autoComplete="off" style={{ opacity: 0, height: 0, position: 'absolute' }} required={true} />}
           </div>
 
           <div className="form-row">
@@ -235,18 +254,18 @@ const EditProject = ({ user }) => {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="projectCategory">Project Category *:</label>
+              <label htmlFor="chargeType">Charge Type *:</label>
               <select
-                id="projectCategory"
-                name="projectCategory"
-                value={formData.projectCategory}
+                id="chargeType"
+                name="chargeType"
+                value={formData.chargeType}
                 onChange={handleChange}
                 required
               >
-                <option value="">Select category</option>
-                {projectCategories.map(category => (
-                  <option key={category.value} value={category.value}>
-                    {category.label}
+                <option value="">Select charge type</option>
+                {PROJECT_CHARGE_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>
+                    {type.label}
                   </option>
                 ))}
               </select>
@@ -262,7 +281,7 @@ const EditProject = ({ user }) => {
                 required
               >
                 <option value="">Select status</option>
-                {projectStatuses.map(status => (
+                {PROJECT_STATUSES.map(status => (
                   <option key={status.value} value={status.value}>
                     {status.label}
                   </option>
@@ -273,7 +292,7 @@ const EditProject = ({ user }) => {
 
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="projectStage">Project Stage *:</label>
+              <label htmlFor="projectStage">Project Lifecycle Stage *</label>
               <select
                 id="projectStage"
                 name="projectStage"
@@ -281,8 +300,8 @@ const EditProject = ({ user }) => {
                 onChange={handleChange}
                 required
               >
-                <option value="">Select stage</option>
-                {projectStages.map(stage => (
+                <option value="">Select lifecycle stage</option>
+                {PROJECT_STAGES.map(stage => (
                   <option key={stage.value} value={stage.value}>
                     {stage.label}
                   </option>
@@ -299,7 +318,7 @@ const EditProject = ({ user }) => {
                 onChange={handleChange}
               >
                 <option value="">Select priority</option>
-                {projectPriorities.map(priority => (
+                {PROJECT_PRIORITIES.map(priority => (
                   <option key={priority.value} value={priority.value}>
                     {priority.label}
                   </option>
@@ -309,36 +328,19 @@ const EditProject = ({ user }) => {
           </div>
 
           {isAdmin && (
-            <div className="form-row">
-              <div className="form-group">
-                <label htmlFor="budget">Budget (₹):</label>
-                <input
-                  type="number"
-                  id="budget"
-                  name="budget"
-                  value={formData.budget}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                />
-                <small className="form-help">Enter budget amount in Indian Rupees (optional)</small>
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="actualCost">Actual Cost (₹):</label>
-                <input
-                  type="number"
-                  id="actualCost"
-                  name="actualCost"
-                  value={formData.actualCost}
-                  onChange={handleChange}
-                  placeholder="0.00"
-                  step="0.01"
-                  min="0"
-                />
-                <small className="form-help">Enter actual cost in Indian Rupees (optional)</small>
-              </div>
+            <div className="form-group">
+              <label htmlFor="budget">Budget (₹):</label>
+              <input
+                type="number"
+                id="budget"
+                name="budget"
+                value={formData.budget}
+                onChange={handleChange}
+                placeholder="0.00"
+                step="0.01"
+                min="0"
+              />
+              <small className="form-help">Enter budget amount in Indian Rupees (optional)</small>
             </div>
           )}
 
@@ -355,15 +357,15 @@ const EditProject = ({ user }) => {
           </div>
 
           <div className="project-actions">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn-primary"
               disabled={submitting}
             >
               {submitting ? 'Updating...' : 'Update Project'}
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn-outline"
               onClick={() => navigate(`/projects/${id}/details`)}
               disabled={submitting}

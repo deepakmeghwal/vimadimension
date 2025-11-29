@@ -1,6 +1,6 @@
 package org.example.dto;
 
-import org.example.models.enums.ProjectCategory;
+import org.example.models.enums.ProjectChargeType;
 import org.example.models.enums.ProjectStatus;
 import org.example.models.enums.ProjectStage;
 import org.example.models.enums.ProjectPriority;
@@ -9,11 +9,11 @@ import java.time.LocalDate;
 
 public class ProjectUpdateDto {
     private String name;
-    private String clientName;
+    private Long clientId;
     private LocalDate startDate;
     private LocalDate estimatedEndDate;
     private String location;
-    private ProjectCategory projectCategory;
+    private ProjectChargeType chargeType;
     private ProjectStatus status;
     private ProjectStage projectStage;
     private String description;
@@ -27,16 +27,16 @@ public class ProjectUpdateDto {
     public ProjectUpdateDto() {
     }
 
-    public ProjectUpdateDto(String name, String clientName, LocalDate startDate, LocalDate estimatedEndDate, 
-                          String location, ProjectCategory projectCategory, ProjectStatus status, 
+    public ProjectUpdateDto(String name, Long clientId, LocalDate startDate, LocalDate estimatedEndDate, 
+                          String location, ProjectChargeType chargeType, ProjectStatus status, 
                           ProjectStage projectStage, String description, BigDecimal budget, 
                           BigDecimal actualCost, ProjectPriority priority) {
         this.name = name;
-        this.clientName = clientName;
+        this.clientId = clientId;
         this.startDate = startDate;
         this.estimatedEndDate = estimatedEndDate;
         this.location = location;
-        this.projectCategory = projectCategory;
+        this.chargeType = chargeType;
         this.status = status;
         this.projectStage = projectStage;
         this.description = description;
@@ -81,12 +81,12 @@ public class ProjectUpdateDto {
         this.name = name;
     }
 
-    public String getClientName() {
-        return clientName;
+    public Long getClientId() {
+        return clientId;
     }
 
-    public void setClientName(String clientName) {
-        this.clientName = clientName;
+    public void setClientId(Long clientId) {
+        this.clientId = clientId;
     }
 
     public String getDescription() {
@@ -121,12 +121,12 @@ public class ProjectUpdateDto {
         this.location = location;
     }
 
-    public ProjectCategory getProjectCategory() {
-        return projectCategory;
+    public ProjectChargeType getChargeType() {
+        return chargeType;
     }
 
-    public void setProjectCategory(ProjectCategory projectCategory) {
-        this.projectCategory = projectCategory;
+    public void setChargeType(ProjectChargeType chargeType) {
+        this.chargeType = chargeType;
     }
 
     public ProjectStatus getStatus() {

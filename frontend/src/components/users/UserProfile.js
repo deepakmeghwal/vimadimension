@@ -1,7 +1,28 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import PageHeader from '../common/PageHeader';
+import ProfileImageUpload from './ProfileImageUpload';
+
+// Get API base URL from environment variable
+const API_BASE_URL = process.env.REACT_APP_API_URL || '';
+
+// Helper to build full API URL
+const getApiUrl = (endpoint) => {
+  const cleanEndpoint = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+  if (API_BASE_URL) {
+    const baseUrl = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+    return `${baseUrl}${cleanEndpoint}`;
+  }
+  return cleanEndpoint;
+};
 
 const UserProfile = ({ user, onUserUpdate }) => {
-  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [showImageUploadModal, setShowImageUploadModal] = useState(false);
+  const [profileImageUrl, setProfileImageUrl] = useState(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [currentUser, setCurrentUser] = useState(user); // Local state for fresh user data
+  const [isLoading, setIsLoading] = useState(false);
+
+  // Password State
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',
     newPassword: '',
@@ -9,182 +30,114 @@ const UserProfile = ({ user, onUserUpdate }) => {
   });
   const [passwordMessage, setPasswordMessage] = useState('');
   const [isChangingPassword, setIsChangingPassword] = useState(false);
-  
-  // Profile editing state
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
+
+  // Profile Editing State
   const [profileData, setProfileData] = useState({
-    name: user?.name || '',
-    email: user?.email || '',
-    bio: user?.bio || ''
+    name: '',
+    email: '',
+    bio: '',
+    designation: '',
+    specialization: '',
+    licenseNumber: '',
+    portfolioLink: ''
   });
   const [profileMessage, setProfileMessage] = useState('');
   const [isUpdatingProfile, setIsUpdatingProfile] = useState(false);
-  
-  // Attendance tracking state
-  const [attendanceStatus, setAttendanceStatus] = useState({
-    isClockedIn: false,
-    lastEntry: null,
-    loading: false,
-    hasClockedInToday: false,
-    hasClockedOutToday: false
-  });
-  const [attendanceMessage, setAttendanceMessage] = useState('');
-  
-  // Update profile data when user prop changes
-  React.useEffect(() => {
-    if (user) {
-      setProfileData({
-        name: user.name || '',
-        email: user.email || '',
-        bio: user.bio || ''
-      });
-    }
-  }, [user]);
 
-  // Load attendance status on component mount
+  // Calculate profile completion percentage
+  const calculateProfileCompletion = (user) => {
+    if (!user) return 0;
+    const fields = [
+      user.name,
+      user.email,
+      user.bio,
+      user.designation,
+      user.specialization,
+      user.profileImageUrl,
+      user.licenseNumber,
+      user.portfolioLink
+    ];
+    const completedFields = fields.filter(field => field && field.trim() !== '').length;
+    return Math.round((completedFields / fields.length) * 100);
+  };
+
+  // Get incomplete fields
+  const getIncompleteFields = (user) => {
+    if (!user) return [];
+    const incomplete = [];
+    if (!user.name || user.name.trim() === '') incomplete.push('Full Name');
+    if (!user.bio || user.bio.trim() === '') incomplete.push('Bio');
+    if (!user.designation || user.designation.trim() === '') incomplete.push('Designation');
+    if (!user.specialization || user.specialization.trim() === '') incomplete.push('Specialization');
+    if (!user.profileImageUrl) incomplete.push('Profile Picture');
+    if (!user.licenseNumber || user.licenseNumber.trim() === '') incomplete.push('License Number');
+    if (!user.portfolioLink || user.portfolioLink.trim() === '') incomplete.push('Portfolio Link');
+    return incomplete;
+  };
+
+  const settingsRef = useRef(null);
+
+  // Fetch fresh user data when component mounts
   useEffect(() => {
-    if (user) {
-      fetchAttendanceStatus();
-    }
-  }, [user]);
-
-  const fetchAttendanceStatus = async () => {
-    try {
-      const response = await fetch('/api/attendance/status', {
-        credentials: 'include'
-      });
-      const data = await response.json();
-      
-      if (response.ok && data.success) {
-        // Check today's attendance to determine if user has already clocked in/out
-        const today = new Date().toDateString();
-        const todayEntries = data.todayEntries || [];
-        
-        const hasClockedInToday = todayEntries.some(entry => 
-          entry.entryType === 'CLOCK_IN' && 
-          new Date(entry.timestamp).toDateString() === today
-        );
-        
-        const hasClockedOutToday = todayEntries.some(entry => 
-          entry.entryType === 'CLOCK_OUT' && 
-          new Date(entry.timestamp).toDateString() === today
-        );
-        
-        setAttendanceStatus({
-          isClockedIn: data.isClockedIn,
-          lastEntry: data.lastEntry,
-          loading: false,
-          hasClockedInToday,
-          hasClockedOutToday
+    const fetchUserData = async () => {
+      setIsLoading(true);
+      try {
+        const statusUrl = getApiUrl('/api/auth/status');
+        const response = await fetch(statusUrl, {
+          credentials: 'include'
         });
+        if (response.ok) {
+          const userData = await response.json();
+          setCurrentUser(userData);
+          // Update profile data and image from fresh data
+          setProfileData({
+            name: userData.name || '',
+            email: userData.email || '',
+            bio: userData.bio || '',
+            designation: userData.designation || '',
+            specialization: userData.specialization || '',
+            licenseNumber: userData.licenseNumber || '',
+            portfolioLink: userData.portfolioLink || ''
+          });
+          setProfileImageUrl(userData.profileImageUrl || null);
+        }
+      } catch (error) {
+        console.error('Failed to fetch user data:', error);
+        // Fallback to prop if fetch fails
+        if (user) {
+          setCurrentUser(user);
+        }
+      } finally {
+        setIsLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching attendance status:', error);
-    }
-  };
+    };
 
+    fetchUserData();
+  }, []); // Only run on mount
 
-  const handleClockIn = async () => {
-    // Prevent clock in if already clocked in today
-    if (attendanceStatus.hasClockedInToday) {
-      setAttendanceMessage({ type: 'error', text: 'You have already clocked in today' });
-      return;
-    }
-
-    setAttendanceStatus(prev => ({ ...prev, loading: true }));
-    setAttendanceMessage('');
-
-    try {
-      const response = await fetch('/api/attendance/clock-in', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
+  // Initialize profile data and image from currentUser
+  useEffect(() => {
+    if (currentUser) {
+      setProfileData({
+        name: currentUser.name || '',
+        email: currentUser.email || '',
+        bio: currentUser.bio || '',
+        designation: currentUser.designation || '',
+        specialization: currentUser.specialization || '',
+        licenseNumber: currentUser.licenseNumber || '',
+        portfolioLink: currentUser.portfolioLink || ''
       });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setAttendanceMessage({ type: 'success', text: data.message });
-        fetchAttendanceStatus();
-      } else {
-        setAttendanceMessage({ type: 'error', text: data.message || 'Failed to clock in' });
-      }
-    } catch (error) {
-      console.error('Error clocking in:', error);
-      setAttendanceMessage({ type: 'error', text: 'Failed to clock in' });
-    } finally {
-      setAttendanceStatus(prev => ({ ...prev, loading: false }));
+      // Set profile image URL from user data
+      setProfileImageUrl(currentUser.profileImageUrl || null);
     }
-  };
-
-  const handleClockOut = async () => {
-    // Prevent clock out if already clocked out today or never clocked in
-    if (attendanceStatus.hasClockedOutToday) {
-      setAttendanceMessage({ type: 'error', text: 'You have already clocked out today' });
-      return;
-    }
-
-    if (!attendanceStatus.hasClockedInToday) {
-      setAttendanceMessage({ type: 'error', text: 'You must clock in before clocking out' });
-      return;
-    }
-
-    setAttendanceStatus(prev => ({ ...prev, loading: true }));
-    setAttendanceMessage('');
-
-    try {
-      const response = await fetch('/api/attendance/clock-out', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include'
-      });
-
-      const data = await response.json();
-
-      if (response.ok && data.success) {
-        setAttendanceMessage({ type: 'success', text: data.message });
-        fetchAttendanceStatus();
-      } else {
-        setAttendanceMessage({ type: 'error', text: data.message || 'Failed to clock out' });
-      }
-    } catch (error) {
-      console.error('Error clocking out:', error);
-      setAttendanceMessage({ type: 'error', text: 'Failed to clock out' });
-    } finally {
-      setAttendanceStatus(prev => ({ ...prev, loading: false }));
-    }
-  };
-
-  const formatTime = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    return new Date(timestamp).toLocaleTimeString('en-US', {
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true
-    });
-  };
-
-  const formatDate = (timestamp) => {
-    if (!timestamp) return 'N/A';
-    return new Date(timestamp).toLocaleDateString('en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
-  };
+  }, [currentUser]);
 
   const handlePasswordChange = async (e) => {
     e.preventDefault();
-    
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       setPasswordMessage({ type: 'error', text: 'New passwords do not match' });
       return;
     }
-
     if (passwordData.newPassword.length < 6) {
       setPasswordMessage({ type: 'error', text: 'New password must be at least 6 characters long' });
       return;
@@ -196,68 +149,32 @@ const UserProfile = ({ user, onUserUpdate }) => {
     try {
       const response = await fetch('/api/profile/change-password', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
           currentPassword: passwordData.currentPassword,
           newPassword: passwordData.newPassword
         })
       });
-
       const data = await response.json();
 
       if (response.ok && data.success) {
         setPasswordMessage({ type: 'success', text: 'Password changed successfully!' });
-        setPasswordData({
-          currentPassword: '',
-          newPassword: '',
-          confirmPassword: ''
-        });
-        setShowPasswordForm(false);
+        setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
       } else {
         setPasswordMessage({ type: 'error', text: data.error || 'Failed to change password' });
       }
     } catch (error) {
-      console.error('Error changing password:', error);
       setPasswordMessage({ type: 'error', text: 'Failed to change password' });
     } finally {
       setIsChangingPassword(false);
     }
   };
 
-  const handleInputChange = (e) => {
-    setPasswordData({
-      ...passwordData,
-      [e.target.name]: e.target.value
-    });
-  };
-
-  const handleProfileInputChange = (e) => {
-    setProfileData({
-      ...profileData,
-      [e.target.name]: e.target.value
-    });
-  };
-
   const handleProfileUpdate = async (e) => {
     e.preventDefault();
-    
-    if (!profileData.name.trim()) {
-      setProfileMessage({ type: 'error', text: 'Name is required' });
-      return;
-    }
-    
-    if (!profileData.email.trim()) {
-      setProfileMessage({ type: 'error', text: 'Email is required' });
-      return;
-    }
-    
-    // Basic email validation
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(profileData.email)) {
-      setProfileMessage({ type: 'error', text: 'Please enter a valid email address' });
+    if (!profileData.name.trim() || !profileData.email.trim()) {
+      setProfileMessage({ type: 'error', text: 'Name and Email are required' });
       return;
     }
 
@@ -267,357 +184,424 @@ const UserProfile = ({ user, onUserUpdate }) => {
     try {
       const response = await fetch('/api/profile/update-profile', {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
         body: JSON.stringify({
-          name: profileData.name.trim(),
-          email: profileData.email.trim(),
-          bio: profileData.bio.trim()
+          name: profileData.name,
+          email: profileData.email,
+          bio: profileData.bio,
+          designation: profileData.designation,
+          specialization: profileData.specialization,
+          licenseNumber: profileData.licenseNumber,
+          portfolioLink: profileData.portfolioLink
         })
       });
-
       const data = await response.json();
 
       if (response.ok && data.success) {
         setProfileMessage({ type: 'success', text: 'Profile updated successfully!' });
-        setIsEditingProfile(false);
-        // Notify parent component to refresh user data
-        if (onUserUpdate) {
-          onUserUpdate();
+        // Fetch fresh data after update
+        const statusUrl = getApiUrl('/api/auth/status');
+        const refreshResponse = await fetch(statusUrl, {
+          credentials: 'include'
+        });
+        if (refreshResponse.ok) {
+          const userData = await refreshResponse.json();
+          setCurrentUser(userData);
         }
+        if (onUserUpdate) onUserUpdate();
+        setIsEditing(false); // Exit edit mode on success
       } else {
         setProfileMessage({ type: 'error', text: data.error || 'Failed to update profile' });
       }
     } catch (error) {
-      console.error('Error updating profile:', error);
       setProfileMessage({ type: 'error', text: 'Failed to update profile' });
     } finally {
       setIsUpdatingProfile(false);
     }
   };
 
-  const cancelProfileEdit = () => {
-    setProfileData({
-      name: user?.name || '',
-      email: user?.email || '',
-      bio: user?.bio || ''
+  const formatDate = (timestamp) => {
+    if (!timestamp) return 'N/A';
+    return new Date(timestamp).toLocaleDateString('en-US', {
+      year: 'numeric', month: 'short', day: 'numeric'
     });
-    setIsEditingProfile(false);
-    setProfileMessage('');
   };
 
-    return (
-      <div className="modern-profile-container">
-        {/* Modern Profile Header */}
-        <div className="modern-profile-header">
-          <div className="profile-avatar-section">
-            <div className="modern-profile-avatar">
-              {user?.name?.charAt(0)?.toUpperCase() || user?.username?.charAt(0)?.toUpperCase() || 'U'}
-            </div>
-            <div className="profile-info">
-              <h1 className="modern-profile-name">{user?.name || user?.username || 'User'}</h1>
-              <p className="profile-username">@{user?.username || 'username'}</p>
-              
-              {/* Professional Information */}
-              <div className="profile-professional-badges">
-                {user?.designation && (
-                  <div className="professional-badge">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
-                    </svg>
-                    <span>{user.designation}</span>
-                  </div>
-                )}
-                {user?.specialization && (
-                  <div className="professional-badge">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                    </svg>
-                    <span>{user.specialization}</span>
+  const scrollToSettings = () => {
+    setIsEditing(true);
+    setTimeout(() => {
+      settingsRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+  };
+
+  return (
+    <div className="main-content">
+      {/* LinkedIn-style Profile Header */}
+      <div className="profile-container" style={{ maxWidth: '1000px', margin: '0 auto', paddingBottom: '2rem' }}>
+
+
+        {/* Top Card */}
+        <div className="profile-card-modern" style={{ marginBottom: '1.5rem', overflow: 'hidden', borderRadius: '8px', background: 'white', boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05)' }}>
+          {/* Banner */}
+          <div className="profile-banner" style={{
+            height: '200px',
+            background: 'linear-gradient(135deg, #0a66c2 0%, #004182 100%)',
+            position: 'relative'
+          }}>
+          </div>
+
+          {/* Profile Info */}
+          <div className="profile-info-section" style={{ padding: '0 24px 24px', position: 'relative' }}>
+            <div className="profile-avatar-wrapper" style={{ marginTop: '-80px', marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+              <div
+                className="profile-avatar-modern profile-avatar-clickable"
+                onClick={() => setShowImageUploadModal(true)}
+                title="Click to change profile picture"
+                style={{
+                  width: '160px',
+                  height: '160px',
+                  border: '4px solid white',
+                  borderRadius: '50%',
+                  overflow: 'hidden',
+                  background: 'white',
+                  cursor: 'pointer',
+                  position: 'relative'
+                }}
+              >
+                {profileImageUrl ? (
+                  <img
+                    src={profileImageUrl}
+                    alt={currentUser?.name || 'Profile'}
+                    style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <div className="profile-avatar-placeholder" style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f3f4f6', fontSize: '3rem', color: '#9ca3af' }}>
+                    {currentUser?.name?.charAt(0)?.toUpperCase() || currentUser?.username?.charAt(0)?.toUpperCase() || 'U'}
                   </div>
                 )}
               </div>
+
+              <div className="profile-actions" style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: '8px' }}>
+                {(() => {
+                  const completion = calculateProfileCompletion(currentUser);
+                  const incompleteFields = getIncompleteFields(currentUser);
+                  if (completion < 100 && incompleteFields.length > 0) {
+                    return (
+                      <span style={{ 
+                        fontSize: '12px', 
+                        color: '#6b7280',
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '4px'
+                      }}>
+                        <span>📊</span>
+                        <span>{completion}% complete</span>
+                      </span>
+                    );
+                  }
+                  return null;
+                })()}
+                <button
+                  className="btn-primary"
+                  onClick={scrollToSettings}
+                  style={{ borderRadius: '24px', padding: '6px 16px', fontWeight: '600' }}
+                >
+                  {isEditing ? 'Editing Profile...' : 'Edit Profile'}
+                </button>
+              </div>
             </div>
-          </div>
-          
-          <div className="profile-actions-modern">
-            <button 
-              className="btn-modern-secondary"
-              onClick={() => setIsEditingProfile(true)}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-              </svg>
-              Edit Profile
-            </button>
-            <button 
-              className="btn-modern-outline"
-              onClick={() => setShowPasswordForm(true)}
-            >
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                <rect x="3" y="11" width="18" height="11" rx="2" ry="2" stroke="currentColor" strokeWidth="2"/>
-                <circle cx="12" cy="16" r="1" stroke="currentColor" strokeWidth="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4" stroke="currentColor" strokeWidth="2"/>
-              </svg>
-              Change Password
-            </button>
+
+            <div className="profile-text-content">
+              <h1 style={{ fontSize: '24px', fontWeight: '700', marginBottom: '4px', color: '#1f2937' }}>
+                {currentUser?.name || 'User Name'}
+              </h1>
+              <p style={{ fontSize: '16px', color: '#4b5563', marginBottom: '8px' }}>
+                {currentUser?.designation || 'Team Member'}
+                {currentUser?.specialization && <span> • {currentUser.specialization}</span>}
+              </p>
+              <p style={{ fontSize: '14px', color: '#6b7280', marginBottom: '16px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                <span>Joined {formatDate(currentUser?.createdAt)}</span>
+                <span>•</span>
+                <span style={{ color: '#0077b5', fontWeight: '600' }}>Contact Info</span>
+              </p>
+
+              <div className="profile-badges-modern" style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <span className="badge badge-status done">
+                  {currentUser?.authorities?.map(a => a.authority.replace('ROLE_', '')).join(', ') || 'Member'}
+                </span>
+              </div>
+            </div>
+
+            {/* About Section */}
+            <div style={{ paddingTop: '24px', borderTop: '1px solid #e5e7eb', marginTop: '24px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: '600', marginBottom: '16px', color: '#1f2937' }}>About</h2>
+              <p style={{ color: '#4b5563', lineHeight: '1.6', whiteSpace: 'pre-wrap' }}>
+                {currentUser?.bio || "No bio information provided. Click 'Edit Profile' to add a summary about yourself."}
+              </p>
+            </div>
           </div>
         </div>
 
-        {/* Modern Profile Content */}
-        <div className="modern-profile-content">
-          {/* Personal Information Card */}
-          <div className="modern-profile-card">
-            <div className="card-header-modern">
-              <div className="card-title-section">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <circle cx="12" cy="7" r="4" stroke="currentColor" strokeWidth="2"/>
-                </svg>
-                <h3>Personal Information</h3>
+        {/* Settings / Edit Section */}
+        <div ref={settingsRef} className="settings-container" style={{ display: isEditing ? 'block' : 'none' }}>
+          <div className="profile-card-modern" style={{ marginBottom: '1.5rem', padding: '24px', borderRadius: '8px', background: 'white', boxShadow: '0 0 0 1px rgba(0,0,0,0.08), 0 2px 4px rgba(0,0,0,0.05)' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '24px', paddingBottom: '16px', borderBottom: '1px solid #e5e7eb' }}>
+              <div>
+                <h2 style={{ fontSize: '20px', fontWeight: '600', color: '#1f2937', margin: '0 0 4px 0' }}>Edit Profile</h2>
+                {(() => {
+                  const incompleteFields = getIncompleteFields(currentUser);
+                  if (incompleteFields.length > 0) {
+                    return (
+                      <p style={{ fontSize: '13px', color: '#6b7280', margin: 0 }}>
+                        Complete {incompleteFields.length} field{incompleteFields.length !== 1 ? 's' : ''} to improve your profile
+                      </p>
+                    );
+                  }
+                  return null;
+                })()}
               </div>
+              <button 
+                onClick={() => setIsEditing(false)} 
+                style={{ 
+                  padding: '6px 16px', 
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  color: '#6b7280',
+                  background: 'transparent',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '24px',
+                  cursor: 'pointer'
+                }}
+              >
+                Close
+              </button>
             </div>
-            <div className="card-content-modern">
-              {!isEditingProfile ? (
-                <div className="info-grid-modern">
-                  <div className="info-item-modern">
-                    <div className="info-label-modern">Username</div>
-                    <div className="info-value-modern">{user?.username || 'Not available'}</div>
-                  </div>
-                  <div className="info-item-modern">
-                    <div className="info-label-modern">Full Name</div>
-                    <div className="info-value-modern">{user?.name || 'Not set'}</div>
-                  </div>
-                  <div className="info-item-modern">
-                    <div className="info-label-modern">Email</div>
-                    <div className="info-value-modern">{user?.email || 'Not set'}</div>
-                  </div>
-                  {user?.bio && (
-                    <div className="info-item-modern bio-item-modern">
-                      <div className="info-label-modern">Bio</div>
-                      <div className="bio-text-modern">{user.bio}</div>
+
+            <div className="settings-grid" style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '32px' }}>
+              {/* Personal Info Form */}
+              <div className="settings-section">
+                <h3 className="settings-title" style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#4b5563' }}>Personal Information</h3>
+                <form onSubmit={handleProfileUpdate}>
+                  <div className="settings-form-grid" style={{ display: 'grid', gap: '16px' }}>
+                    <div className="form-group">
+                      <label className="form-label">
+                        Full Name {(!currentUser?.name || currentUser.name.trim() === '') && <span style={{ color: '#dc2626' }}>*</span>}
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.name}
+                        onChange={(e) => setProfileData({ ...profileData, name: e.target.value })}
+                        required
+                        className="form-input"
+                      />
                     </div>
-                  )}
-                </div>
-              ) : (
-                <form onSubmit={handleProfileUpdate} className="modern-profile-form">
-                  <div className="form-group-modern">
-                    <label htmlFor="profileName">Full Name</label>
-                    <input
-                      type="text"
-                      id="profileName"
-                      name="name"
-                      value={profileData.name}
-                      onChange={handleProfileInputChange}
-                      required
-                      placeholder="Enter your full name"
-                      className="modern-input"
-                    />
+                    <div className="form-group">
+                      <label className="form-label">Email Address</label>
+                      <input
+                        type="email"
+                        value={profileData.email}
+                        onChange={(e) => setProfileData({ ...profileData, email: e.target.value })}
+                        required
+                        disabled={currentUser && currentUser.email && currentUser.email.trim() !== ''}
+                        className={currentUser && currentUser.email && currentUser.email.trim() !== '' ? "form-input disabled" : "form-input"}
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">
+                        Designation
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.designation}
+                        onChange={(e) => setProfileData({ ...profileData, designation: e.target.value })}
+                        className="form-input"
+                        placeholder="e.g., Principal Architect, Project Architect"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">
+                        Specialization
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.specialization}
+                        onChange={(e) => setProfileData({ ...profileData, specialization: e.target.value })}
+                        className="form-input"
+                        placeholder="e.g., Sustainable Design, Urban Planning"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">
+                        License Number
+                      </label>
+                      <input
+                        type="text"
+                        value={profileData.licenseNumber}
+                        onChange={(e) => setProfileData({ ...profileData, licenseNumber: e.target.value })}
+                        className="form-input"
+                        placeholder="Your professional license number (if applicable)"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">
+                        Portfolio Link
+                      </label>
+                      <input
+                        type="url"
+                        value={profileData.portfolioLink}
+                        onChange={(e) => setProfileData({ ...profileData, portfolioLink: e.target.value })}
+                        className="form-input"
+                        placeholder="https://yourportfolio.com"
+                      />
+                    </div>
+                    <div className="form-group full-width">
+                      <label className="form-label">
+                        Bio
+                      </label>
+                      <textarea
+                        value={profileData.bio}
+                        onChange={(e) => setProfileData({ ...profileData, bio: e.target.value })}
+                        rows="4"
+                        className="form-textarea"
+                        placeholder="Tell us a bit about yourself..."
+                      />
+                    </div>
                   </div>
-                  <div className="form-group-modern">
-                    <label htmlFor="profileEmail">Email Address</label>
-                    <input
-                      type="email"
-                      id="profileEmail"
-                      name="email"
-                      value={profileData.email}
-                      onChange={handleProfileInputChange}
-                      required
-                      placeholder="Enter your email address"
-                      className="modern-input"
-                    />
-                  </div>
-                  <div className="form-group-modern">
-                    <label htmlFor="profileBio">Bio</label>
-                    <textarea
-                      id="profileBio"
-                      name="bio"
-                      value={profileData.bio}
-                      onChange={handleProfileInputChange}
-                      rows="4"
-                      placeholder="Enter your bio (optional)"
-                      className="modern-textarea"
-                    />
-                  </div>
-                  
+
                   {profileMessage && (
-                    <div className={`modern-message ${profileMessage.type === 'error' ? 'error' : 'success'}`}>
+                    <div className={`alert ${profileMessage.type === 'error' ? 'alert-danger' : 'alert-success'}`} style={{ marginTop: '1.5rem' }}>
                       {profileMessage.text}
                     </div>
                   )}
-                  
-                  <div className="form-actions-modern">
-                    <button 
-                      type="submit" 
-                      className="btn-modern-primary"
-                      disabled={isUpdatingProfile}
-                    >
+
+                  <div className="form-actions" style={{ marginTop: '16px' }}>
+                    <button type="submit" className="btn-primary" disabled={isUpdatingProfile}>
                       {isUpdatingProfile ? 'Saving...' : 'Save Changes'}
-                    </button>
-                    <button 
-                      type="button" 
-                      className="btn-modern-outline"
-                      onClick={cancelProfileEdit}
-                      disabled={isUpdatingProfile}
-                    >
-                      Cancel
                     </button>
                   </div>
                 </form>
-              )}
-            </div>
-          </div>
-
-          {/* Attendance Tracking Card */}
-          <div className="modern-profile-card">
-            <div className="card-header-modern">
-              <div className="card-title-section">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                  <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                  <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2"/>
-                </svg>
-                <h3>Attendance Tracking</h3>
               </div>
-            </div>
-            <div className="card-content-modern">
-              <div className="attendance-status-modern">
-                <div className="status-indicator-modern">
-                  <div className={`status-dot-modern ${attendanceStatus.isClockedIn ? 'active' : 'inactive'}`}></div>
-                  <div className="status-info-modern">
-                    <span className="status-text-modern">
-                      {attendanceStatus.isClockedIn ? 'Currently Clocked In' : 'Currently Clocked Out'}
-                    </span>
-                    {attendanceStatus.lastEntry && (
-                      <span className="last-entry-time-modern">
-                        Last {attendanceStatus.lastEntry.entryType === 'CLOCK_IN' ? 'clock in' : 'clock out'}: {' '}
-                        {formatTime(attendanceStatus.lastEntry.timestamp)} on {formatDate(attendanceStatus.lastEntry.timestamp)}
-                      </span>
-                    )}
+
+              {/* Password Form */}
+              <div className="settings-section" style={{ borderTop: '1px solid #e5e7eb', paddingTop: '24px' }}>
+                <h3 className="settings-title" style={{ fontSize: '16px', fontWeight: '600', marginBottom: '16px', color: '#4b5563' }}>Security</h3>
+                <form onSubmit={handlePasswordChange}>
+                  <div className="settings-form-grid" style={{ display: 'grid', gap: '16px' }}>
+                    <div className="form-group full-width">
+                      <label className="form-label">Current Password</label>
+                      <input
+                        type="password"
+                        value={passwordData.currentPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, currentPassword: e.target.value })}
+                        required
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">New Password</label>
+                      <input
+                        type="password"
+                        value={passwordData.newPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, newPassword: e.target.value })}
+                        required
+                        minLength="6"
+                        className="form-input"
+                      />
+                    </div>
+                    <div className="form-group">
+                      <label className="form-label">Confirm New Password</label>
+                      <input
+                        type="password"
+                        value={passwordData.confirmPassword}
+                        onChange={(e) => setPasswordData({ ...passwordData, confirmPassword: e.target.value })}
+                        required
+                        minLength="6"
+                        className="form-input"
+                      />
+                    </div>
                   </div>
-                </div>
-                
-                <div className="attendance-actions-modern">
-                  <button
-                    onClick={handleClockIn}
-                    disabled={attendanceStatus.loading || attendanceStatus.hasClockedInToday || attendanceStatus.hasClockedOutToday}
-                    className={`btn-attendance-modern clock-in ${attendanceStatus.hasClockedInToday || attendanceStatus.hasClockedOutToday ? 'disabled' : ''}`}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="2"/>
-                      <polyline points="12,6 12,12 16,14" stroke="currentColor" strokeWidth="2"/>
-                    </svg>
-                    {attendanceStatus.loading ? 'Processing...' : 
-                     attendanceStatus.hasClockedInToday ? 'Already Clocked In' :
-                     attendanceStatus.hasClockedOutToday ? 'Already Clocked Out' : 'Clock In'}
-                  </button>
-                  <button
-                    onClick={handleClockOut}
-                    disabled={attendanceStatus.loading || !attendanceStatus.hasClockedInToday || attendanceStatus.hasClockedOutToday}
-                    className={`btn-attendance-modern clock-out ${!attendanceStatus.hasClockedInToday || attendanceStatus.hasClockedOutToday ? 'disabled' : ''}`}
-                  >
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none">
-                      <rect x="6" y="6" width="12" height="12" rx="2" stroke="currentColor" strokeWidth="2"/>
-                      <path d="M9 9h6v6H9z" stroke="currentColor" strokeWidth="2"/>
-                    </svg>
-                    {attendanceStatus.loading ? 'Processing...' : 
-                     !attendanceStatus.hasClockedInToday ? 'Clock In First' :
-                     attendanceStatus.hasClockedOutToday ? 'Already Clocked Out' : 'Clock Out'}
-                  </button>
-                </div>
-              </div>
 
-              {attendanceMessage && (
-                <div className={`modern-message ${attendanceMessage.type === 'error' ? 'error' : 'success'}`}>
-                  {attendanceMessage.text}
-                </div>
-              )}
+                  {passwordMessage && (
+                    <div className={`alert ${passwordMessage.type === 'error' ? 'alert-danger' : 'alert-success'}`} style={{ marginTop: '1.5rem' }}>
+                      {passwordMessage.text}
+                    </div>
+                  )}
+
+                  <div className="form-actions" style={{ marginTop: '16px' }}>
+                    <button type="submit" className="btn-primary" disabled={isChangingPassword}>
+                      {isChangingPassword ? 'Updating...' : 'Update Password'}
+                    </button>
+                  </div>
+                </form>
+              </div>
             </div>
           </div>
         </div>
 
-      {/* Password Change Form - Now shown as modal/overlay */}
-      {showPasswordForm && (
+      </div>
+
+      {/* Profile Image Upload Modal */}
+      {showImageUploadModal && (
         <div className="password-modal-overlay">
-          <div className="password-modal">
+          <div className="password-modal image-upload-modal">
             <div className="password-modal-header">
-              <h3>Change Password</h3>
-              <button 
-                onClick={() => setShowPasswordForm(false)}
-                className="close-btn"
-              >
-                ×
-              </button>
+              <h3>Update Profile Picture</h3>
+              <button onClick={() => setShowImageUploadModal(false)} className="close-btn">×</button>
             </div>
-            
-            <form onSubmit={handlePasswordChange} className="password-form">
-              <div className="form-group">
-                <label htmlFor="currentPassword">Current Password</label>
-                <input
-                  type="password"
-                  id="currentPassword"
-                  name="currentPassword"
-                  value={passwordData.currentPassword}
-                  onChange={handleInputChange}
-                  required
-                  placeholder="Enter current password"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="newPassword">New Password</label>
-                <input
-                  type="password"
-                  id="newPassword"
-                  name="newPassword"
-                  value={passwordData.newPassword}
-                  onChange={handleInputChange}
-                  required
-                  minLength="6"
-                  placeholder="Enter new password (min 6 characters)"
-                />
-              </div>
-
-              <div className="form-group">
-                <label htmlFor="confirmPassword">Confirm New Password</label>
-                <input
-                  type="password"
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  value={passwordData.confirmPassword}
-                  onChange={handleInputChange}
-                  required
-                  minLength="6"
-                  placeholder="Confirm new password"
-                />
-              </div>
-
-              {passwordMessage && (
-                <div className={`alert ${passwordMessage.type === 'error' ? 'alert-danger' : 'alert-success'}`}>
-                  {passwordMessage.text}
-                </div>
-              )}
-
-              <div className="form-actions">
-                <button 
-                  type="button"
-                  onClick={() => setShowPasswordForm(false)}
-                  className="btn-outline"
-                >
-                  Cancel
-                </button>
-                <button 
-                  type="submit" 
-                  className="btn-primary"
-                  disabled={isChangingPassword}
-                >
-                  {isChangingPassword ? 'Updating...' : 'Update Password'}
-                </button>
-              </div>
-            </form>
+            <div className="modal-content">
+              <ProfileImageUpload
+                currentImageUrl={profileImageUrl}
+                onUploadSuccess={(newImageUrl) => {
+                  setProfileImageUrl(newImageUrl);
+                  // Fetch fresh data after image upload
+                  const fetchUserData = async () => {
+                    try {
+                      const statusUrl = getApiUrl('/api/auth/status');
+                      const response = await fetch(statusUrl, {
+                        credentials: 'include'
+                      });
+                      if (response.ok) {
+                        const userData = await response.json();
+                        setCurrentUser(userData);
+                      }
+                    } catch (error) {
+                      console.error('Failed to refresh user data:', error);
+                    }
+                  };
+                  fetchUserData();
+                  if (onUserUpdate) onUserUpdate();
+                  setTimeout(() => setShowImageUploadModal(false), 500);
+                }}
+                onUploadError={(error) => {
+                  console.error('Upload error:', error);
+                }}
+                onDelete={() => {
+                  setProfileImageUrl(null);
+                  // Fetch fresh data after image deletion
+                  const fetchUserData = async () => {
+                    try {
+                      const statusUrl = getApiUrl('/api/auth/status');
+                      const response = await fetch(statusUrl, {
+                        credentials: 'include'
+                      });
+                      if (response.ok) {
+                        const userData = await response.json();
+                        setCurrentUser(userData);
+                      }
+                    } catch (error) {
+                      console.error('Failed to refresh user data:', error);
+                    }
+                  };
+                  fetchUserData();
+                  if (onUserUpdate) onUserUpdate();
+                }}
+                maxSizeMB={2}
+              />
+              <p className="upload-tip">
+                Your profile picture will be visible to other members of your organization.
+              </p>
+            </div>
           </div>
         </div>
       )}

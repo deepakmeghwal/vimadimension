@@ -1,0 +1,48 @@
+.btn-small-primary {
+  padding: 0.625rem 1rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  border-radius: 6px;
+  background: transparent;
+  color: #0f172a;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-decoration: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.375rem;
+  white-space: nowrap;
+  line-height: 1.5;
+}
+
+.btn-small-primary:hover {
+  background: #f8fafc;
+  border-color: #cbd5e1;
+}
+
+.btn-small-primary:active {
+  background: #f1f5f9;
+  border-color: #94a3b8;
+}
+
+.kanban-card {
+  cursor: grab;
+  user-select: none;
+}
+
+.kanban-card:active {
+  cursor: grabbing;
+  opacity: 0.8;
+}
+
+.kanban-card.dragging {
+  opacity: 0.5;
+}
+
+.kanban-column.drag-over {
+  background: rgba(99, 102, 241, 0.05);
+  border: 2px dashed #6366f1;
+  border-radius: 8px;
+}

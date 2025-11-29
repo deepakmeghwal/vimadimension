@@ -35,13 +35,12 @@ public class UserDetailsServiceImpl implements UserDetailsService {
         // System.out.println("!!! UserDetailsServiceImpl.loadUserByUsername CALLED with username: " + username + " !!!"); // Temporary test
         logger.info("Attempting to load user by username: {}", username); // Log attempt
 
-        // It's good practice to normalize the username if it's stored normalized
-        // String normalizedUsername = username.trim().toLowerCase();
-        // User user = userRepository.findByUsername(normalizedUsername)
-        User user = userRepository.findByUsername(username) // Assuming username is already handled consistently
+        // Normalize the username to ensure consistent lookup regardless of casing
+        String normalizedUsername = username.trim().toLowerCase();
+        User user = userRepository.findByUsername(normalizedUsername)
                 .orElseThrow(() -> {
-                    logger.warn("User not found with username: {}", username); // Log if not found
-                    return new UsernameNotFoundException("User not found with username: " + username);
+                    logger.warn("User not found with username: {}", normalizedUsername); // Log if not found
+                    return new UsernameNotFoundException("User not found with username: " + normalizedUsername);
                 });
 
         logger.info("User found: {}. Enabled: {}. Password (encoded): {}",

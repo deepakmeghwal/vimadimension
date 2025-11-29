@@ -13,11 +13,19 @@ import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.header.writers.ReferrerPolicyHeaderWriter;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 @Configuration
 @EnableWebSecurity
 @EnableMethodSecurity(prePostEnabled = true) // To enable @PreAuthorize
 public class SecurityConfig {
+
+    private final CorsConfig corsConfig;
+
+    public SecurityConfig(CorsConfig corsConfig) {
+        this.corsConfig = corsConfig;
+    }
 
     @Bean
     public PasswordEncoder passwordEncoder() {
@@ -29,40 +37,86 @@ public class SecurityConfig {
         return authConfig.getAuthenticationManager();
     }
 
+    private CorsConfigurationSource corsConfigurationSource() {
+        return corsConfig.corsConfigurationSource();
+    }
+
     @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
+                // CORS must be configured first - before authentication
+                .cors(cors -> cors.configurationSource(corsConfigurationSource()))
+                .csrf(csrf -> csrf
+                        // Disable CSRF for API endpoints (using session-based auth)
+                        .ignoringRequestMatchers("/api/**")
+                )
                 .authorizeHttpRequests(authorize -> authorize
-                        .requestMatchers("/css/**", "/js/**", "/images/**", "/static/**", "/index.html", "/error").permitAll()
+                        // Health check endpoint (public)
                         .requestMatchers("/actuator/health").permitAll()
+                        .requestMatchers("/error").permitAll()
+                        
+                        // CORS preflight requests (OPTIONS) - MUST be allowed before authentication
+                        // This ensures CORS filter can add headers before auth check
+                        .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/api/**").permitAll()
+                        
+                        // Public API endpoints (no authentication required)
+                        // Organization registration and verification
                         .requestMatchers("/api/organization/register").permitAll()
-                        .requestMatchers("/api/auth/login").permitAll()
+                        .requestMatchers("/api/organization/verify").permitAll()
+                        .requestMatchers("/api/organization/resend-verification").permitAll()
+                        
+                        // Authentication endpoints
+                        .requestMatchers("/api/auth/**").permitAll()
+                        .requestMatchers("/api/auth/validate-reset-token").permitAll()
+                        .requestMatchers("/api/auth/reset-password").permitAll()
+                        
+                        // Invitation endpoints (validation and acceptance are public)
+                        .requestMatchers("/api/invitations/validate").permitAll()
+                        .requestMatchers("/api/invitations/accept").permitAll()
+                        
+                        // File serving endpoint (public for viewing profile images and other files)
+                        // Must come BEFORE the general /api/** rule to be matched first
+                        .requestMatchers("/api/files/**").permitAll()
+                        
+                        // All other API endpoints require authentication
                         .requestMatchers("/api/**").authenticated()
-                        .requestMatchers("/", "/login", "/register").permitAll()
-                        .requestMatchers("/projects/**", "/tasks/**", "/profile", "/users/**", "/admin/**").permitAll()
-                        .anyRequest().authenticated()
+                        
+                        // Note: Frontend is served from S3 + CloudFront, so no static file paths needed
+                        // All other requests should return 404 (frontend handles routing)
+                        .anyRequest().denyAll()
                 )
-                .formLogin(form -> form
-                        .loginPage("/login")
-                        .permitAll()
-                        .defaultSuccessUrl("/profile", true)
-                        .failureUrl("/login?error=true")
-                )
-                .logout(logout -> logout
-                        .logoutUrl("/logout")  // Changed from /api/logout to avoid conflict
-                        .logoutSuccessUrl("/login?logout")
-                        .permitAll()
-                )
+                // Disable anonymous authentication for better CORS handling
+                // .anonymous(anonymous -> anonymous.disable())
+                // Form login disabled (using API-based authentication)
+                // Frontend handles login UI from CloudFront
+                
+                // Session management for API authentication
                 .sessionManagement(session -> session
                         .sessionCreationPolicy(org.springframework.security.config.http.SessionCreationPolicy.IF_REQUIRED)
                         .maximumSessions(1)
                         .maxSessionsPreventsLogin(false)
                 )
-                .csrf(csrf -> csrf
-                        .ignoringRequestMatchers("/api/**") // Disable CSRF for API endpoints
+                
+                // Security headers
+                .headers(headers -> headers
+                        .frameOptions(frameOptions -> frameOptions.deny())
+                        .contentTypeOptions(contentTypeOptions -> {})
+                        .httpStrictTransportSecurity(hstsConfig -> hstsConfig
+                                .maxAgeInSeconds(31536000)
+                        )
                 )
+                
                 .exceptionHandling(exceptions -> exceptions
-                        .accessDeniedPage("/access-denied")
+                        .accessDeniedHandler((request, response, accessDeniedException) -> {
+                            response.setStatus(403);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Access denied\"}");
+                        })
+                        .authenticationEntryPoint((request, response, authException) -> {
+                            response.setStatus(401);
+                            response.setContentType("application/json");
+                            response.getWriter().write("{\"error\":\"Unauthorized - DEBUG\"}");
+                        })
                 );
 
         return http.build();

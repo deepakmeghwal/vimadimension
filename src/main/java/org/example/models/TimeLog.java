@@ -8,7 +8,11 @@ import java.time.LocalDateTime;
 import java.util.Objects;
 
 @Entity
-@Table(name = "time_logs")
+@Table(name = "time_logs", indexes = {
+    @Index(name = "idx_timelog_user_id", columnList = "user_id"),
+    @Index(name = "idx_timelog_task_id", columnList = "task_id"),
+    @Index(name = "idx_timelog_date_logged", columnList = "date_logged")
+})
 public class TimeLog {
 
     @Id

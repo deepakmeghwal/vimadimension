@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 
-const EditUser = () => {
+const EditUser = ({ isPeopleContext = false }) => {
   const navigate = useNavigate();
   const { userId } = useParams();
   const [formData, setFormData] = useState({
@@ -11,8 +11,12 @@ const EditUser = () => {
     designation: '',
     specialization: '',
     bio: '',
-    role: 'ROLE_USER'
+    role: 'ROLE_USER',
+    monthlySalary: '',
+    typicalHoursPerMonth: '160',
+    overheadMultiplier: '2.5'
   });
+  const [originalEmail, setOriginalEmail] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -33,19 +37,24 @@ const EditUser = () => {
       const response = await fetch(`/api/admin/users/${userId}`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success) {
           const user = data.user;
+          const userEmail = user.email || '';
+          setOriginalEmail(userEmail);
           setFormData({
             username: user.username || '',
             name: user.name || '',
-            email: user.email || '',
+            email: userEmail,
             designation: user.designation || '',
             specialization: user.specialization || '',
             bio: user.bio || '',
-            role: user.roles && user.roles.length > 0 ? user.roles[0] : 'ROLE_USER'
+            role: user.roles && user.roles.length > 0 ? user.roles[0] : 'ROLE_USER',
+            monthlySalary: user.monthlySalary || '',
+            typicalHoursPerMonth: user.typicalHoursPerMonth || '160',
+            overheadMultiplier: user.overheadMultiplier || '2.5'
           });
         } else {
           setError(data.error || 'Failed to fetch user data');
@@ -88,7 +97,10 @@ const EditUser = () => {
           designation: formData.designation,
           specialization: formData.specialization,
           bio: formData.bio,
-          role: formData.role
+          role: formData.role,
+          monthlySalary: formData.monthlySalary,
+          typicalHoursPerMonth: formData.typicalHoursPerMonth,
+          overheadMultiplier: formData.overheadMultiplier
         })
       });
 
@@ -97,7 +109,7 @@ const EditUser = () => {
       if (response.ok && data.success) {
         setSuccess('User updated successfully!');
         setTimeout(() => {
-          navigate('/admin/users');
+          navigate(isPeopleContext ? '/people/directory' : '/admin/users');
         }, 2000);
       } else {
         setError(data.error || 'Failed to update user');
@@ -109,6 +121,8 @@ const EditUser = () => {
       setLoading(false);
     }
   };
+
+  const backPath = isPeopleContext ? '/people/directory' : '/admin/users';
 
   if (fetchingUser) {
     return (
@@ -124,13 +138,13 @@ const EditUser = () => {
   return (
     <div className="main-content">
       <div className="page-header">
-        <h1 className="page-title">Edit User</h1>
+        <h1 className="page-title">Edit Person</h1>
         <div className="page-actions">
-          <button 
-            onClick={() => navigate('/admin/users')} 
+          <button
+            onClick={() => navigate(backPath)}
             className="btn-outline"
           >
-            Back to Users List
+            Back to Directory
           </button>
         </div>
       </div>
@@ -188,8 +202,15 @@ const EditUser = () => {
                 value={formData.email}
                 onChange={handleChange}
                 required
-                placeholder="Enter email"
+                disabled={originalEmail && originalEmail.trim() !== ''}
+                className={originalEmail && originalEmail.trim() !== '' ? "form-input disabled" : "form-input"}
+                placeholder={originalEmail && originalEmail.trim() !== '' ? "Email cannot be changed" : "Enter email"}
               />
+              {originalEmail && originalEmail.trim() !== '' && (
+                <small className="form-help" style={{ color: '#666', display: 'block', marginTop: '0.25rem' }}>
+                  Email cannot be changed once set
+                </small>
+              )}
             </div>
 
             <div className="form-group">
@@ -248,18 +269,66 @@ const EditUser = () => {
             />
           </div>
 
+          {/* Resource Planning Section */}
+          <div className="form-section-header" style={{ marginTop: '2rem', marginBottom: '1rem', borderBottom: '1px solid #eee', paddingBottom: '0.5rem' }}>
+            <h3 style={{ fontSize: '1.1rem', color: '#334155' }}>Resource Planning Settings</h3>
+          </div>
+
+          <div className="form-row">
+            <div className="form-group">
+              <label htmlFor="monthlySalary">Monthly Salary (₹):</label>
+              <input
+                type="number"
+                id="monthlySalary"
+                name="monthlySalary"
+                value={formData.monthlySalary}
+                onChange={handleChange}
+                placeholder="e.g. 80000"
+                step="0.01"
+              />
+              <small className="form-help">Base monthly cost for this employee</small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="typicalHoursPerMonth">Typical Hours/Month:</label>
+              <input
+                type="number"
+                id="typicalHoursPerMonth"
+                name="typicalHoursPerMonth"
+                value={formData.typicalHoursPerMonth}
+                onChange={handleChange}
+                placeholder="160"
+              />
+              <small className="form-help">Standard working hours (default: 160)</small>
+            </div>
+
+            <div className="form-group">
+              <label htmlFor="overheadMultiplier">Overhead Multiplier:</label>
+              <input
+                type="number"
+                id="overheadMultiplier"
+                name="overheadMultiplier"
+                value={formData.overheadMultiplier}
+                onChange={handleChange}
+                placeholder="2.5"
+                step="0.1"
+              />
+              <small className="form-help">Factor for overheads & profit (default: 2.5)</small>
+            </div>
+          </div>
+
           <div className="project-actions">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn-primary"
               disabled={loading}
             >
-              {loading ? 'Updating...' : 'Update User'}
+              {loading ? 'Updating...' : 'Update Person'}
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn-outline"
-              onClick={() => navigate('/admin/users')}
+              onClick={() => navigate(backPath)}
               disabled={loading}
             >
               Cancel

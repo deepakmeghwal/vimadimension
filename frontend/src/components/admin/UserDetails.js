@@ -3,7 +3,7 @@ import { useNavigate, useParams } from 'react-router-dom';
 import AttendanceCalendar from './AttendanceCalendar';
 import GeneratePayslipModal from '../payslips/GeneratePayslipModal';
 
-const UserDetails = () => {
+const UserDetails = ({ isPeopleContext = false }) => {
   const navigate = useNavigate();
   const { userId } = useParams();
   const [user, setUser] = useState(null);
@@ -15,10 +15,29 @@ const UserDetails = () => {
   const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
-    checkAdminAuth();
-  }, []);
+    if (!userId) {
+      setError('Invalid user ID');
+      setLoading(false);
+      setCheckingAuth(false);
+      return;
+    }
+    
+    // Validate that userId is numeric
+    const userIdNum = parseInt(userId, 10);
+    if (isNaN(userIdNum) || userIdNum <= 0) {
+      setError('Invalid user ID. User ID must be a positive number.');
+      setLoading(false);
+      setCheckingAuth(false);
+      return;
+    }
+    
+    checkAccess();
+  }, [userId]);
 
-  const checkAdminAuth = async () => {
+  const checkAccess = async () => {
+    setCheckingAuth(true);
+    setLoading(true);
+    setError('');
     try {
       const response = await fetch('/api/auth/status', {
         credentials: 'include'
@@ -27,28 +46,38 @@ const UserDetails = () => {
       if (response.ok) {
         const userData = await response.json();
         const isAdmin = userData.authorities?.some(auth => auth.authority === 'ROLE_ADMIN');
+        const hasViewPermission = userData.authorities?.some(auth => auth.authority === 'users.view' || auth.authority === 'ROLE_ADMIN');
         
-        if (isAdmin) {
+        if (isPeopleContext ? hasViewPermission : isAdmin) {
           setAuthorized(true);
-          fetchUserDetails();
+          await fetchUserDetails();
         } else {
-          setError('Access denied. Admin privileges required.');
+          setError('Access denied. Insufficient privileges.');
           setTimeout(() => navigate('/projects'), 3000);
+          setLoading(false);
         }
       } else {
         setError('Please login to access this page.');
         setTimeout(() => navigate('/login'), 3000);
+        setLoading(false);
       }
     } catch (error) {
       console.error('Auth check failed:', error);
       setError('Authentication check failed.');
       setTimeout(() => navigate('/login'), 3000);
+      setLoading(false);
     } finally {
       setCheckingAuth(false);
     }
   };
 
   const fetchUserDetails = async () => {
+    if (!userId) {
+      setError('Invalid user ID');
+      setLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch(`/api/admin/users/${userId}`, {
         credentials: 'include'
@@ -59,8 +88,12 @@ const UserDetails = () => {
         if (responseData.success && responseData.user) {
           setUser(responseData.user);
         } else {
-          setError('Failed to fetch user details');
+          setError(responseData.error || 'Failed to fetch user details');
         }
+      } else if (response.status === 404) {
+        setError('User not found');
+      } else if (response.status === 403) {
+        setError('Access denied. You do not have permission to view this user.');
       } else {
         setError('Failed to fetch user details');
       }
@@ -94,6 +127,9 @@ const UserDetails = () => {
     );
   }
 
+  const backPath = isPeopleContext ? '/people/directory' : '/admin/users';
+  const editPath = isPeopleContext ? `/people/directory/${userId}/edit` : `/admin/users/${userId}/edit`;
+
   if (loading) {
     return (
       <div className="main-content">
@@ -111,8 +147,8 @@ const UserDetails = () => {
         <div className="error-container">
           <h2>Error</h2>
           <p>{error}</p>
-          <button onClick={() => navigate('/admin/users')} className="btn-primary">
-            Back to Users
+          <button onClick={() => navigate(backPath)} className="btn-primary">
+            Back to Directory
           </button>
         </div>
       </div>
@@ -125,8 +161,8 @@ const UserDetails = () => {
         <div className="error-container">
           <h2>User Not Found</h2>
           <p>The requested user could not be found.</p>
-          <button onClick={() => navigate('/admin/users')} className="btn-primary">
-            Back to Users
+          <button onClick={() => navigate(backPath)} className="btn-primary">
+            Back to Directory
           </button>
         </div>
       </div>
@@ -136,13 +172,13 @@ const UserDetails = () => {
   return (
     <div className="main-content">
       <div className="page-header">
-        <h1 className="page-title">User Details</h1>
+        <h1 className="page-title">Person Details</h1>
         <div className="page-actions">
           <button 
-            onClick={() => navigate('/admin/users')} 
+            onClick={() => navigate(backPath)} 
             className="btn-outline"
           >
-            Back to Users
+            Back to Directory
           </button>
           <button 
             onClick={() => setShowPayslipModal(true)} 
@@ -151,10 +187,10 @@ const UserDetails = () => {
             Generate Payslip
           </button>
           <button 
-            onClick={() => navigate(`/admin/users/${userId}/edit`)} 
+            onClick={() => navigate(editPath)} 
             className="btn-primary"
           >
-            Edit User
+            Edit Person
           </button>
         </div>
       </div>

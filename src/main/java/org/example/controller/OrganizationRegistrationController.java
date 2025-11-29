@@ -1,165 +1,156 @@
 package org.example.controller;
 
-import org.example.models.Organization;
-import org.example.models.Role;
-import org.example.models.User;
-import org.example.repository.OrganizationRepository;
-import org.example.repository.RoleRepository;
-import org.example.repository.UserRepository;
+import org.example.dto.auth.OrganizationRegistrationRequest;
+import org.example.service.AuthService;
+import org.example.service.AuthService.OrganizationRegistrationResult;
+import org.example.service.AuthService.VerificationResult;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
-import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
 
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
-import java.util.Set;
 
+/**
+ * Controller for organization registration and email verification.
+ * 
+ * Endpoints:
+ * - POST /api/organization/register - Register a new organization (sends verification email)
+ * - GET /api/organization/verify - Verify email using token
+ * - POST /api/organization/resend-verification - Resend verification email
+ */
 @RestController
 @RequestMapping("/api/organization")
 public class OrganizationRegistrationController {
 
-    @Autowired
-    private OrganizationRepository organizationRepository;
+    private static final Logger logger = LoggerFactory.getLogger(OrganizationRegistrationController.class);
 
     @Autowired
-    private UserRepository userRepository;
+    private AuthService authService;
 
-    @Autowired
-    private RoleRepository roleRepository;
-
-    @Autowired
-    private PasswordEncoder passwordEncoder;
-
+    /**
+     * Register a new organization with an admin user.
+     * Creates an unverified organization and sends a verification email.
+     */
     @PostMapping("/register")
-    public ResponseEntity<?> registerOrganization(@RequestBody OrganizationRegistrationRequest request) {
+    public ResponseEntity<Map<String, Object>> registerOrganization(
+            @Valid @RequestBody OrganizationRegistrationRequest request,
+            BindingResult bindingResult) {
+        
         Map<String, Object> response = new HashMap<>();
 
+        // Handle validation errors
+        if (bindingResult.hasErrors()) {
+            response.put("success", false);
+            response.put("message", bindingResult.getFieldErrors().get(0).getDefaultMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+
         try {
-            // Validate organization name uniqueness
-            if (organizationRepository.existsByName(request.getOrganizationName())) {
+            OrganizationRegistrationResult result = authService.registerOrganization(
+                    request.getOrganizationName(),
+                    request.getOrganizationDescription(),
+                    request.getOrganizationEmail(),
+                    request.getOrganizationPhone(),
+                    request.getOrganizationAddress(),
+                    request.getOrganizationWebsite(),
+                    request.getAdminName(),
+                    request.getAdminUsername(),
+                    request.getAdminEmail(),
+                    request.getAdminPassword(),
+                    request.getAdminDesignation(),
+                    request.getAdminSpecialization()
+            );
+
+            if (result.success()) {
+                response.put("success", true);
+                response.put("message", result.message());
+                response.put("organizationId", result.organizationId());
+                response.put("requiresVerification", true);
+                logger.info("Organization registered successfully: {}", request.getOrganizationName());
+                return ResponseEntity.ok(response);
+            } else {
                 response.put("success", false);
-                response.put("message", "Organization name already exists");
+                response.put("message", result.message());
                 return ResponseEntity.badRequest().body(response);
             }
-
-            // Validate organization email uniqueness
-            if (organizationRepository.existsByContactEmail(request.getOrganizationEmail())) {
-                response.put("success", false);
-                response.put("message", "Organization email already exists");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Validate admin username uniqueness
-            if (userRepository.existsByUsername(request.getAdminUsername())) {
-                response.put("success", false);
-                response.put("message", "Username already exists");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Validate admin email uniqueness
-            if (userRepository.existsByEmail(request.getAdminEmail())) {
-                response.put("success", false);
-                response.put("message", "Admin email already exists");
-                return ResponseEntity.badRequest().body(response);
-            }
-
-            // Create organization
-            Organization organization = new Organization();
-            organization.setName(request.getOrganizationName());
-            organization.setDescription(request.getOrganizationDescription());
-            organization.setContactEmail(request.getOrganizationEmail());
-            organization.setContactPhone(request.getOrganizationPhone());
-            organization.setAddress(request.getOrganizationAddress());
-            organization.setWebsite(request.getOrganizationWebsite());
-
-            Organization savedOrganization = organizationRepository.save(organization);
-
-            // Get ADMIN role
-            Optional<Role> adminRole = roleRepository.findByName("ROLE_ADMIN");
-            if (!adminRole.isPresent()) {
-                response.put("success", false);
-                response.put("message", "Admin role not found in system");
-                return ResponseEntity.internalServerError().body(response);
-            }
-
-            // Create admin user
-            User adminUser = new User();
-            adminUser.setUsername(request.getAdminUsername());
-            adminUser.setName(request.getAdminName()); // Add the name field
-            adminUser.setEmail(request.getAdminEmail());
-            adminUser.setPassword(passwordEncoder.encode(request.getAdminPassword()));
-            adminUser.setDesignation(request.getAdminDesignation());
-            adminUser.setSpecialization(request.getAdminSpecialization());
-            adminUser.setEnabled(true);
-            adminUser.setOrganization(savedOrganization);
-            adminUser.setRoles(Set.of(adminRole.get()));
-
-            userRepository.save(adminUser);
-
-            response.put("success", true);
-            response.put("message", "Organization and admin user registered successfully");
-            response.put("organizationId", savedOrganization.getId());
-
-            return ResponseEntity.ok(response);
 
         } catch (Exception e) {
+            logger.error("Registration failed: {}", e.getMessage(), e);
             response.put("success", false);
             response.put("message", "Registration failed: " + e.getMessage());
             return ResponseEntity.internalServerError().body(response);
         }
     }
 
-    public static class OrganizationRegistrationRequest {
-        private String organizationName;
-        private String organizationDescription;
-        private String organizationEmail;
-        private String organizationPhone;
-        private String organizationAddress;
-        private String organizationWebsite;
-        private String adminName;
-        private String adminUsername;
-        private String adminEmail;
-        private String adminPassword;
-        private String adminDesignation;
-        private String adminSpecialization;
+    /**
+     * Verify organization email using the token from the verification email.
+     */
+    @GetMapping("/verify")
+    public ResponseEntity<Map<String, Object>> verifyEmail(@RequestParam String token) {
+        Map<String, Object> response = new HashMap<>();
 
-        // Getters and setters
-        public String getOrganizationName() { return organizationName; }
-        public void setOrganizationName(String organizationName) { this.organizationName = organizationName; }
+        if (token == null || token.trim().isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Verification token is required");
+            return ResponseEntity.badRequest().body(response);
+        }
 
-        public String getOrganizationDescription() { return organizationDescription; }
-        public void setOrganizationDescription(String organizationDescription) { this.organizationDescription = organizationDescription; }
+        try {
+            VerificationResult result = authService.verifyOrganization(token);
 
-        public String getOrganizationEmail() { return organizationEmail; }
-        public void setOrganizationEmail(String organizationEmail) { this.organizationEmail = organizationEmail; }
+            if (result.success()) {
+                response.put("success", true);
+                response.put("message", result.message());
+                response.put("organizationId", result.organizationId());
+                response.put("organizationName", result.organizationName());
+                logger.info("Organization verified successfully: {}", result.organizationName());
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", result.message());
+                return ResponseEntity.badRequest().body(response);
+            }
 
-        public String getOrganizationPhone() { return organizationPhone; }
-        public void setOrganizationPhone(String organizationPhone) { this.organizationPhone = organizationPhone; }
+        } catch (Exception e) {
+            logger.error("Verification failed: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("message", "Verification failed: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
 
-        public String getOrganizationAddress() { return organizationAddress; }
-        public void setOrganizationAddress(String organizationAddress) { this.organizationAddress = organizationAddress; }
+    /**
+     * Resend verification email.
+     */
+    @PostMapping("/resend-verification")
+    public ResponseEntity<Map<String, Object>> resendVerification(@RequestBody Map<String, String> request) {
+        Map<String, Object> response = new HashMap<>();
 
-        public String getOrganizationWebsite() { return organizationWebsite; }
-        public void setOrganizationWebsite(String organizationWebsite) { this.organizationWebsite = organizationWebsite; }
+        String email = request.get("email");
+        if (email == null || email.trim().isEmpty()) {
+            response.put("success", false);
+            response.put("message", "Email is required");
+            return ResponseEntity.badRequest().body(response);
+        }
 
-        public String getAdminName() { return adminName; }
-        public void setAdminName(String adminName) { this.adminName = adminName; }
+        try {
+            // Always return success to prevent email enumeration
+            authService.resendVerificationEmail(email);
+            
+            response.put("success", true);
+            response.put("message", "If an unverified account exists with this email, a new verification link has been sent.");
+            return ResponseEntity.ok(response);
 
-        public String getAdminUsername() { return adminUsername; }
-        public void setAdminUsername(String adminUsername) { this.adminUsername = adminUsername; }
-
-        public String getAdminEmail() { return adminEmail; }
-        public void setAdminEmail(String adminEmail) { this.adminEmail = adminEmail; }
-
-        public String getAdminPassword() { return adminPassword; }
-        public void setAdminPassword(String adminPassword) { this.adminPassword = adminPassword; }
-
-        public String getAdminDesignation() { return adminDesignation; }
-        public void setAdminDesignation(String adminDesignation) { this.adminDesignation = adminDesignation; }
-
-        public String getAdminSpecialization() { return adminSpecialization; }
-        public void setAdminSpecialization(String adminSpecialization) { this.adminSpecialization = adminSpecialization; }
+        } catch (Exception e) {
+            logger.error("Resend verification failed: {}", e.getMessage(), e);
+            response.put("success", true); // Still return success to prevent enumeration
+            response.put("message", "If an unverified account exists with this email, a new verification link has been sent.");
+            return ResponseEntity.ok(response);
+        }
     }
 }

@@ -1,9 +1,12 @@
 package org.example.models.enums;
 
 public enum ProjectStatus {
-    IN_DISCUSSION("In discussion"),
-    PROGRESS("Progress"),
-    ON_HOLD("On hold"),
+    ACTIVE("Active"),
+    INACTIVE("Inactive"),
+    DORMANT("Dormant"),
+    IN_DISCUSSION("In Discussion"),
+    PROGRESS("In Progress"),
+    ON_HOLD("On Hold"),
     COMPLETED("Completed"),
     ARCHIVED("Archived");
 

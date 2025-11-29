@@ -10,18 +10,24 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
 import org.springframework.security.web.context.SecurityContextRepository;
+import org.springframework.validation.BindingResult;
 import org.springframework.web.bind.annotation.*;
-import org.springframework.beans.factory.annotation.Autowired;
 
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.servlet.http.HttpSession;
+import jakarta.validation.Valid;
 import java.util.HashMap;
 import java.util.Map;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+import org.example.dto.auth.ForgotPasswordRequest;
+import org.example.dto.auth.ResetPasswordRequest;
 import org.example.models.User;
+import org.example.service.AuthService;
+import org.example.service.AuthService.PasswordResetResult;
+import org.example.service.AuthService.PasswordResetValidation;
 import org.example.service.UserService;
 
 @RestController
@@ -35,6 +41,9 @@ public class ApiAuthController {
 
     @Autowired
     private UserService userService;
+
+    @Autowired
+    private AuthService authService;
 
     private final SecurityContextRepository securityContextRepository = new HttpSessionSecurityContextRepository();
 
@@ -52,9 +61,12 @@ public class ApiAuthController {
                 return ResponseEntity.badRequest().body(response);
             }
             
+            // Normalize username (email) to ensure consistent authentication
+            String normalizedUsername = username.trim().toLowerCase();
+            
             // Authenticate the user
             Authentication authentication = authenticationManager.authenticate(
-                new UsernamePasswordAuthenticationToken(username, password)
+                new UsernamePasswordAuthenticationToken(normalizedUsername, password)
             );
             
             if (authentication.isAuthenticated()) {
@@ -114,9 +126,17 @@ public class ApiAuthController {
                 userInfo.put("enabled", user.isEnabled());
                 userInfo.put("organizationId", user.getOrganization() != null ? user.getOrganization().getId() : null);
                 userInfo.put("organizationName", user.getOrganization() != null ? user.getOrganization().getName() : null);
+                userInfo.put("organizationLogoUrl", user.getOrganization() != null ? user.getOrganization().getLogoUrl() : null);
                 userInfo.put("designation", user.getDesignation());
                 userInfo.put("specialization", user.getSpecialization());
+                userInfo.put("licenseNumber", user.getLicenseNumber());
+                userInfo.put("portfolioLink", user.getPortfolioLink());
                 userInfo.put("bio", user.getBio());
+                userInfo.put("profileImageUrl", user.getProfileImageUrl());
+                userInfo.put("createdAt", user.getCreatedAt());
+                
+                // Add roles and permissions
+                userInfo.put("roles", user.getRoles());
                 
                 // Add authorities if available
                 if (authentication.getPrincipal() instanceof UserDetails) {
@@ -173,6 +193,127 @@ public class ApiAuthController {
             errorResponse.put("success", false);
             errorResponse.put("message", "Logout failed");
             return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    // ========================
+    // Password Reset Endpoints
+    // ========================
+
+    /**
+     * Request a password reset.
+     * Sends a reset link to the user's email.
+     */
+    @PostMapping("/forgot-password")
+    public ResponseEntity<Map<String, Object>> forgotPassword(
+            @Valid @RequestBody ForgotPasswordRequest request,
+            BindingResult bindingResult) {
+        
+        Map<String, Object> response = new HashMap<>();
+
+        // Handle validation errors
+        if (bindingResult.hasErrors()) {
+            response.put("success", false);
+            response.put("message", bindingResult.getFieldErrors().get(0).getDefaultMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            // Always return success to prevent email enumeration
+            authService.requestPasswordReset(request.getEmail());
+            
+            response.put("success", true);
+            response.put("message", "If an account exists with this email, a password reset link has been sent.");
+            logger.info("Password reset requested for email: {}", request.getEmail());
+            return ResponseEntity.ok(response);
+
+        } catch (Exception e) {
+            logger.error("Forgot password error: {}", e.getMessage(), e);
+            // Still return success to prevent email enumeration
+            response.put("success", true);
+            response.put("message", "If an account exists with this email, a password reset link has been sent.");
+            return ResponseEntity.ok(response);
+        }
+    }
+
+    /**
+     * Validate a password reset token.
+     * Used by frontend to check if the reset link is valid before showing the form.
+     */
+    @GetMapping("/validate-reset-token")
+    public ResponseEntity<Map<String, Object>> validateResetToken(@RequestParam String token) {
+        Map<String, Object> response = new HashMap<>();
+
+        if (token == null || token.trim().isEmpty()) {
+            response.put("valid", false);
+            response.put("message", "Reset token is required");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            PasswordResetValidation validation = authService.validatePasswordResetToken(token);
+
+            if (validation.valid()) {
+                response.put("valid", true);
+                response.put("email", validation.email());
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("valid", false);
+                response.put("message", validation.message());
+                return ResponseEntity.badRequest().body(response);
+            }
+
+        } catch (Exception e) {
+            logger.error("Validate reset token error: {}", e.getMessage(), e);
+            response.put("valid", false);
+            response.put("message", "Failed to validate reset token");
+            return ResponseEntity.internalServerError().body(response);
+        }
+    }
+
+    /**
+     * Reset password using the token from the reset email.
+     */
+    @PostMapping("/reset-password")
+    public ResponseEntity<Map<String, Object>> resetPassword(
+            @Valid @RequestBody ResetPasswordRequest request,
+            BindingResult bindingResult) {
+        
+        Map<String, Object> response = new HashMap<>();
+
+        // Handle validation errors
+        if (bindingResult.hasErrors()) {
+            response.put("success", false);
+            response.put("message", bindingResult.getFieldErrors().get(0).getDefaultMessage());
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        // Validate passwords match
+        if (!request.passwordsMatch()) {
+            response.put("success", false);
+            response.put("message", "Passwords do not match");
+            return ResponseEntity.badRequest().body(response);
+        }
+
+        try {
+            PasswordResetResult result = authService.resetPassword(request.getToken(), request.getNewPassword());
+
+            if (result.success()) {
+                response.put("success", true);
+                response.put("message", result.message());
+                logger.info("Password reset successful for user: {}", result.username());
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", result.message());
+                return ResponseEntity.badRequest().body(response);
+            }
+
+        } catch (Exception e) {
+            logger.error("Reset password error: {}", e.getMessage(), e);
+            response.put("success", false);
+            response.put("message", "Failed to reset password: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
     }
 }

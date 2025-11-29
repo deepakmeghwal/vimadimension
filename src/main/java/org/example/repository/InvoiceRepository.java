@@ -71,4 +71,48 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
 
     @Query("SELECT SUM(i.balanceAmount) FROM Invoice i WHERE i.organization = :organization AND i.status NOT IN ('PAID', 'CANCELLED')")
     Double getTotalOutstandingByOrganization(@Param("organization") Organization organization);
+
+    // Financial Health Dashboard Aggregation Queries
+    
+    // Get invoice statistics grouped by status for active projects in an organization
+    @Query("SELECT i.status, COUNT(i), COALESCE(SUM(i.totalAmount), 0), COALESCE(SUM(i.paidAmount), 0), COALESCE(SUM(i.balanceAmount), 0) " +
+           "FROM Invoice i WHERE i.organization.id = :organizationId " +
+           "AND (i.project IS NULL OR i.project.status IN ('ACTIVE', 'PROGRESS')) " +
+           "GROUP BY i.status")
+    List<Object[]> getInvoiceStatsByStatusForActiveProjects(@Param("organizationId") Long organizationId);
+
+    // Get invoice statistics grouped by charge type for active projects
+    @Query("SELECT p.chargeType, COUNT(i), COALESCE(SUM(i.totalAmount), 0), COALESCE(SUM(i.paidAmount), 0), COALESCE(SUM(i.balanceAmount), 0) " +
+           "FROM Invoice i JOIN i.project p " +
+           "WHERE i.organization.id = :organizationId " +
+           "AND p.status IN ('ACTIVE', 'PROGRESS') " +
+           "GROUP BY p.chargeType")
+    List<Object[]> getInvoiceStatsByChargeType(@Param("organizationId") Long organizationId);
+
+    // Get invoice statistics grouped by project stage for active projects
+    @Query("SELECT p.projectStage, COUNT(i), COALESCE(SUM(i.totalAmount), 0), COALESCE(SUM(i.paidAmount), 0), COALESCE(SUM(i.balanceAmount), 0) " +
+           "FROM Invoice i JOIN i.project p " +
+           "WHERE i.organization.id = :organizationId " +
+           "AND p.status IN ('ACTIVE', 'PROGRESS') " +
+           "GROUP BY p.projectStage")
+    List<Object[]> getInvoiceStatsByProjectStage(@Param("organizationId") Long organizationId);
+
+    // Get overall financial metrics for active projects
+    // Only include invoices that belong to active projects (or have no project for legacy data)
+    @Query("SELECT COUNT(i), " +
+           "COALESCE(SUM(i.totalAmount), 0) as totalInvoiced, " +
+           "COALESCE(SUM(i.paidAmount), 0) as totalPaid, " +
+           "COALESCE(SUM(i.balanceAmount), 0) as totalOutstanding " +
+           "FROM Invoice i WHERE i.organization.id = :organizationId " +
+           "AND (i.project IS NULL OR i.project.status IN ('ACTIVE', 'PROGRESS'))")
+    Object[] getOverallInvoiceStats(@Param("organizationId") Long organizationId);
+    
+    // Get overall financial metrics for ALL invoices (not filtered by project status)
+    @Query("SELECT COUNT(i), " +
+           "COALESCE(SUM(i.totalAmount), 0) as totalInvoiced, " +
+           "COALESCE(SUM(i.paidAmount), 0) as totalPaid, " +
+           "COALESCE(SUM(i.balanceAmount), 0) as totalOutstanding " +
+           "FROM Invoice i WHERE i.organization.id = :organizationId")
+    Object[] getAllInvoiceStats(@Param("organizationId") Long organizationId);
+
 }

@@ -12,6 +12,10 @@ const InvoicesList = ({ user }) => {
   const [pageSize, setPageSize] = useState(10);
   const [hasNext, setHasNext] = useState(false);
   const [hasPrevious, setHasPrevious] = useState(false);
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
+  const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
+  const [message, setMessage] = useState(null);
   const navigate = useNavigate();
 
   // Check if user has admin or manager role
@@ -68,6 +72,15 @@ const InvoicesList = ({ user }) => {
   };
 
   const handleStatusUpdate = async (invoiceId, newStatus) => {
+    // If marking as SENT, show email confirmation dialog
+    if (newStatus === 'SENT') {
+      const invoice = invoices.find(inv => inv.id === invoiceId);
+      setSelectedInvoice(invoice);
+      setShowEmailConfirm(true);
+      return;
+    }
+
+    // For other status updates, proceed normally
     try {
       const response = await fetch(`/api/invoices/${invoiceId}/status?status=${newStatus}`, {
         method: 'PATCH',
@@ -86,6 +99,7 @@ const InvoicesList = ({ user }) => {
               ? { ...invoice, status: newStatus }
               : invoice
           ));
+          setMessage({ type: 'success', text: result.message || 'Status updated successfully' });
         } else {
           setError(result.message || 'Failed to update status');
         }
@@ -95,6 +109,83 @@ const InvoicesList = ({ user }) => {
     } catch (error) {
       console.error('Error updating status:', error);
       setError('Error updating invoice status');
+    }
+  };
+
+  const handleSendEmail = async () => {
+    if (!selectedInvoice) return;
+
+    setIsSendingEmail(true);
+    setMessage(null);
+    setError('');
+    setShowEmailConfirm(false);
+
+    try {
+      const response = await fetch(`/api/invoices/${selectedInvoice.id}/send-email`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        // Update the invoice in the list
+        setInvoices(invoices.map(invoice => 
+          invoice.id === selectedInvoice.id 
+            ? { ...invoice, status: 'SENT' }
+            : invoice
+        ));
+        setMessage({ type: 'success', text: result.message || 'Invoice email sent successfully' });
+      } else {
+        setError(result.message || 'Failed to send invoice email');
+      }
+    } catch (error) {
+      console.error('Error sending invoice email:', error);
+      setError('Error sending invoice email');
+    } finally {
+      setIsSendingEmail(false);
+      setSelectedInvoice(null);
+    }
+  };
+
+  const handleSkipEmail = async () => {
+    if (!selectedInvoice) return;
+
+    setShowEmailConfirm(false);
+    // Just update status without sending email
+    try {
+      const response = await fetch(`/api/invoices/${selectedInvoice.id}/status?status=SENT`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          // Update the invoice in the list
+          setInvoices(invoices.map(invoice => 
+            invoice.id === selectedInvoice.id 
+              ? { ...invoice, status: 'SENT' }
+              : invoice
+          ));
+          setMessage({ type: 'success', text: 'Invoice status updated to SENT' });
+        } else {
+          setError(result.message || 'Failed to update status');
+        }
+      } else {
+        setError('Failed to update invoice status');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setError('Error updating invoice status');
+    } finally {
+      setSelectedInvoice(null);
     }
   };
 
@@ -264,6 +355,73 @@ const InvoicesList = ({ user }) => {
         </div>
       )}
 
+      {message && (
+        <div className={`alert alert-${message.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
+          {message.text}
+          <button 
+            type="button" 
+            className="btn-close" 
+            onClick={() => setMessage(null)}
+          ></button>
+        </div>
+      )}
+
+      {/* Email Confirmation Modal */}
+      {showEmailConfirm && selectedInvoice && (
+        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog">
+          <div className="modal-dialog" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Send Invoice Email</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => {
+                    setShowEmailConfirm(false);
+                    setSelectedInvoice(null);
+                  }}
+                  disabled={isSendingEmail}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>Do you want to send an email to the client with the invoice PDF?</p>
+                {selectedInvoice?.clientEmail ? (
+                  <p><strong>Client Email:</strong> {selectedInvoice.clientEmail}</p>
+                ) : (
+                  <p className="text-warning"><strong>Note:</strong> Client email is not available for this invoice.</p>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={handleSkipEmail}
+                  disabled={isSendingEmail}
+                >
+                  Skip Email
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleSendEmail}
+                  disabled={isSendingEmail || !selectedInvoice?.clientEmail}
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Sending...
+                    </>
+                  ) : (
+                    'Yes, Send Email'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEmailConfirm && <div className="modal-backdrop fade show"></div>}
+
       {/* Filters */}
       <div className="row mb-4">
         <div className="col-md-6">
@@ -422,16 +580,17 @@ const InvoicesList = ({ user }) => {
                               Edit
                             </button>
                           )}
-                          <div className="btn-group" role="group">
+                          <div className="btn-group" role="group" style={{ position: 'relative' }}>
                             <button
                               className="btn btn-sm btn-outline-info dropdown-toggle"
                               type="button"
                               data-bs-toggle="dropdown"
+                              aria-expanded="false"
                               title="Update Status"
                             >
                               <i className="fas fa-cog"></i>
                             </button>
-                            <ul className="dropdown-menu">
+                            <ul className="dropdown-menu" style={{ zIndex: 1050, minWidth: '200px' }}>
                               {/* DRAFT Status Options */}
                               {invoice.status === 'DRAFT' && (
                                 <>

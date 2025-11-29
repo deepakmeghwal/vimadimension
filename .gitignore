@@ -3,8 +3,6 @@
 build/
 !gradle/wrapper/gradle-wrapper.jar
 !gradle/wrapper/gradle-wrapper.properties
-!build/libs/*-SNAPSHOT.jar
-!build/libs/*-SNAPSHOT-plain.jar
 
 # Frontend
 frontend/build/
@@ -69,6 +67,7 @@ test/
 
 # Database files (never commit actual data)
 *.sql
+!src/main/resources/db/migration/*.sql
 *.dump
 *.backup
 data/
@@ -77,8 +76,6 @@ mysql-data/
 # Build artifacts (already covered above, but explicit)
 .gradle/
 build/
-!build/libs/*-SNAPSHOT.jar
-!build/libs/*-SNAPSHOT-plain.jar
 out/
 target/
 
@@ -86,3 +83,24 @@ target/
 *.cookies.txt
 cookies*.txt
 *_cookies.txt
+cookies.txt
+
+# CDK build outputs
+cdk/cdk.out/
+cdk/cdk.out*/
+cdk/node_modules/
+cdk/bin/*.js
+cdk/bin/*.d.ts
+cdk/lib/*.js
+cdk/lib/*.d.ts
+cdk/test/*.js
+cdk/test/*.d.ts
+
+# User uploads (contain user-generated content)
+uploads/
+
+# Temporary build triggers
+rebuild-trigger.txt
+
+# MySQL data
+mysql/data/

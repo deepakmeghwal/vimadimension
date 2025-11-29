@@ -66,7 +66,7 @@ public class TaskController {
                 Map<String, Object> projectInfo = new HashMap<>();
                 projectInfo.put("id", task.getProject().getId());
                 projectInfo.put("name", task.getProject().getName());
-                projectInfo.put("clientName", task.getProject().getClientName());
+                projectInfo.put("clientName", task.getProject().getClient().getName());
                 taskDetails.put("project", projectInfo);
             }
             
@@ -118,7 +118,7 @@ public class TaskController {
         }
     }
 
-    @GetMapping
+    @GetMapping("/list")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<Task>> getAllTasks() {
         try {
@@ -131,13 +131,26 @@ public class TaskController {
         }
     }
 
-    @GetMapping("/paginated")
+    /**
+     * Unified endpoint for getting tasks with filtering and pagination
+     * Supports filter types: assigned, reported, to-check, all
+     * Supports additional filters: status, priority, projectId
+     * 
+     * Example: GET /api/tasks?filter=assigned&status=TO_DO,IN_PROGRESS&priority=HIGH&page=0&size=10
+     */
+    @GetMapping
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<Map<String, Object>> getAllTasksPaginated(
+    public ResponseEntity<Map<String, Object>> getTasksWithFilters(
+            @RequestParam(required = false, defaultValue = "all") String filter,
+            @RequestParam(required = false) Long assigneeId,
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) List<String> priority,
+            @RequestParam(required = false) Long projectId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         try {
-            Map<String, Object> response = taskService.getAllTasksPaginated(page, size);
+            Map<String, Object> response = taskService.getTasksWithFilters(
+                    filter, assigneeId, status, priority, projectId, page, size);
             
             // Convert tasks to include assignee and checkedBy information
             @SuppressWarnings("unchecked")
@@ -151,9 +164,27 @@ public class TaskController {
             
             response.put("tasks", taskResponses);
             
-            logger.info("Retrieved paginated tasks - page: {}, size: {}, total: {}", 
-                       page, size, response.get("totalItems"));
+            logger.info("Retrieved filtered tasks - filter: {}, page: {}, size: {}, total: {}", 
+                       filter, page, size, response.get("totalItems"));
             return ResponseEntity.ok(response);
+        } catch (Exception e) {
+            logger.error("Error retrieving filtered tasks: {}", e.getMessage(), e);
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to retrieve tasks: " + e.getMessage());
+            errorResponse.put("error", e.getClass().getName());
+            return ResponseEntity.status(500).body(errorResponse);
+        }
+    }
+
+    @GetMapping("/paginated")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Map<String, Object>> getAllTasksPaginated(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size) {
+        try {
+            // Redirect to unified endpoint with filter=all
+            return getTasksWithFilters("all", null, null, null, null, page, size);
         } catch (Exception e) {
             logger.error("Error retrieving paginated tasks: {}", e.getMessage(), e);
             throw e;
@@ -163,10 +194,16 @@ public class TaskController {
     @GetMapping("/assigned-to-me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getTasksAssignedToCurrentUser(
+            @RequestParam(required = false) List<String> status,
+            @RequestParam(required = false) List<String> priority,
+            @RequestParam(required = false) Long projectId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "10") int size) {
         try {
-            Map<String, Object> response = taskService.getTasksAssignedToCurrentUserPaginated(page, size);
+            // Use the unified filter method with filter="assigned" to get current user's tasks
+            // This ensures backend handles the filtering by authenticated user
+            Map<String, Object> response = taskService.getTasksWithFilters(
+                    "assigned", null, status, priority, projectId, page, size);
 
             @SuppressWarnings("unchecked")
             List<Task> tasks = (List<Task>) response.get("tasks");
@@ -184,7 +221,11 @@ public class TaskController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error retrieving tasks assigned to current user: {}", e.getMessage(), e);
-            throw e;
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to retrieve tasks: " + e.getMessage());
+            errorResponse.put("error", e.getClass().getName());
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 
@@ -212,7 +253,11 @@ public class TaskController {
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             logger.error("Error retrieving tasks reported by current user: {}", e.getMessage(), e);
-            throw e;
+            Map<String, Object> errorResponse = new HashMap<>();
+            errorResponse.put("success", false);
+            errorResponse.put("message", "Failed to retrieve tasks: " + e.getMessage());
+            errorResponse.put("error", e.getClass().getName());
+            return ResponseEntity.status(500).body(errorResponse);
         }
     }
 
@@ -254,7 +299,8 @@ public class TaskController {
                                        @RequestParam("priority") String priority,
                                        @RequestParam(value = "dueDate", required = false) String dueDate,
                                        @RequestParam(value = "assigneeId", required = false) String assigneeId,
-                                       @RequestParam(value = "checkedById", required = false) String checkedById) {
+                                       @RequestParam(value = "checkedById", required = false) String checkedById,
+                                       @RequestParam(value = "phaseId", required = false) Long phaseId) {
         try {
             // Convert assigneeId to Long if provided
             Long assigneeIdLong = null;
@@ -268,7 +314,7 @@ public class TaskController {
                 checkedByIdLong = Long.valueOf(checkedById);
             }
 
-            Task updatedTask = taskService.updateTaskComplete(taskId, name, description, projectStage, status, priority, dueDate, assigneeIdLong, checkedByIdLong);
+            Task updatedTask = taskService.updateTaskComplete(taskId, name, description, projectStage, status, priority, dueDate, assigneeIdLong, checkedByIdLong, phaseId);
             
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
@@ -297,14 +343,18 @@ public class TaskController {
     public ResponseEntity<?> updateTaskStatus(@PathVariable Long taskId,
                                              @RequestBody Map<String, String> statusRequest) {
         try {
+            logger.info("Received status update request for task ID: {} with body: {}", taskId, statusRequest);
+            
             String statusStr = statusRequest.get("status");
-            if (statusStr == null) {
+            if (statusStr == null || statusStr.trim().isEmpty()) {
+                logger.warn("Status is null or empty for task ID: {}", taskId);
                 Map<String, Object> errorResponse = new HashMap<>();
                 errorResponse.put("success", false);
                 errorResponse.put("message", "Status is required");
                 return ResponseEntity.badRequest().body(errorResponse);
             }
 
+            logger.info("Attempting to parse status: {} for task ID: {}", statusStr, taskId);
             TaskStatus status = TaskStatus.valueOf(statusStr);
             Optional<Task> updatedTask = taskService.updateTaskStatus(taskId, status);
             
@@ -314,25 +364,26 @@ public class TaskController {
                 response.put("message", "Task status updated successfully");
                 response.put("task", updatedTask.get());
                 
-                logger.info("Updated status for task ID: {} to {}", taskId, status);
+                logger.info("Successfully updated status for task ID: {} to {}", taskId, status);
                 return ResponseEntity.ok(response);
             } else {
+                logger.warn("Task not found with ID: {}", taskId);
                 Map<String, Object> errorResponse = new HashMap<>();
                 errorResponse.put("success", false);
                 errorResponse.put("message", "Task not found");
-                return ResponseEntity.notFound().build();
+                return ResponseEntity.status(404).body(errorResponse);
             }
         } catch (IllegalArgumentException e) {
-            logger.error("Error updating task status for task ID {}: {}", taskId, e.getMessage());
+            logger.error("Invalid status value for task ID {}: {}", taskId, e.getMessage());
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", e.getMessage());
+            errorResponse.put("message", "Invalid status value: " + e.getMessage());
             return ResponseEntity.badRequest().body(errorResponse);
         } catch (Exception e) {
-            logger.error("Error updating task status for task ID {}: {}", taskId, e.getMessage(), e);
+            logger.error("Unexpected error updating task status for task ID {}: {}", taskId, e.getMessage(), e);
             Map<String, Object> errorResponse = new HashMap<>();
             errorResponse.put("success", false);
-            errorResponse.put("message", "Failed to update task status");
+            errorResponse.put("message", "Failed to update task status: " + e.getMessage());
             return ResponseEntity.status(500).body(errorResponse);
         }
     }
@@ -431,47 +482,7 @@ public class TaskController {
         }
     }
 
-    @PostMapping("/create-standalone")
-    @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> createStandaloneTask(@RequestParam("name") String name,
-                                                @RequestParam(value = "description", required = false) String description,
-                                                @RequestParam(value = "priority", required = false) String priority,
-                                                @RequestParam(value = "dueDate", required = false) String dueDate,
-                                                @RequestParam("assigneeId") String assigneeId,
-                                                @RequestParam("checkedById") String checkedById) {
-        try {
-            logger.info("Creating standalone task: name='{}'", name);
-            
-            // Convert assigneeId to Long (required)
-            Long assigneeIdLong = Long.valueOf(assigneeId);
-            
-            // Convert checkedById to Long (required)
-            Long checkedByIdLong = Long.valueOf(checkedById);
-            
-            // Use a default project stage for standalone tasks
-            org.example.models.enums.ProjectStage projectStageEnum = org.example.models.enums.ProjectStage.STAGE_01_PREPARATION_BRIEF;
-            
-            // Create the task without a project (projectId = null)
-            taskService.createTask(
-                name,
-                description,
-                projectStageEnum,
-                null, // No project for standalone tasks
-                Optional.of(assigneeIdLong),
-                Optional.of(checkedByIdLong)
-            );
-            
-            logger.info("Standalone task created successfully: '{}'", name);
-            return ResponseEntity.ok(Map.of("message", "Task created successfully!"));
-            
-        } catch (IllegalArgumentException e) {
-            logger.error("Error creating standalone task: {}", e.getMessage());
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
-        } catch (Exception e) {
-            logger.error("Unexpected error creating standalone task: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body(Map.of("error", "Internal server error"));
-        }
-    }
+
 
     @GetMapping("/users")
     @PreAuthorize("isAuthenticated()")
@@ -525,7 +536,7 @@ public class TaskController {
             Map<String, Object> projectInfo = new HashMap<>();
             projectInfo.put("id", task.getProject().getId());
             projectInfo.put("name", task.getProject().getName());
-            projectInfo.put("clientName", task.getProject().getClientName());
+            projectInfo.put("clientName", task.getProject().getClient().getName());
             taskResponse.put("project", projectInfo);
         }
         
@@ -557,6 +568,15 @@ public class TaskController {
             checkedByInfo.put("name", task.getCheckedBy().getName());
             checkedByInfo.put("email", task.getCheckedBy().getEmail());
             taskResponse.put("checkedBy", checkedByInfo);
+        }
+
+        // Add phase information
+        if (task.getPhase() != null) {
+            Map<String, Object> phaseInfo = new HashMap<>();
+            phaseInfo.put("id", task.getPhase().getId());
+            phaseInfo.put("name", task.getPhase().getName());
+            phaseInfo.put("phaseNumber", task.getPhase().getPhaseNumber());
+            taskResponse.put("phase", phaseInfo);
         }
         
         return taskResponse;

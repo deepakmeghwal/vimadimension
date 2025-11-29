@@ -23,11 +23,9 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.security.core.Authentication;
 
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 import org.example.service.ProjectService;
 import org.example.service.TaskService;
@@ -146,6 +144,38 @@ public class AdminController {
         }
     }
 
+    @GetMapping("/users/paginated")
+    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    public ResponseEntity<?> listUsersPaginated(
+            @RequestParam(value = "query", required = false) String query,
+            @RequestParam(value = "page", defaultValue = "0") int page,
+            @RequestParam(value = "size", defaultValue = "20") int size,
+            Authentication authentication) {
+        try {
+            String adminUsername = authentication.getName();
+            User adminUser = userService.findByUsername(adminUsername)
+                    .orElseThrow(() -> new IllegalArgumentException("Admin user not found"));
+            
+            if (adminUser.getOrganization() == null) {
+                return ResponseEntity.badRequest().body(Map.of(
+                    "success", false,
+                    "error", "Admin user must belong to an organization"
+                ));
+            }
+            
+            org.springframework.data.domain.Page<User> usersPage = userService.searchUsersPaginated(
+                adminUser.getOrganization().getId(), query, page, size);
+            
+            return ResponseEntity.ok(usersPage);
+        } catch (Exception e) {
+            logger.error("Error listing users paginated: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of(
+                "success", false,
+                "error", "Failed to list users"
+            ));
+        }
+    }
+
     // Endpoint to change user password
     @PostMapping("/users/{userId}/change-password")
     @PreAuthorize("hasRole('ROLE_ADMIN')")
@@ -209,6 +239,9 @@ public class AdminController {
             userData.put("designation", user.getDesignation() != null ? user.getDesignation() : "");
             userData.put("specialization", user.getSpecialization() != null ? user.getSpecialization() : "");
             userData.put("bio", user.getBio() != null ? user.getBio() : "");
+            userData.put("monthlySalary", user.getMonthlySalary());
+            userData.put("typicalHoursPerMonth", user.getTypicalHoursPerMonth());
+            userData.put("overheadMultiplier", user.getOverheadMultiplier());
             userData.put("enabled", user.isEnabled());
             userData.put("organizationId", user.getOrganization() != null ? user.getOrganization().getId() : null);
             userData.put("organizationName", user.getOrganization() != null ? user.getOrganization().getName() : null);
@@ -260,7 +293,45 @@ public class AdminController {
                 user.setName((String) userData.get("name"));
             }
             if (userData.containsKey("email")) {
-                user.setEmail((String) userData.get("email"));
+                String newEmail = (String) userData.get("email");
+                String currentEmail = user.getEmail();
+                
+                // If user already has an email, prevent changing it
+                if (currentEmail != null && !currentEmail.trim().isEmpty()) {
+                    String trimmedNewEmail = newEmail != null ? newEmail.trim().toLowerCase() : null;
+                    if (trimmedNewEmail == null || trimmedNewEmail.isEmpty()) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "error", "Email is required. Cannot remove existing email."
+                        ));
+                    }
+                    if (!currentEmail.equalsIgnoreCase(trimmedNewEmail)) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "error", "Email cannot be changed once set. Current email: " + currentEmail
+                        ));
+                    }
+                    // Email is the same, no change needed
+                } else {
+                    // User doesn't have an email yet, allow setting it for the first time
+                    if (newEmail == null || newEmail.trim().isEmpty()) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "error", "Email is required."
+                        ));
+                    }
+                    String trimmedEmail = newEmail.trim().toLowerCase();
+                    // Check if email is already taken by another user
+                    var existingUserOpt = userService.findByEmail(trimmedEmail);
+                    if (existingUserOpt.isPresent() && 
+                        !existingUserOpt.get().getId().equals(userId)) {
+                        return ResponseEntity.badRequest().body(Map.of(
+                            "success", false,
+                            "error", "Email already exists: " + newEmail
+                        ));
+                    }
+                    user.setEmail(trimmedEmail);
+                }
             }
             if (userData.containsKey("designation")) {
                 user.setDesignation((String) userData.get("designation"));
@@ -270,6 +341,19 @@ public class AdminController {
             }
             if (userData.containsKey("bio")) {
                 user.setBio((String) userData.get("bio"));
+            }
+            // Update Resource Planner fields
+            if (userData.containsKey("monthlySalary")) {
+                Object val = userData.get("monthlySalary");
+                user.setMonthlySalary(val != null ? new java.math.BigDecimal(val.toString()) : null);
+            }
+            if (userData.containsKey("typicalHoursPerMonth")) {
+                Object val = userData.get("typicalHoursPerMonth");
+                user.setTypicalHoursPerMonth(val != null ? Integer.parseInt(val.toString()) : 160);
+            }
+            if (userData.containsKey("overheadMultiplier")) {
+                Object val = userData.get("overheadMultiplier");
+                user.setOverheadMultiplier(val != null ? new java.math.BigDecimal(val.toString()) : new java.math.BigDecimal("2.5"));
             }
             
             // Update role if provided
@@ -575,12 +659,4 @@ public class AdminController {
             ));
         }
     }
-
-    // You would likely have a GET mapping to display a user management page
-    // @GetMapping("/user-management")
-    // @PreAuthorize("hasAuthority('ROLE_ADMIN')")
-    // public String showUserManagementPage(Model model) {
-    //     model.addAttribute("users", userService.findAllUsers()); // Example
-    //     return "admin/user-management-page"; // Thymeleaf template
-    // }
 }

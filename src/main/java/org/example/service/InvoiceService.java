@@ -4,6 +4,7 @@ import org.example.models.*;
 import org.example.models.enums.InvoiceStatus;
 import org.example.repository.InvoiceRepository;
 import org.example.repository.InvoiceItemRepository;
+import org.example.repository.InvoiceTemplateRepository;
 import org.example.repository.OrganizationRepository;
 import org.example.repository.ProjectRepository;
 import org.example.repository.UserRepository;
@@ -28,6 +29,7 @@ public class InvoiceService {
 
     private final InvoiceRepository invoiceRepository;
     private final InvoiceItemRepository invoiceItemRepository;
+    private final InvoiceTemplateRepository templateRepository;
     private final OrganizationRepository organizationRepository;
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
@@ -35,18 +37,20 @@ public class InvoiceService {
     @Autowired
     public InvoiceService(InvoiceRepository invoiceRepository,
                          InvoiceItemRepository invoiceItemRepository,
+                         InvoiceTemplateRepository templateRepository,
                          OrganizationRepository organizationRepository,
                          ProjectRepository projectRepository,
                          UserRepository userRepository) {
         this.invoiceRepository = invoiceRepository;
         this.invoiceItemRepository = invoiceItemRepository;
+        this.templateRepository = templateRepository;
         this.organizationRepository = organizationRepository;
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
     }
 
     // Create new invoice
-    public Invoice createInvoice(Invoice invoice, Long organizationId, Long createdById, Long projectId) {
+    public Invoice createInvoice(Invoice invoice, Long organizationId, Long createdById, Long projectId, Long templateId) {
         logger.info("Creating new invoice for organization ID: {}", organizationId);
 
         // Validate and set organization
@@ -67,8 +71,20 @@ public class InvoiceService {
             
             // Auto-populate client info from project if not provided
             if (invoice.getClientName() == null || invoice.getClientName().trim().isEmpty()) {
-                invoice.setClientName(project.getClientName());
+                invoice.setClientName(project.getClient().getName());
             }
+            if (invoice.getClientAddress() == null || invoice.getClientAddress().trim().isEmpty()) {
+                invoice.setClientAddress(project.getClient().getBillingAddress());
+            }
+            
+            // Calculate cumulative fees if this is a standard invoice
+            calculateCumulativeFees(invoice, project, organization);
+            
+            // Determine and set GST rates based on organization and client states
+            determineGstRates(invoice, organization, project.getClient());
+        } else {
+            // For non-project invoices, still determine GST if client state is available
+            // This would require client state to be stored separately or extracted from address
         }
 
         // Generate invoice number if not provided
@@ -87,6 +103,11 @@ public class InvoiceService {
         // Set default status
         if (invoice.getStatus() == null) {
             invoice.setStatus(InvoiceStatus.DRAFT);
+        }
+
+        // Set template if provided
+        if (templateId != null) {
+            templateRepository.findById(templateId).ifPresent(invoice::setTemplate);
         }
 
         // Ensure all invoice items have proper reference to the invoice
@@ -198,9 +219,23 @@ public class InvoiceService {
         Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
 
-        return invoiceRepository.findById(invoiceId)
-                .filter(invoice -> invoice.getOrganization().getId().equals(organizationId))
+        Invoice invoice = invoiceRepository.findById(invoiceId)
+                .filter(inv -> inv.getOrganization().getId().equals(organizationId))
                 .orElseThrow(() -> new IllegalArgumentException("Invoice not found or access denied"));
+        
+        // Initialize lazy relationships to avoid LazyInitializationException during JSON serialization
+        org.hibernate.Hibernate.initialize(invoice.getOrganization());
+        if (invoice.getProject() != null) {
+            org.hibernate.Hibernate.initialize(invoice.getProject());
+            if (invoice.getProject().getClient() != null) {
+                org.hibernate.Hibernate.initialize(invoice.getProject().getClient());
+            }
+        }
+        if (invoice.getItems() != null) {
+            org.hibernate.Hibernate.initialize(invoice.getItems());
+        }
+        
+        return invoice;
     }
 
     // Get all invoices for organization
@@ -407,5 +442,80 @@ public class InvoiceService {
 
         public BigDecimal getYearlyRevenue() { return yearlyRevenue; }
         public void setYearlyRevenue(BigDecimal yearlyRevenue) { this.yearlyRevenue = yearlyRevenue; }
+    }
+
+    /**
+     * Calculate cumulative fees for standard invoices based on project stages
+     */
+    private void calculateCumulativeFees(Invoice invoice, Project project, Organization organization) {
+        if (project.getBudget() == null) {
+            return; // Cannot calculate without budget
+        }
+
+        // Get all previous invoices for this project
+        List<Invoice> previousInvoices = invoiceRepository.findByOrganizationAndProjectId(
+            organization, project.getId());
+
+        // Calculate previously billed amount
+        BigDecimal previouslyBilled = previousInvoices.stream()
+            .filter(inv -> inv.getStatus() != InvoiceStatus.CANCELLED)
+            .map(Invoice::getSubtotal)
+            .reduce(BigDecimal.ZERO, BigDecimal::add);
+
+        invoice.setPreviouslyBilledAmount(previouslyBilled);
+
+        // Calculate cumulative fee percentage based on project stage
+        BigDecimal cumulativePercentage = calculateCumulativePercentageForStage(project.getProjectStage());
+        
+        if (cumulativePercentage != null) {
+            invoice.setCumulativeFeePercentage(cumulativePercentage);
+            BigDecimal cumulativeAmount = project.getBudget()
+                .multiply(cumulativePercentage)
+                .divide(BigDecimal.valueOf(100), 2, BigDecimal.ROUND_HALF_UP);
+            invoice.setCumulativeFeeAmount(cumulativeAmount);
+        }
+    }
+
+    /**
+     * Calculate cumulative fee percentage up to a given stage
+     * Based on COA India standard fee structure
+     */
+    private BigDecimal calculateCumulativePercentageForStage(org.example.models.enums.ProjectStage stage) {
+        if (stage == null) return null;
+        
+        // Cumulative percentages based on COA India standards
+        switch (stage) {
+            case CONCEPT: return BigDecimal.valueOf(10);
+            case PRELIM: return BigDecimal.valueOf(25); // 10% + 15%
+            case STATUTORY: return BigDecimal.valueOf(35); // 10% + 15% + 10%
+            case TENDER: return BigDecimal.valueOf(60); // 10% + 15% + 10% + 25%
+            case CONTRACT: return BigDecimal.valueOf(65); // 10% + 15% + 10% + 25% + 5%
+            case CONSTRUCTION: return BigDecimal.valueOf(90); // 10% + 15% + 10% + 25% + 5% + 25%
+            case COMPLETION: return BigDecimal.valueOf(100); // All stages
+            default: return null;
+        }
+    }
+
+    /**
+     * Determine GST rates (CGST/SGST for same state, IGST for different states)
+     */
+    private void determineGstRates(Invoice invoice, Organization organization, Client client) {
+        String orgState = organization.getState();
+        String clientState = client.getState();
+
+        // If states match, use CGST + SGST (9% each = 18% total)
+        // If states differ or client is unregistered, use IGST (18%)
+        if (orgState != null && clientState != null && 
+            orgState.trim().equalsIgnoreCase(clientState.trim())) {
+            // Same state - use CGST and SGST
+            invoice.setCgstRate(BigDecimal.valueOf(9));
+            invoice.setSgstRate(BigDecimal.valueOf(9));
+            invoice.setIgstRate(BigDecimal.ZERO);
+        } else {
+            // Different state or unregistered - use IGST
+            invoice.setIgstRate(BigDecimal.valueOf(18));
+            invoice.setCgstRate(BigDecimal.ZERO);
+            invoice.setSgstRate(BigDecimal.ZERO);
+        }
     }
 }

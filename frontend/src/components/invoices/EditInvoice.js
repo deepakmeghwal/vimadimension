@@ -11,7 +11,6 @@ const EditInvoice = ({ user }) => {
     clientPhone: '',
     projectId: '',
     issueDate: '',
-    dueDate: '',
     taxRate: '0',
     notes: '',
     termsAndConditions: '',
@@ -92,7 +91,6 @@ const EditInvoice = ({ user }) => {
           clientPhone: invoice.clientPhone || '',
           projectId: invoice.projectId ? invoice.projectId.toString() : '',
           issueDate: invoice.issueDate || '',
-          dueDate: invoice.dueDate || '',
           taxRate: invoice.taxRate ? invoice.taxRate.toString() : '0',
           notes: invoice.notes || '',
           termsAndConditions: invoice.termsAndConditions || '',
@@ -194,11 +192,12 @@ const EditInvoice = ({ user }) => {
     setError('');
 
     try {
-      // Prepare the invoice data
+      // Prepare the invoice data (exclude client and project info from update)
       const invoiceData = {
-        ...formData,
-        projectId: formData.projectId || null,
+        issueDate: formData.issueDate,
         taxRate: parseFloat(formData.taxRate),
+        notes: formData.notes,
+        termsAndConditions: formData.termsAndConditions,
         items: formData.items.map(item => ({
           ...item,
           quantity: parseFloat(item.quantity),
@@ -321,38 +320,20 @@ const EditInvoice = ({ user }) => {
                       />
                     </div>
                   </div>
-                  <div className="col-md-6">
-                    <div className="mb-3">
-                      <label htmlFor="dueDate" className="form-label">Due Date *</label>
-                      <input
-                        type="date"
-                        className="form-control"
-                        id="dueDate"
-                        name="dueDate"
-                        value={formData.dueDate}
-                        onChange={handleInputChange}
-                        required
-                      />
-                    </div>
-                  </div>
                 </div>
 
                 <div className="mb-3">
-                  <label htmlFor="projectId" className="form-label">Project (Optional)</label>
-                  <select
-                    className="form-select"
+                  <label htmlFor="projectId" className="form-label">Project</label>
+                  <input
+                    type="text"
+                    className="form-control"
                     id="projectId"
-                    name="projectId"
-                    value={formData.projectId}
-                    onChange={handleInputChange}
-                  >
-                    <option value="">Select a project (optional)</option>
-                    {projects.map(project => (
-                      <option key={project.id} value={project.id}>
-                        {project.name} - {project.clientName}
-                      </option>
-                    ))}
-                  </select>
+                    value={formData.projectId ? projects.find(p => p.id.toString() === formData.projectId)?.name || 'N/A' : 'Not assigned'}
+                    readOnly
+                    disabled
+                    style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
+                  />
+                  <small className="form-text text-muted">Project cannot be changed after invoice creation</small>
                 </div>
               </div>
             </div>
@@ -366,15 +347,16 @@ const EditInvoice = ({ user }) => {
                 <div className="row">
                   <div className="col-md-6">
                     <div className="mb-3">
-                      <label htmlFor="clientName" className="form-label">Client Name *</label>
+                      <label htmlFor="clientName" className="form-label">Client Name</label>
                       <input
                         type="text"
                         className="form-control"
                         id="clientName"
                         name="clientName"
                         value={formData.clientName}
-                        onChange={handleInputChange}
-                        required
+                        readOnly
+                        disabled
+                        style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                       />
                     </div>
                   </div>
@@ -387,7 +369,9 @@ const EditInvoice = ({ user }) => {
                         id="clientEmail"
                         name="clientEmail"
                         value={formData.clientEmail}
-                        onChange={handleInputChange}
+                        readOnly
+                        disabled
+                        style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                       />
                     </div>
                   </div>
@@ -402,7 +386,9 @@ const EditInvoice = ({ user }) => {
                         id="clientPhone"
                         name="clientPhone"
                         value={formData.clientPhone}
-                        onChange={handleInputChange}
+                        readOnly
+                        disabled
+                        style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                       />
                     </div>
                   </div>
@@ -415,9 +401,12 @@ const EditInvoice = ({ user }) => {
                     name="clientAddress"
                     rows="3"
                     value={formData.clientAddress}
-                    onChange={handleInputChange}
+                    readOnly
+                    disabled
+                    style={{ backgroundColor: '#f8f9fa', cursor: 'not-allowed' }}
                   ></textarea>
                 </div>
+                <small className="form-text text-muted">Client information cannot be changed after invoice creation</small>
               </div>
             </div>
 

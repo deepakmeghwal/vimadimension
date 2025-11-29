@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { getOrganizationLogoProps } from '../../utils/organizationLogo';
 
 // Modern SVG Icons
 const UserIcon = () => (
@@ -66,6 +67,7 @@ const CloseIcon = () => (
 
 const Navbar = ({ user, onLogout }) => {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const [logoError, setLogoError] = useState(false);
   const location = useLocation();
   
   const handleLogout = (e) => {
@@ -106,13 +108,51 @@ const Navbar = ({ user, onLogout }) => {
     return user?.username || 'User';
   };
 
+  // Get organization logo props
+  const logoProps = getOrganizationLogoProps(
+    user?.organizationLogoUrl,
+    getOrganizationName()
+  );
+
+  // Reset logo error when logo URL changes
+  useEffect(() => {
+    setLogoError(false);
+  }, [user?.organizationLogoUrl]);
+
   return (
     <nav className="navbar-ultra-modern">
       <div className="navbar-container-ultra">
         {/* Brand Section */}
         <div className="navbar-brand-ultra">
           <Link to="/" className="brand-link-ultra">
-            <img src="/images/firm-logo.jpg" alt="Logo" className="brand-logo-ultra" />
+            {logoProps.hasLogo && !logoError ? (
+              <img 
+                src={logoProps.logoUrl} 
+                alt="Logo" 
+                className="brand-logo-ultra"
+                style={{ width: '40px', height: '40px', objectFit: 'contain', borderRadius: '8px' }}
+                onError={() => setLogoError(true)}
+              />
+            ) : (
+              <div 
+                className="brand-logo-ultra brand-logo-initials"
+                style={{
+                  display: 'flex',
+                  width: '40px',
+                  height: '40px',
+                  borderRadius: '8px',
+                  backgroundColor: '#2563eb',
+                  color: 'white',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  fontSize: '16px',
+                  fontWeight: '600',
+                  flexShrink: 0
+                }}
+              >
+                {logoProps.initials}
+              </div>
+            )}
             <div className="brand-text-ultra">
               <span className="brand-name-ultra">{getOrganizationName()}</span>
             </div>

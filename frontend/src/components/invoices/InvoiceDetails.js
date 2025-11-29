@@ -7,6 +7,9 @@ const InvoiceDetails = ({ user }) => {
   const [invoice, setInvoice] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [message, setMessage] = useState(null);
+  const [showEmailConfirm, setShowEmailConfirm] = useState(false);
+  const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Check if user has admin or manager role
   const canManageInvoices = user?.authorities?.some(auth => 
@@ -45,6 +48,13 @@ const InvoiceDetails = ({ user }) => {
   };
 
   const handleStatusUpdate = async (newStatus) => {
+    // If marking as SENT, show email confirmation dialog
+    if (newStatus === 'SENT') {
+      setShowEmailConfirm(true);
+      return;
+    }
+
+    // For other status updates, proceed normally
     try {
       const response = await fetch(`/api/invoices/${id}/status?status=${newStatus}`, {
         method: 'PATCH',
@@ -58,6 +68,67 @@ const InvoiceDetails = ({ user }) => {
         const result = await response.json();
         if (result.success) {
           setInvoice(prev => ({ ...prev, status: newStatus }));
+          setMessage({ type: 'success', text: result.message || 'Status updated successfully' });
+        } else {
+          setError(result.message || 'Failed to update status');
+        }
+      } else {
+        setError('Failed to update invoice status');
+      }
+    } catch (error) {
+      console.error('Error updating status:', error);
+      setError('Error updating invoice status');
+    }
+  };
+
+  const handleSendEmail = async () => {
+    setIsSendingEmail(true);
+    setMessage(null);
+    setError('');
+    setShowEmailConfirm(false);
+
+    try {
+      const response = await fetch(`/api/invoices/${id}/send-email`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const result = await response.json();
+
+      if (response.ok && result.success) {
+        setInvoice(prev => ({ ...prev, status: 'SENT' }));
+        setMessage({ type: 'success', text: result.message || 'Invoice email sent successfully' });
+      } else {
+        setError(result.message || 'Failed to send invoice email');
+      }
+    } catch (error) {
+      console.error('Error sending invoice email:', error);
+      setError('Error sending invoice email');
+    } finally {
+      setIsSendingEmail(false);
+    }
+  };
+
+  const handleSkipEmail = async () => {
+    setShowEmailConfirm(false);
+    // Just update status without sending email
+    try {
+      const response = await fetch(`/api/invoices/${id}/status?status=SENT`, {
+        method: 'PATCH',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success) {
+          setInvoice(prev => ({ ...prev, status: 'SENT' }));
+          setMessage({ type: 'success', text: 'Invoice status updated to SENT' });
         } else {
           setError(result.message || 'Failed to update status');
         }
@@ -249,6 +320,70 @@ const InvoiceDetails = ({ user }) => {
         </div>
       )}
 
+      {message && (
+        <div className={`alert alert-${message.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
+          {message.text}
+          <button 
+            type="button" 
+            className="btn-close" 
+            onClick={() => setMessage(null)}
+          ></button>
+        </div>
+      )}
+
+      {/* Email Confirmation Modal */}
+      {showEmailConfirm && (
+        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog">
+          <div className="modal-dialog" role="document">
+            <div className="modal-content">
+              <div className="modal-header">
+                <h5 className="modal-title">Send Invoice Email</h5>
+                <button 
+                  type="button" 
+                  className="btn-close" 
+                  onClick={() => setShowEmailConfirm(false)}
+                  disabled={isSendingEmail}
+                ></button>
+              </div>
+              <div className="modal-body">
+                <p>Do you want to send an email to the client with the invoice PDF?</p>
+                {invoice?.clientEmail ? (
+                  <p><strong>Client Email:</strong> {invoice.clientEmail}</p>
+                ) : (
+                  <p className="text-warning"><strong>Note:</strong> Client email is not available for this invoice.</p>
+                )}
+              </div>
+              <div className="modal-footer">
+                <button 
+                  type="button" 
+                  className="btn btn-secondary" 
+                  onClick={handleSkipEmail}
+                  disabled={isSendingEmail}
+                >
+                  Skip Email
+                </button>
+                <button 
+                  type="button" 
+                  className="btn btn-primary" 
+                  onClick={handleSendEmail}
+                  disabled={isSendingEmail || !invoice?.clientEmail}
+                >
+                  {isSendingEmail ? (
+                    <>
+                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                      Sending...
+                    </>
+                  ) : (
+                    'Yes, Send Email'
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {showEmailConfirm && <div className="modal-backdrop fade show"></div>}
+
       <div className="row">
         {/* Left Column - Invoice Information */}
         <div className="col-md-8">
@@ -412,105 +547,131 @@ const InvoiceDetails = ({ user }) => {
             </div>
             <div className="card-body">
               <div className="d-grid gap-2">
-                {/* DRAFT Status Actions */}
-                {invoice.status === 'DRAFT' && (
-                  <>
-                    <button 
-                      className="btn btn-primary"
-                      onClick={() => handleStatusUpdate('SENT')}
+                {/* Status Update Dropdown */}
+                {(invoice.status !== 'PAID' && invoice.status !== 'CANCELLED') && (
+                  <div className="btn-group" role="group" style={{ position: 'relative', width: '100%' }}>
+                    <button
+                      className="btn btn-primary dropdown-toggle"
+                      type="button"
+                      data-bs-toggle="dropdown"
+                      aria-expanded="false"
+                      style={{ width: '100%' }}
                     >
-                      <i className="fas fa-paper-plane me-2"></i>
-                      Mark as Sent
+                      <i className="fas fa-cog me-2"></i>
+                      Update Status
                     </button>
-                    <button 
-                      className="btn btn-outline-danger"
-                      onClick={() => handleStatusUpdate('CANCELLED')}
-                    >
-                      <i className="fas fa-times me-2"></i>
-                      Cancel Invoice
-                    </button>
-                  </>
+                    <ul className="dropdown-menu" style={{ zIndex: 1050, minWidth: '100%', width: '100%' }}>
+                      {/* DRAFT Status Options */}
+                      {invoice.status === 'DRAFT' && (
+                        <>
+                          <li>
+                            <button 
+                              className="dropdown-item"
+                              onClick={() => handleStatusUpdate('SENT')}
+                            >
+                              <i className="fas fa-paper-plane me-2"></i>
+                              Mark as Sent
+                            </button>
+                          </li>
+                          <li><hr className="dropdown-divider" /></li>
+                          <li>
+                            <button 
+                              className="dropdown-item text-danger"
+                              onClick={() => handleStatusUpdate('CANCELLED')}
+                            >
+                              <i className="fas fa-times me-2"></i>
+                              Cancel Invoice
+                            </button>
+                          </li>
+                        </>
+                      )}
+
+                      {/* SENT Status Options */}
+                      {invoice.status === 'SENT' && (
+                        <>
+                          <li>
+                            <button 
+                              className="dropdown-item"
+                              onClick={() => handleStatusUpdate('VIEWED')}
+                            >
+                              <i className="fas fa-eye me-2"></i>
+                              Mark as Viewed
+                            </button>
+                          </li>
+                          <li>
+                            <button 
+                              className="dropdown-item text-warning"
+                              onClick={() => handleStatusUpdate('OVERDUE')}
+                            >
+                              <i className="fas fa-exclamation-triangle me-2"></i>
+                              Mark Overdue
+                            </button>
+                          </li>
+                          <li><hr className="dropdown-divider" /></li>
+                          <li>
+                            <button 
+                              className="dropdown-item text-danger"
+                              onClick={() => handleStatusUpdate('CANCELLED')}
+                            >
+                              <i className="fas fa-times me-2"></i>
+                              Cancel Invoice
+                            </button>
+                          </li>
+                        </>
+                      )}
+
+                      {/* VIEWED Status Options */}
+                      {invoice.status === 'VIEWED' && (
+                        <>
+                          <li>
+                            <button 
+                              className="dropdown-item text-warning"
+                              onClick={() => handleStatusUpdate('OVERDUE')}
+                            >
+                              <i className="fas fa-exclamation-triangle me-2"></i>
+                              Mark Overdue
+                            </button>
+                          </li>
+                          <li><hr className="dropdown-divider" /></li>
+                          <li>
+                            <button 
+                              className="dropdown-item text-danger"
+                              onClick={() => handleStatusUpdate('CANCELLED')}
+                            >
+                              <i className="fas fa-times me-2"></i>
+                              Cancel Invoice
+                            </button>
+                          </li>
+                        </>
+                      )}
+
+                      {/* OVERDUE Status Options */}
+                      {invoice.status === 'OVERDUE' && (
+                        <>
+                          <li>
+                            <button 
+                              className="dropdown-item text-danger"
+                              onClick={() => handleStatusUpdate('CANCELLED')}
+                            >
+                              <i className="fas fa-times me-2"></i>
+                              Cancel Invoice
+                            </button>
+                          </li>
+                        </>
+                      )}
+                    </ul>
+                  </div>
                 )}
 
-                {/* SENT Status Actions */}
-                {invoice.status === 'SENT' && (
-                  <>
-                    <button 
-                      className="btn btn-info"
-                      onClick={() => handleStatusUpdate('VIEWED')}
-                    >
-                      <i className="fas fa-eye me-2"></i>
-                      Mark as Viewed
-                    </button>
-                    <button 
-                      className="btn btn-success"
-                      onClick={() => navigate(`/invoices/${id}/payment`)}
-                    >
-                      <i className="fas fa-rupee-sign me-2"></i>
-                      Record Payment
-                    </button>
-                    <button 
-                      className="btn btn-warning"
-                      onClick={() => handleStatusUpdate('OVERDUE')}
-                    >
-                      <i className="fas fa-exclamation-triangle me-2"></i>
-                      Mark Overdue
-                    </button>
-                    <button 
-                      className="btn btn-outline-danger"
-                      onClick={() => handleStatusUpdate('CANCELLED')}
-                    >
-                      <i className="fas fa-times me-2"></i>
-                      Cancel Invoice
-                    </button>
-                  </>
-                )}
-
-                {/* VIEWED Status Actions */}
-                {invoice.status === 'VIEWED' && (
-                  <>
-                    <button 
-                      className="btn btn-success"
-                      onClick={() => navigate(`/invoices/${id}/payment`)}
-                    >
-                      <i className="fas fa-rupee-sign me-2"></i>
-                      Record Payment
-                    </button>
-                    <button 
-                      className="btn btn-warning"
-                      onClick={() => handleStatusUpdate('OVERDUE')}
-                    >
-                      <i className="fas fa-exclamation-triangle me-2"></i>
-                      Mark Overdue
-                    </button>
-                    <button 
-                      className="btn btn-outline-danger"
-                      onClick={() => handleStatusUpdate('CANCELLED')}
-                    >
-                      <i className="fas fa-times me-2"></i>
-                      Cancel Invoice
-                    </button>
-                  </>
-                )}
-
-                {/* OVERDUE Status Actions */}
-                {invoice.status === 'OVERDUE' && (
-                  <>
-                    <button 
-                      className="btn btn-success"
-                      onClick={() => navigate(`/invoices/${id}/payment`)}
-                    >
-                      <i className="fas fa-rupee-sign me-2"></i>
-                      Record Payment
-                    </button>
-                    <button 
-                      className="btn btn-outline-danger"
-                      onClick={() => handleStatusUpdate('CANCELLED')}
-                    >
-                      <i className="fas fa-times me-2"></i>
-                      Cancel Invoice
-                    </button>
-                  </>
+                {/* Record Payment Button (for SENT, VIEWED, OVERDUE) */}
+                {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
+                  <button 
+                    className="btn btn-success"
+                    onClick={() => navigate(`/invoices/${id}/payment`)}
+                  >
+                    <i className="fas fa-rupee-sign me-2"></i>
+                    Record Payment
+                  </button>
                 )}
 
                 {/* PAID and CANCELLED Status - No Actions */}

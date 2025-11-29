@@ -5,7 +5,10 @@ import org.example.models.InvoiceItem;
 import org.example.models.User;
 import org.example.models.enums.InvoiceStatus;
 import org.example.models.enums.InvoiceItemType;
+import org.example.dto.InvoiceResponseDto;
+import org.example.service.EmailService;
 import org.example.service.InvoiceService;
+import org.example.service.InvoiceTemplateService;
 import org.example.service.PdfService;
 import org.example.service.UserService;
 import org.slf4j.Logger;
@@ -24,10 +27,12 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.text.NumberFormat;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 
 @RestController
@@ -38,14 +43,19 @@ public class InvoiceController {
     private static final Logger logger = LoggerFactory.getLogger(InvoiceController.class);
 
     private final InvoiceService invoiceService;
+    private final InvoiceTemplateService templateService;
     private final PdfService pdfService;
     private final UserService userService;
+    private final EmailService emailService;
 
     @Autowired
-    public InvoiceController(InvoiceService invoiceService, PdfService pdfService, UserService userService) {
+    public InvoiceController(InvoiceService invoiceService, InvoiceTemplateService templateService, 
+                           PdfService pdfService, UserService userService, EmailService emailService) {
         this.invoiceService = invoiceService;
+        this.templateService = templateService;
         this.pdfService = pdfService;
         this.userService = userService;
+        this.emailService = emailService;
     }
 
     // Get all invoices for the user's organization
@@ -84,13 +94,14 @@ public class InvoiceController {
     // Get invoice by ID
     @GetMapping("/{id}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
-    public ResponseEntity<Invoice> getInvoiceById(@PathVariable Long id) {
+    public ResponseEntity<InvoiceResponseDto> getInvoiceById(@PathVariable Long id) {
         try {
             User currentUser = getCurrentUser();
             Long organizationId = currentUser.getOrganization().getId();
 
             Invoice invoice = invoiceService.findInvoiceByIdAndOrganization(id, organizationId);
-            return ResponseEntity.ok(invoice);
+            InvoiceResponseDto dto = InvoiceResponseDto.fromEntity(invoice);
+            return ResponseEntity.ok(dto);
         } catch (IllegalArgumentException e) {
             logger.warn("Invoice not found or access denied: {}", e.getMessage());
             return ResponseEntity.notFound().build();
@@ -120,10 +131,25 @@ public class InvoiceController {
                 }
             }
 
+            // Extract template ID from request if provided
+            Long templateId = null;
+            if (requestData.containsKey("templateId") && requestData.get("templateId") != null) {
+                String templateIdStr = requestData.get("templateId").toString();
+                if (!templateIdStr.isEmpty()) {
+                    templateId = Long.parseLong(templateIdStr);
+                }
+            }
+            // If no template specified, use default
+            if (templateId == null) {
+                templateId = templateService.getDefaultTemplate(organizationId)
+                    .map(t -> t.getId())
+                    .orElse(null);
+            }
+
             // Create Invoice object from request data
             Invoice invoice = createInvoiceFromRequestData(requestData);
 
-            Invoice createdInvoice = invoiceService.createInvoice(invoice, organizationId, createdById, projectId);
+            Invoice createdInvoice = invoiceService.createInvoice(invoice, organizationId, createdById, projectId, templateId);
             
             response.put("success", true);
             response.put("message", "Invoice created successfully");
@@ -214,6 +240,62 @@ public class InvoiceController {
             logger.error("Error updating invoice status", e);
             response.put("success", false);
             response.put("message", "Failed to update status: " + e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
+        }
+    }
+
+    // Send invoice email with PDF attachment
+    @PostMapping("/{id}/send-email")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public ResponseEntity<Map<String, Object>> sendInvoiceEmail(@PathVariable Long id) {
+        Map<String, Object> response = new HashMap<>();
+        
+        try {
+            User currentUser = getCurrentUser();
+            Long organizationId = currentUser.getOrganization().getId();
+
+            Invoice invoice = invoiceService.findInvoiceByIdAndOrganization(id, organizationId);
+            
+            // Check if client email is available
+            if (invoice.getClientEmail() == null || invoice.getClientEmail().trim().isEmpty()) {
+                response.put("success", false);
+                response.put("message", "Client email is not available for this invoice");
+                return ResponseEntity.badRequest().body(response);
+            }
+
+            // Update invoice status to SENT
+            Invoice updatedInvoice = invoiceService.updateInvoiceStatus(id, organizationId, InvoiceStatus.SENT);
+            
+            // Generate PDF
+            byte[] pdfBytes = pdfService.generateInvoicePdf(updatedInvoice);
+            
+            // Format total amount for email
+            NumberFormat currencyFormatter = NumberFormat.getCurrencyInstance(new Locale("en", "IN"));
+            String totalAmount = currencyFormatter.format(updatedInvoice.getTotalAmount());
+            
+            // Send email with PDF attachment
+            emailService.sendInvoiceEmail(
+                updatedInvoice.getClientEmail(),
+                updatedInvoice.getClientName(),
+                updatedInvoice.getInvoiceNumber(),
+                totalAmount,
+                pdfBytes
+            );
+            
+            response.put("success", true);
+            response.put("message", "Invoice has been sent to " + updatedInvoice.getClientEmail() + " successfully");
+            response.put("invoice", updatedInvoice);
+            
+            return ResponseEntity.ok(response);
+        } catch (IllegalArgumentException e) {
+            logger.warn("Invoice not found or invalid: {}", e.getMessage());
+            response.put("success", false);
+            response.put("message", e.getMessage());
+            return ResponseEntity.badRequest().body(response);
+        } catch (Exception e) {
+            logger.error("Error sending invoice email", e);
+            response.put("success", false);
+            response.put("message", "Failed to send invoice email: " + e.getMessage());
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(response);
         }
     }

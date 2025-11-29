@@ -3,8 +3,10 @@ package org.example.controller;
 import org.example.dto.ProjectCreateDto;
 import org.example.dto.ProjectUpdateDto;
 import org.example.dto.TaskCreateDto;
+import org.example.models.Client;
 import org.example.models.Project;
 import org.example.models.Task;
+import org.example.models.User;
 import org.example.service.ProjectService;
 import org.example.service.TaskService;
 import org.slf4j.Logger;
@@ -24,6 +26,8 @@ import java.util.Optional;
 import java.util.Map;
 import java.util.HashMap;
 import java.util.ArrayList;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/projects")
@@ -33,11 +37,17 @@ public class ProjectController {
 
     private final ProjectService projectService;
     private final TaskService taskService;
+    private final org.example.service.PhaseService phaseService;
+    private final org.example.service.ResourceAssignmentService resourceAssignmentService;
 
     @Autowired
-    public ProjectController(ProjectService projectService, TaskService taskService) {
+    public ProjectController(ProjectService projectService, TaskService taskService, 
+                            org.example.service.PhaseService phaseService,
+                            org.example.service.ResourceAssignmentService resourceAssignmentService) {
         this.projectService = projectService;
         this.taskService = taskService;
+        this.phaseService = phaseService;
+        this.resourceAssignmentService = resourceAssignmentService;
     }
 
     @GetMapping("/health")
@@ -205,7 +215,14 @@ public class ProjectController {
         
         Map<String, Object> response = new HashMap<>();
         response.put("project", project);
+        response.put("phases", phaseService.getPhasesByProjectId(projectId)); // Add phases
         response.put("tasks", taskResponses);
+        
+        // Add team roster (users who have access or are assigned to tasks)
+        // For now, we'll just include the project creator and task assignees as the "team"
+        // In a real app, you might have a dedicated ProjectMember entity
+        // This is a simplified view for the Hub
+        
         Map<String, Object> paginationMetadata = new HashMap<>(paginatedTasks);
         paginationMetadata.remove("tasks");
         response.put("taskPagination", paginationMetadata);
@@ -224,11 +241,12 @@ public class ProjectController {
         Project project = projectOptional.get();
         ProjectUpdateDto projectUpdateDto = new ProjectUpdateDto();
         projectUpdateDto.setName(project.getName());
-        projectUpdateDto.setClientName(project.getClientName());
+        projectUpdateDto.setClientId(project.getClient().getId());
         projectUpdateDto.setStartDate(project.getStartDate());
         projectUpdateDto.setEstimatedEndDate(project.getEstimatedEndDate());
         projectUpdateDto.setLocation(project.getLocation());
-        projectUpdateDto.setProjectCategory(project.getProjectCategory());
+        projectUpdateDto.setLocation(project.getLocation());
+        projectUpdateDto.setChargeType(project.getChargeType());
         projectUpdateDto.setStatus(project.getStatus());
         projectUpdateDto.setProjectStage(project.getProjectStage());
         projectUpdateDto.setDescription(project.getDescription());
@@ -238,9 +256,22 @@ public class ProjectController {
 
         logger.debug("Displaying edit form for project ID: {}", projectId);
         
+        // Safely serialize client to avoid Hibernate proxy serialization issues
+        Map<String, Object> clientInfo = null;
+        if (project.getClient() != null) {
+            Client client = project.getClient();
+            clientInfo = new HashMap<>();
+            clientInfo.put("id", client.getId());
+            clientInfo.put("name", client.getName());
+            clientInfo.put("code", client.getCode());
+            clientInfo.put("billingAddress", client.getBillingAddress());
+            clientInfo.put("paymentTerms", client.getPaymentTerms());
+        }
+        
         Map<String, Object> response = new HashMap<>();
         response.put("projectUpdateDto", projectUpdateDto);
         response.put("projectId", projectId);
+        response.put("client", clientInfo);
         return ResponseEntity.ok(response);
     }
 
@@ -297,37 +328,66 @@ public class ProjectController {
     // Task creation endpoints
     @PostMapping("/{projectId}/tasks")
     @PreAuthorize("isAuthenticated()")
-    public ResponseEntity<?> createTask(@PathVariable Long projectId,
-                                      @ModelAttribute TaskCreateDto taskCreateDto,
-                                      BindingResult result) {
-        logger.info("Received task creation request for project {}: name='{}', description='{}'", 
-                   projectId, taskCreateDto.getName(), taskCreateDto.getDescription());
+    public ResponseEntity<?> createTaskForProject(@PathVariable Long projectId,
+                                                 @RequestParam Map<String, String> params) {
+        logger.info("Received task creation request for project {}: name='{}'", 
+                   projectId, params.get("name"));
         
-        if (result.hasErrors()) {
-            logger.warn("Validation errors in task creation: {}", result.getAllErrors());
-            Map<String, Object> errorResponse = new HashMap<>();
-            errorResponse.put("errors", result.getAllErrors());
-            return ResponseEntity.badRequest().body(errorResponse);
-        }
-
         try {
-            Project project = projectService.findById(projectId)
-                    .orElseThrow(() -> new IllegalArgumentException("Invalid project ID: " + projectId));
+            String name = params.get("name");
+            String description = params.get("description");
+            String projectStageStr = params.get("projectStage");
+            String phaseIdStr = params.get("phaseId");
+            String assigneeIdStr = params.get("assigneeId");
+            String checkedByIdStr = params.get("checkedById");
             
-            logger.info("Creating task with name: '{}' for project: {}", taskCreateDto.getName(), projectId);
+            if (name == null || name.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Task name is required."));
+            }
             
-            taskService.createTask(
-                    taskCreateDto.getName(),
-                    taskCreateDto.getDescription(),
-                    taskCreateDto.getProjectStage(),
+            if (projectStageStr == null || projectStageStr.trim().isEmpty()) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Project stage is required."));
+            }
+            
+            org.example.models.enums.ProjectStage projectStage;
+            try {
+                projectStage = org.example.models.enums.ProjectStage.valueOf(projectStageStr);
+            } catch (IllegalArgumentException e) {
+                return ResponseEntity.badRequest().body(Map.of("error", "Invalid project stage: " + projectStageStr));
+            }
+            
+            Optional<Long> phaseIdOpt = phaseIdStr != null && !phaseIdStr.trim().isEmpty() 
+                    ? Optional.of(Long.parseLong(phaseIdStr)) 
+                    : Optional.empty();
+            Optional<Long> assigneeIdOpt = assigneeIdStr != null && !assigneeIdStr.trim().isEmpty() 
+                    ? Optional.of(Long.parseLong(assigneeIdStr)) 
+                    : Optional.empty();
+            Optional<Long> checkedByIdOpt = checkedByIdStr != null && !checkedByIdStr.trim().isEmpty() 
+                    ? Optional.of(Long.parseLong(checkedByIdStr)) 
+                    : Optional.empty();
+            
+            logger.info("Creating task with name: '{}' for project: {} (phase: {})", 
+                       name, projectId, phaseIdOpt.orElse(null));
+            
+            taskService.createTaskForProject(
+                    name,
+                    description,
+                    projectStage,
                     projectId,
-                    Optional.ofNullable(taskCreateDto.getAssigneeId()),
-                    Optional.ofNullable(taskCreateDto.getCheckedById())
+                    phaseIdOpt,
+                    assigneeIdOpt,
+                    checkedByIdOpt
             );
             return ResponseEntity.ok(Map.of("message", "Task created successfully!"));
+        } catch (NumberFormatException e) {
+            logger.error("Error parsing numeric parameter: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(Map.of("error", "Invalid numeric parameter: " + e.getMessage()));
         } catch (IllegalArgumentException e) {
             logger.error("Error creating task for project ID {}: {}", projectId, e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Unexpected error creating task for project ID {}: {}", projectId, e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to create task: " + e.getMessage()));
         }
     }
     
@@ -349,10 +409,26 @@ public class ProjectController {
         // Add project information
         if (task.getProject() != null) {
             Map<String, Object> projectInfo = new HashMap<>();
-            projectInfo.put("id", task.getProject().getId());
-            projectInfo.put("name", task.getProject().getName());
-            projectInfo.put("clientName", task.getProject().getClientName());
-            taskResponse.put("project", projectInfo);
+            try {
+                Project project = task.getProject();
+                // Check if proxy is initialized before accessing properties
+                if (org.hibernate.Hibernate.isInitialized(project)) {
+                    projectInfo.put("id", project.getId());
+                    projectInfo.put("name", project.getName());
+                    // Safely access client if initialized
+                    if (project.getClient() != null && org.hibernate.Hibernate.isInitialized(project.getClient())) {
+                        projectInfo.put("clientName", project.getClient().getName());
+                    }
+                } else {
+                    // If proxy not initialized, just use ID
+                    projectInfo.put("id", project.getId());
+                }
+                taskResponse.put("project", projectInfo);
+            } catch (org.hibernate.LazyInitializationException e) {
+                // Fallback: just include project ID
+                projectInfo.put("id", task.getProject().getId());
+                taskResponse.put("project", projectInfo);
+            }
         }
         
         // Add assignee information
@@ -384,7 +460,150 @@ public class ProjectController {
             checkedByInfo.put("email", task.getCheckedBy().getEmail());
             taskResponse.put("checkedBy", checkedByInfo);
         }
+
+        // Add phase information
+        if (task.getPhase() != null) {
+            Map<String, Object> phaseInfo = new HashMap<>();
+            phaseInfo.put("id", task.getPhase().getId());
+            phaseInfo.put("name", task.getPhase().getName());
+            phaseInfo.put("phaseNumber", task.getPhase().getPhaseNumber());
+            taskResponse.put("phase", phaseInfo);
+        }
         
         return taskResponse;
+    }
+
+    // ========== PROJECT TEAM MANAGEMENT ENDPOINTS ==========
+
+    /**
+     * Get all users assigned to a project
+     */
+    @GetMapping("/{projectId}/team")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getProjectTeam(@PathVariable Long projectId) {
+        try {
+            List<User> teamMembers = projectService.getProjectTeamMembers(projectId);
+            List<Map<String, Object>> teamList = teamMembers.stream()
+                .map(user -> {
+                    Map<String, Object> userMap = new HashMap<>();
+                    userMap.put("id", user.getId());
+                    userMap.put("username", user.getUsername());
+                    userMap.put("name", user.getName() != null ? user.getName() : user.getUsername());
+                    userMap.put("email", user.getEmail());
+                    userMap.put("designation", user.getDesignation() != null ? user.getDesignation() : "");
+                    return userMap;
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "team", teamList
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error fetching project team: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch project team"));
+        }
+    }
+
+    /**
+     * Get available users from the same organization who can be assigned to the project
+     */
+    @GetMapping("/{projectId}/team/available")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getAvailableUsersForProject(@PathVariable Long projectId) {
+        try {
+            // Get all enabled users from the same organization
+            List<User> allUsers = taskService.getAllUsersForTaskAssignment();
+            
+            // Get users already assigned to the project
+            List<User> assignedUsers = projectService.getProjectTeamMembers(projectId);
+            Set<Long> assignedUserIds = assignedUsers.stream()
+                .map(User::getId)
+                .collect(java.util.stream.Collectors.toSet());
+            
+            // Filter out already assigned users
+            List<Map<String, Object>> availableUsers = allUsers.stream()
+                .filter(user -> !assignedUserIds.contains(user.getId()))
+                .map(user -> {
+                    Map<String, Object> userMap = new HashMap<>();
+                    userMap.put("id", user.getId());
+                    userMap.put("username", user.getUsername());
+                    userMap.put("name", user.getName() != null ? user.getName() : user.getUsername());
+                    userMap.put("email", user.getEmail());
+                    userMap.put("designation", user.getDesignation() != null ? user.getDesignation() : "");
+                    return userMap;
+                })
+                .collect(java.util.stream.Collectors.toList());
+            
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "users", availableUsers
+            ));
+        } catch (Exception e) {
+            logger.error("Error fetching available users: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch available users"));
+        }
+    }
+
+    /**
+     * Assign a user to a project
+     */
+    @PostMapping("/{projectId}/team/{userId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> assignUserToProject(@PathVariable Long projectId, @PathVariable Long userId) {
+        try {
+            projectService.assignUserToProject(projectId, userId);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "User assigned to project successfully"
+            ));
+        } catch (IllegalArgumentException | IllegalStateException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error assigning user to project: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to assign user to project"));
+        }
+    }
+
+    /**
+     * Remove a user from a project
+     */
+    @DeleteMapping("/{projectId}/team/{userId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> removeUserFromProject(@PathVariable Long projectId, @PathVariable Long userId) {
+        try {
+            projectService.removeUserFromProject(projectId, userId);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "message", "User removed from project successfully"
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error removing user from project: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to remove user from project"));
+        }
+    }
+
+    /**
+     * Get all resource assignments for a project (across all phases)
+     * Level 2: Resource Planning endpoint
+     */
+    @GetMapping("/{projectId}/resources")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getProjectResourceAssignments(@PathVariable Long projectId) {
+        try {
+            List<org.example.models.ResourceAssignment> assignments = 
+                resourceAssignmentService.getResourceAssignmentsByProject(projectId);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "assignments", assignments
+            ));
+        } catch (Exception e) {
+            logger.error("Error fetching project resource assignments: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch resource assignments"));
+        }
     }
 }

@@ -84,8 +84,24 @@ public class PdfService {
         // Left cell - Logo and organization info
         Cell leftCell = new Cell().setBorder(null);
         
-        // Add logo
-        addLogoToCell(leftCell);
+        // Add logo (from organization logo URL if available)
+        if (org.getLogoUrl() != null && !org.getLogoUrl().trim().isEmpty()) {
+            try {
+                java.net.URL logoUrl = new java.net.URL(org.getLogoUrl());
+                ImageData logoImageData = ImageDataFactory.create(logoUrl);
+                Image logo = new Image(logoImageData);
+                logo.setWidth(100);
+                logo.setHeight(60);
+                logo.setHorizontalAlignment(HorizontalAlignment.LEFT);
+                leftCell.add(logo);
+                leftCell.add(new Paragraph("\n").setFontSize(6));
+            } catch (Exception e) {
+                logger.warn("Could not load logo from URL: {}", e.getMessage());
+                addLogoToCell(leftCell); // Fall back to default logo
+            }
+        } else {
+            addLogoToCell(leftCell);
+        }
 
         // Organization name
         Paragraph orgName = new Paragraph(org.getName())
@@ -94,27 +110,56 @@ public class PdfService {
                 .setTextAlignment(TextAlignment.LEFT);
         leftCell.add(orgName);
 
-        // Organization details
-        if (org.getAddress() != null) {
+        // Organization address (use structured address if available)
+        if (org.getAddressLine1() != null) {
+            leftCell.add(new Paragraph(org.getAddressLine1()).setFontSize(9));
+        }
+        if (org.getAddressLine2() != null) {
+            leftCell.add(new Paragraph(org.getAddressLine2()).setFontSize(9));
+        }
+        String addressLine = "";
+        if (org.getCity() != null) addressLine += org.getCity();
+        if (org.getState() != null) {
+            if (!addressLine.isEmpty()) addressLine += ", ";
+            addressLine += org.getState();
+        }
+        if (org.getPincode() != null) {
+            if (!addressLine.isEmpty()) addressLine += " - ";
+            addressLine += org.getPincode();
+        }
+        if (!addressLine.isEmpty()) {
+            leftCell.add(new Paragraph(addressLine).setFontSize(9));
+        } else if (org.getAddress() != null) {
             leftCell.add(new Paragraph(org.getAddress()).setFontSize(9));
         }
+        
         if (org.getContactPhone() != null) {
             leftCell.add(new Paragraph("Phone: " + org.getContactPhone()).setFontSize(9));
         }
         if (org.getContactEmail() != null) {
             leftCell.add(new Paragraph("Email: " + org.getContactEmail()).setFontSize(9));
         }
-        if (org.getWebsite() != null) {
-            leftCell.add(new Paragraph("Website: " + org.getWebsite()).setFontSize(9));
+        if (org.getGstin() != null) {
+            leftCell.add(new Paragraph("GSTIN: " + org.getGstin()).setFontSize(9));
+        }
+        if (org.getPan() != null) {
+            leftCell.add(new Paragraph("PAN: " + org.getPan()).setFontSize(9));
+        }
+        if (org.getCoaRegNumber() != null) {
+            leftCell.add(new Paragraph("COA Reg. No.: " + org.getCoaRegNumber()).setFontSize(9));
         }
 
-        // Right cell - Invoice title
+        // Right cell - Invoice title and details
         Cell rightCell = new Cell().setBorder(null);
         Paragraph invoiceTitle = new Paragraph("INVOICE")
                 .setFontSize(32)
                 .setBold()
                 .setTextAlignment(TextAlignment.RIGHT);
         rightCell.add(invoiceTitle);
+        
+        rightCell.add(new Paragraph("Invoice No: " + invoice.getInvoiceNumber()).setFontSize(10).setTextAlignment(TextAlignment.RIGHT));
+        rightCell.add(new Paragraph("Invoice Date: " + invoice.getIssueDate().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy"))).setFontSize(10).setTextAlignment(TextAlignment.RIGHT));
+        rightCell.add(new Paragraph("Due Date: " + invoice.getDueDate().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy"))).setFontSize(10).setTextAlignment(TextAlignment.RIGHT));
 
         // Add cells to table
         headerTable.addCell(leftCell);
@@ -152,29 +197,60 @@ public class PdfService {
     }
 
     private void addClientInformation(Document document, Invoice invoice) {
-        // Bill To section
-        Paragraph billToTitle = new Paragraph("Bill To:")
-                .setFontSize(14)
-                .setBold();
-        document.add(billToTitle);
+        // Create a table for Bill To and Project sections
+        Table clientProjectTable = new Table(UnitValue.createPercentArray(new float[]{1, 1}))
+                .setWidth(UnitValue.createPercentValue(100));
 
+        // Left cell - Bill To
+        Cell billToCell = new Cell().setBorder(null);
+        billToCell.add(new Paragraph("BILL TO:").setFontSize(12).setBold());
+        
         Paragraph clientName = new Paragraph(invoice.getClientName())
                 .setFontSize(12)
                 .setBold();
-        document.add(clientName);
+        billToCell.add(clientName);
 
         if (invoice.getClientAddress() != null && !invoice.getClientAddress().trim().isEmpty()) {
-            document.add(new Paragraph(invoice.getClientAddress()).setFontSize(10));
+            billToCell.add(new Paragraph(invoice.getClientAddress()).setFontSize(10));
+        }
+
+        // Get client GSTIN from project's client if available
+        String clientGstin = null;
+        if (invoice.getProject() != null && invoice.getProject().getClient() != null) {
+            clientGstin = invoice.getProject().getClient().getGstin();
+        }
+        if (clientGstin != null && !clientGstin.trim().isEmpty()) {
+            billToCell.add(new Paragraph("GSTIN: " + clientGstin).setFontSize(10));
+        } else {
+            billToCell.add(new Paragraph("GSTIN: Unregistered").setFontSize(10));
         }
 
         if (invoice.getClientEmail() != null && !invoice.getClientEmail().trim().isEmpty()) {
-            document.add(new Paragraph("Email: " + invoice.getClientEmail()).setFontSize(10));
+            billToCell.add(new Paragraph("Email: " + invoice.getClientEmail()).setFontSize(10));
         }
 
         if (invoice.getClientPhone() != null && !invoice.getClientPhone().trim().isEmpty()) {
-            document.add(new Paragraph("Phone: " + invoice.getClientPhone()).setFontSize(10));
+            billToCell.add(new Paragraph("Phone: " + invoice.getClientPhone()).setFontSize(10));
         }
 
+        // Right cell - Project
+        Cell projectCell = new Cell().setBorder(null);
+        projectCell.add(new Paragraph("PROJECT:").setFontSize(12).setBold());
+        
+        if (invoice.getProject() != null) {
+            projectCell.add(new Paragraph(invoice.getProject().getName()).setFontSize(12).setBold());
+            if (invoice.getProject().getLocation() != null) {
+                projectCell.add(new Paragraph(invoice.getProject().getLocation()).setFontSize(10));
+            }
+            if (invoice.getProject().getStartDate() != null) {
+                projectCell.add(new Paragraph("Ref: Agreement dated " + invoice.getProject().getStartDate().format(DateTimeFormatter.ofPattern("dd-MMM-yyyy"))).setFontSize(10));
+            }
+        }
+
+        clientProjectTable.addCell(billToCell);
+        clientProjectTable.addCell(projectCell);
+        
+        document.add(clientProjectTable);
         document.add(new Paragraph("\n"));
     }
 
@@ -207,18 +283,36 @@ public class PdfService {
                 .setWidth(UnitValue.createPercentValue(50))
                 .setHorizontalAlignment(com.itextpdf.layout.properties.HorizontalAlignment.RIGHT);
 
-        // Subtotal
-        totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("Subtotal:")));
+        // Subtotal / Taxable Value
+        totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("Total Taxable Value:")));
         totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph(formatCurrency(invoice.getSubtotal()))).setTextAlignment(TextAlignment.RIGHT));
 
-        // Tax
-        if (invoice.getTaxRate() != null && invoice.getTaxRate().compareTo(BigDecimal.ZERO) > 0) {
+        // GST - Show CGST/SGST or IGST based on what's applied
+        boolean hasGst = false;
+        if (invoice.getCgstRate() != null && invoice.getCgstRate().compareTo(BigDecimal.ZERO) > 0) {
+            hasGst = true;
+            totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("Add: CGST @ " + formatNumber(invoice.getCgstRate()) + "%:")));
+            totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph(formatCurrency(invoice.getCgstAmount()))).setTextAlignment(TextAlignment.RIGHT));
+        }
+        if (invoice.getSgstRate() != null && invoice.getSgstRate().compareTo(BigDecimal.ZERO) > 0) {
+            hasGst = true;
+            totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("Add: SGST @ " + formatNumber(invoice.getSgstRate()) + "%:")));
+            totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph(formatCurrency(invoice.getSgstAmount()))).setTextAlignment(TextAlignment.RIGHT));
+        }
+        if (invoice.getIgstRate() != null && invoice.getIgstRate().compareTo(BigDecimal.ZERO) > 0) {
+            hasGst = true;
+            totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("Add: IGST @ " + formatNumber(invoice.getIgstRate()) + "%:")));
+            totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph(formatCurrency(invoice.getIgstAmount()))).setTextAlignment(TextAlignment.RIGHT));
+        }
+        
+        // Fall back to simple tax if GST not set
+        if (!hasGst && invoice.getTaxRate() != null && invoice.getTaxRate().compareTo(BigDecimal.ZERO) > 0) {
             totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("Tax (" + formatNumber(invoice.getTaxRate()) + "%):")));
             totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph(formatCurrency(invoice.getTaxAmount()))).setTextAlignment(TextAlignment.RIGHT));
         }
 
         // Total
-        totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("Total:").setBold()));
+        totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph("GRAND TOTAL:").setBold()));
         totalsTable.addCell(new Cell().setBorder(null).add(new Paragraph(formatCurrency(invoice.getTotalAmount())).setBold()).setTextAlignment(TextAlignment.RIGHT));
 
         // Paid amount (if any)
@@ -236,6 +330,8 @@ public class PdfService {
     }
 
     private void addFooter(Document document, Invoice invoice) {
+        Organization org = invoice.getOrganization();
+        
         // Notes
         if (invoice.getNotes() != null && !invoice.getNotes().trim().isEmpty()) {
             document.add(new Paragraph("Notes:").setBold().setMarginTop(20));
@@ -244,20 +340,52 @@ public class PdfService {
         }
 
         // Terms and conditions
+        document.add(new Paragraph("Payment Terms:").setBold().setMarginTop(10));
         if (invoice.getTermsAndConditions() != null && !invoice.getTermsAndConditions().trim().isEmpty()) {
-            document.add(new Paragraph("Terms and Conditions:").setBold());
             document.add(new Paragraph(invoice.getTermsAndConditions()).setFontSize(9));
         } else {
             // Default terms
-            document.add(new Paragraph("Terms and Conditions:").setBold());
-            document.add(new Paragraph("Payment is due within 30 days of invoice date. Late payments may be subject to a 1.5% monthly service charge.").setFontSize(9));
+            document.add(new Paragraph("Payment is due within " + 
+                java.time.temporal.ChronoUnit.DAYS.between(invoice.getIssueDate(), invoice.getDueDate()) + 
+                " days of invoice date.").setFontSize(9));
+        }
+        
+        // Bank details
+        if (org.getBankName() != null || org.getBankAccountNumber() != null) {
+            document.add(new Paragraph("\nBank Details:").setBold().setMarginTop(10));
+            StringBuilder bankDetails = new StringBuilder();
+            if (org.getBankName() != null) {
+                bankDetails.append("Bank: ").append(org.getBankName());
+            }
+            if (org.getBankAccountNumber() != null) {
+                if (bankDetails.length() > 0) bankDetails.append(" | ");
+                bankDetails.append("A/c No: ").append(org.getBankAccountNumber());
+            }
+            if (org.getBankIfsc() != null) {
+                if (bankDetails.length() > 0) bankDetails.append(" | ");
+                bankDetails.append("IFSC: ").append(org.getBankIfsc());
+            }
+            if (org.getBankBranch() != null) {
+                if (bankDetails.length() > 0) bankDetails.append(" | ");
+                bankDetails.append("Branch: ").append(org.getBankBranch());
+            }
+            document.add(new Paragraph(bankDetails.toString()).setFontSize(9));
+            
+            if (org.getBankAccountName() != null) {
+                document.add(new Paragraph("Please make payments via NEFT/RTGS/Cheque in favour of \"" + org.getBankAccountName() + "\".").setFontSize(9));
+            }
+            document.add(new Paragraph("Please deduct TDS u/s 194J (10% for individuals/firms, as applicable) and provide the TDS certificate.").setFontSize(9));
         }
 
-        // Thank you message
-        document.add(new Paragraph("\nThank you for your business!")
+        // Thank you message with signature
+        document.add(new Paragraph("\nFor " + org.getName())
                 .setTextAlignment(TextAlignment.CENTER)
-                .setMarginTop(30)
-                .setItalic());
+                .setMarginTop(30));
+        document.add(new Paragraph("\n\n_________________________")
+                .setTextAlignment(TextAlignment.CENTER));
+        document.add(new Paragraph("(Authorized Signatory)")
+                .setTextAlignment(TextAlignment.CENTER)
+                .setFontSize(10));
     }
 
     private String formatCurrency(BigDecimal amount) {

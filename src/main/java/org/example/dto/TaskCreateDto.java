@@ -21,8 +21,8 @@ public class TaskCreateDto {
     // @NotNull(message = "Project stage cannot be null")
     private ProjectStage projectStage;
 
-    // @NotNull(message = "Project ID cannot be null")
-    private Long projectId;
+    // @NotNull(message = "Phase ID cannot be null")
+    private Long phaseId;
 
     private Long assigneeId; // Optional: ID of the user to assign the task to
 
@@ -57,12 +57,12 @@ public class TaskCreateDto {
         this.projectStage = projectStage;
     }
 
-    public Long getProjectId() {
-        return projectId;
+    public Long getPhaseId() {
+        return phaseId;
     }
 
-    public void setProjectId(Long projectId) {
-        this.projectId = projectId;
+    public void setPhaseId(Long phaseId) {
+        this.phaseId = phaseId;
     }
 
     public Long getAssigneeId() {
