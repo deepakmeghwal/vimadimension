@@ -1,0 +1,6 @@
+/* My Approvals Page Styles */
+
+/* Override main-content max-width for full width layout */
+.approvals-page.main-content {
+    max-width: 100%;
+}

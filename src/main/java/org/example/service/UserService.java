@@ -1,10 +1,8 @@
 package org.example.service;
 
 import org.example.dto.UserRegistrationDto;
-import org.example.models.AttendanceEntry;
 import org.example.models.Role; // Import the Role entity
 import org.example.models.User;
-import org.example.repository.AttendanceEntryRepository;
 import org.example.repository.RoleRepository; // Import RoleRepository
 import org.example.repository.UserRepository;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,17 +27,14 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final RoleRepository roleRepository; // Inject RoleRepository
-    private final AttendanceEntryRepository attendanceEntryRepository;
 
     @Autowired
     public UserService(UserRepository userRepository,
                        PasswordEncoder passwordEncoder,
-                       RoleRepository roleRepository,
-                       AttendanceEntryRepository attendanceEntryRepository) { // Add AttendanceEntryRepository to constructor
+                       RoleRepository roleRepository) {
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
         this.roleRepository = roleRepository;
-        this.attendanceEntryRepository = attendanceEntryRepository;
     }
 
     /**
@@ -405,175 +400,7 @@ public class UserService {
         return userRepository.save(user);
     }
 
-    /**
-     * Gets user attendance data for a specific month
-     *
-     * @param userId The ID of the user
-     * @param year The year
-     * @param month The month (1-12)
-     * @return Map of date strings to attendance status
-     */
-    public Map<String, String> getUserAttendanceForMonth(Long userId, int year, int month) {
-        // Create date range for the month
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-        
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
-        
-        // Get all attendance entries for the user in the specified month
-        List<AttendanceEntry> entries = attendanceEntryRepository
-                .findByUserIdAndTimestampBetweenOrderByTimestampDesc(userId, startDateTime, endDateTime);
-        
-        Map<String, String> attendanceMap = new HashMap<>();
-        
-        // Process each day in the month
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            String dateStr = date.toString(); // Format: YYYY-MM-DD
-            
-            // Get entries for this specific date
-            List<AttendanceEntry> dayEntries = attendanceEntryRepository.findByUserIdAndDate(userId, date);
-            
-            // Check if this is a working day (Monday-Saturday)
-            int dayOfWeek = date.getDayOfWeek().getValue(); // 1=Monday, 7=Sunday
-            boolean isWorkingDay = dayOfWeek >= 1 && dayOfWeek <= 6; // Monday to Saturday
-            
-            // Check if this date is in the past (before today)
-            LocalDate today = LocalDate.now();
-            boolean isPastDate = date.isBefore(today);
-            
-            if (dayEntries.isEmpty()) {
-                // No entries for this date
-                if (isWorkingDay && isPastDate) {
-                    // For past working days with no data, consider as absent
-                    attendanceMap.put(dateStr, "absent");
-                } else {
-                    // For future working days or non-working days, mark as no-data
-                    attendanceMap.put(dateStr, "no-data");
-                }
-            } else {
-                // Determine if user was present (has both clock-in and clock-out)
-                boolean hasClockIn = dayEntries.stream()
-                        .anyMatch(entry -> entry.getEntryType() == AttendanceEntry.EntryType.CLOCK_IN);
-                boolean hasClockOut = dayEntries.stream()
-                        .anyMatch(entry -> entry.getEntryType() == AttendanceEntry.EntryType.CLOCK_OUT);
-                
-                if (hasClockIn && hasClockOut) {
-                    attendanceMap.put(dateStr, "present");
-                } else if (hasClockIn) {
-                    // Only clock-in, might be present but forgot to clock out
-                    attendanceMap.put(dateStr, "present");
-                } else {
-                    // Only clock-out or other cases
-                    attendanceMap.put(dateStr, "absent");
-                }
-            }
-        }
-        
-        return attendanceMap;
-    }
 
-    /**
-     * Gets detailed user attendance data for export
-     *
-     * @param userId The ID of the user
-     * @param year The year
-     * @param month The month (1-12)
-     * @return List of attendance export data
-     */
-    public List<Map<String, Object>> getUserAttendanceForExport(Long userId, int year, int month) {
-        // Create date range for the month
-        LocalDate startDate = LocalDate.of(year, month, 1);
-        LocalDate endDate = startDate.withDayOfMonth(startDate.lengthOfMonth());
-        
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.atTime(23, 59, 59);
-        
-        // Get all attendance entries for the user in the specified month
-        List<AttendanceEntry> entries = attendanceEntryRepository
-                .findByUserIdAndTimestampBetweenOrderByTimestampDesc(userId, startDateTime, endDateTime);
-        
-        List<Map<String, Object>> exportData = new ArrayList<>();
-        
-        // Get user details
-        Optional<User> userOptional = userRepository.findById(userId);
-        String userName = userOptional.map(User::getName).orElse("Unknown User");
-        String userEmail = userOptional.map(User::getEmail).orElse("Unknown Email");
-        
-        // Process each day in the month
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            // Get entries for this specific date
-            List<AttendanceEntry> dayEntries = attendanceEntryRepository.findByUserIdAndDate(userId, date);
-            
-            // Check if this is a working day (Monday-Saturday)
-            int dayOfWeek = date.getDayOfWeek().getValue(); // 1=Monday, 7=Sunday
-            boolean isWorkingDay = dayOfWeek >= 1 && dayOfWeek <= 6; // Monday to Saturday
-            String dayName = date.getDayOfWeek().toString();
-            
-            // Check if this date is in the past (before today)
-            LocalDate today = LocalDate.now();
-            boolean isPastDate = date.isBefore(today);
-            
-            String status;
-            String clockInTime = "";
-            String clockOutTime = "";
-            String totalHours = "";
-            
-            if (dayEntries.isEmpty()) {
-                // No entries for this date
-                if (isWorkingDay && isPastDate) {
-                    status = "Absent";
-                } else {
-                    status = "No Data";
-                }
-            } else {
-                // Find clock-in and clock-out times
-                Optional<AttendanceEntry> clockInEntry = dayEntries.stream()
-                        .filter(entry -> entry.getEntryType() == AttendanceEntry.EntryType.CLOCK_IN)
-                        .findFirst();
-                Optional<AttendanceEntry> clockOutEntry = dayEntries.stream()
-                        .filter(entry -> entry.getEntryType() == AttendanceEntry.EntryType.CLOCK_OUT)
-                        .findFirst();
-                
-                if (clockInEntry.isPresent()) {
-                    clockInTime = clockInEntry.get().getTimestamp().toLocalTime().toString();
-                    status = "Present";
-                    
-                    if (clockOutEntry.isPresent()) {
-                        clockOutTime = clockOutEntry.get().getTimestamp().toLocalTime().toString();
-                        
-                        // Calculate total hours
-                        LocalDateTime clockIn = clockInEntry.get().getTimestamp();
-                        LocalDateTime clockOut = clockOutEntry.get().getTimestamp();
-                        long minutes = java.time.Duration.between(clockIn, clockOut).toMinutes();
-                        long hours = minutes / 60;
-                        long remainingMinutes = minutes % 60;
-                        totalHours = String.format("%d:%02d", hours, remainingMinutes);
-                    } else {
-                        clockOutTime = "Not clocked out";
-                        totalHours = "Incomplete";
-                    }
-                } else {
-                    status = "Absent";
-                }
-            }
-            
-            Map<String, Object> dayData = new HashMap<>();
-            dayData.put("date", date.toString());
-            dayData.put("dayOfWeek", dayName);
-            dayData.put("isWorkingDay", isWorkingDay);
-            dayData.put("status", status);
-            dayData.put("clockInTime", clockInTime);
-            dayData.put("clockOutTime", clockOutTime);
-            dayData.put("totalHours", totalHours);
-            dayData.put("userName", userName);
-            dayData.put("userEmail", userEmail);
-            
-            exportData.add(dayData);
-        }
-        
-        return exportData;
-    }
 
     /**
      * Updates a user's role

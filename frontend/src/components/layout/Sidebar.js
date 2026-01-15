@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { usePermissions } from '../../hooks/usePermissions';
+import ProfilePopup from '../users/ProfilePopup';
 
 // Modern SVG Icons
 const UserIcon = () => (
@@ -49,10 +50,12 @@ const LogoutIcon = () => (
     </svg>
 );
 
-const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
+const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar, onUserUpdate }) => {
     const location = useLocation();
     const { hasPermission, isAdmin, isManager } = usePermissions(user);
     const lastAppContextRef = useRef('projects'); // Track last app context (excluding profile)
+    const [isProfilePopupOpen, setIsProfilePopupOpen] = useState(false);
+    const profileTriggerRef = useRef(null);
 
     const isActiveLink = (path) => {
         return location.pathname === path || location.pathname.startsWith(`${path}/`);
@@ -60,9 +63,9 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
 
     // Handle link click - collapse sidebar if not already collapsed
     const handleLinkClick = () => {
-        if (!isCollapsed) {
-            toggleSidebar();
-        }
+        // if (!isCollapsed) {
+        //     toggleSidebar();
+        // }
     };
 
     // Determine current app context
@@ -102,20 +105,20 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
             return (
                 <div className="nav-group">
                     {!isCollapsed && <p className="nav-label">Admin</p>}
-                    <Link
-                        to="/admin/dashboard"
-                        className={`nav-item ${isActiveLink('/admin/dashboard') ? 'active' : ''}`}
-                        title={isCollapsed ? "Dashboard" : ""}
-                        onClick={handleLinkClick}
-                    >
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <rect x="3" y="3" width="7" height="9"></rect>
-                            <rect x="14" y="3" width="7" height="5"></rect>
-                            <rect x="14" y="12" width="7" height="9"></rect>
-                            <rect x="3" y="16" width="7" height="5"></rect>
-                        </svg>
-                        {!isCollapsed && <span>Dashboard</span>}
-                    </Link>
+
+                    {hasPermission('organization.view') && (
+                        <Link
+                            to="/admin/organization"
+                            className={`nav-item ${isActiveLink('/admin/organization') ? 'active' : ''}`}
+                            title={isCollapsed ? "Organization" : ""}
+                            onClick={handleLinkClick}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
+                            </svg>
+                            {!isCollapsed && <span>Organization</span>}
+                        </Link>
+                    )}
 
                     {hasPermission('users.view') && (
                         <Link
@@ -131,6 +134,20 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
                                 <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
                             </svg>
                             {!isCollapsed && <span>Users</span>}
+                        </Link>
+                    )}
+
+                    {isAdmin() && (
+                        <Link
+                            to="/admin/roles"
+                            className={`nav-item ${isActiveLink('/admin/roles') ? 'active' : ''}`}
+                            title={isCollapsed ? "Roles & Permissions" : ""}
+                            onClick={handleLinkClick}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                            </svg>
+                            {!isCollapsed && <span>Roles & Permissions</span>}
                         </Link>
                     )}
 
@@ -154,33 +171,20 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
                         </Link>
                     )}
 
-                    {isAdmin() && (
-                        <Link
-                            to="/admin/roles"
-                            className={`nav-item ${isActiveLink('/admin/roles') ? 'active' : ''}`}
-                            title={isCollapsed ? "Roles & Permissions" : ""}
-                            onClick={handleLinkClick}
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
-                            </svg>
-                            {!isCollapsed && <span>Roles & Permissions</span>}
-                        </Link>
-                    )}
-
-                    {hasPermission('organization.view') && (
-                        <Link
-                            to="/admin/organization"
-                            className={`nav-item ${isActiveLink('/admin/organization') ? 'active' : ''}`}
-                            title={isCollapsed ? "Organization" : ""}
-                            onClick={handleLinkClick}
-                        >
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path>
-                            </svg>
-                            {!isCollapsed && <span>Organization</span>}
-                        </Link>
-                    )}
+                    <Link
+                        to="/admin/dashboard"
+                        className={`nav-item ${isActiveLink('/admin/dashboard') ? 'active' : ''}`}
+                        title={isCollapsed ? "Dashboard" : ""}
+                        onClick={handleLinkClick}
+                    >
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <rect x="3" y="3" width="7" height="9"></rect>
+                            <rect x="14" y="3" width="7" height="5"></rect>
+                            <rect x="14" y="12" width="7" height="9"></rect>
+                            <rect x="3" y="16" width="7" height="5"></rect>
+                        </svg>
+                        {!isCollapsed && <span>Dashboard</span>}
+                    </Link>
                 </div>
             );
         }
@@ -250,32 +254,71 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
 
         if (currentApp === 'finance') {
             return (
-                <div className="nav-group">
-                    {!isCollapsed && <p className="nav-label">Finance</p>}
-                    <Link
-                        to="/invoices"
-                        className={`nav-item ${isActiveLink('/invoices') ? 'active' : ''}`}
-                        title={isCollapsed ? "Invoices" : ""}
-                        onClick={handleLinkClick}
-                    >
-                        <InvoiceIcon />
-                        {!isCollapsed && <span>Invoices</span>}
-                    </Link>
-                    {(isAdmin() || isManager()) && (
+                <>
+                    {/* Studio Section */}
+                    <div className="nav-group">
+                        {!isCollapsed && <p className="nav-label">Studio</p>}
+                        {(isAdmin() || isManager()) && (
+                            <Link
+                                to="/finance/dashboard"
+                                className={`nav-item ${isActiveLink('/finance/dashboard') ? 'active' : ''}`}
+                                title={isCollapsed ? "Dashboard" : ""}
+                                onClick={handleLinkClick}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="3" y="3" width="7" height="9"></rect>
+                                    <rect x="14" y="3" width="7" height="5"></rect>
+                                    <rect x="14" y="12" width="7" height="9"></rect>
+                                    <rect x="3" y="16" width="7" height="5"></rect>
+                                </svg>
+                                {!isCollapsed && <span>Dashboard</span>}
+                            </Link>
+                        )}
+                        {(isAdmin() || isManager()) && (
+                            <Link
+                                to="/finance/resource-planning"
+                                className={`nav-item ${isActiveLink('/finance/resource-planning') ? 'active' : ''}`}
+                                title={isCollapsed ? "Resource Planning" : ""}
+                                onClick={handleLinkClick}
+                            >
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <rect x="2" y="7" width="6" height="10" rx="1"></rect>
+                                    <rect x="9" y="3" width="6" height="14" rx="1"></rect>
+                                    <rect x="16" y="5" width="6" height="12" rx="1"></rect>
+                                </svg>
+                                {!isCollapsed && <span>Resource Planning</span>}
+                            </Link>
+                        )}
+                    </div>
+
+                    {/* Books Section */}
+                    <div className="nav-group">
+                        {!isCollapsed && <p className="nav-label">Books</p>}
                         <Link
-                            to="/finance/health"
-                            className={`nav-item ${isActiveLink('/finance/health') ? 'active' : ''}`}
-                            title={isCollapsed ? "Financial Health" : ""}
+                            to="/finance/generate-invoices"
+                            className={`nav-item ${isActiveLink('/finance/generate-invoices') ? 'active' : ''}`}
+                            title={isCollapsed ? "Generate Invoices" : ""}
                             onClick={handleLinkClick}
                         >
                             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="12" y1="1" x2="12" y2="23"></line>
-                                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
+                                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                                <polyline points="14,2 14,8 20,8" />
+                                <line x1="12" y1="18" x2="12" y2="12" />
+                                <line x1="9" y1="15" x2="15" y2="15" />
                             </svg>
-                            {!isCollapsed && <span>Financial Health</span>}
+                            {!isCollapsed && <span>Generate Invoices</span>}
                         </Link>
-                    )}
-                </div>
+                        <Link
+                            to="/invoices"
+                            className={`nav-item ${isActiveLink('/invoices') ? 'active' : ''}`}
+                            title={isCollapsed ? "Invoices" : ""}
+                            onClick={handleLinkClick}
+                        >
+                            <InvoiceIcon />
+                            {!isCollapsed && <span>Invoices</span>}
+                        </Link>
+                    </div>
+                </>
             );
         }
 
@@ -302,7 +345,8 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
                         <TasksIcon />
                         {!isCollapsed && <span>Tasks</span>}
                     </Link>
-                </div>
+
+                </div >
                 <div className="nav-group">
                     {!isCollapsed && <p className="nav-label">My Workspace</p>}
                     <Link
@@ -333,37 +377,69 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar }) => {
 
     return (
         <aside className={`sidebar ${isCollapsed ? 'collapsed' : ''}`}>
-            <div className="sidebar-header">
-                <div className="sidebar-brand">
 
-                    <button onClick={toggleSidebar} className="collapse-btn-header" title={isCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ transform: isCollapsed ? 'rotate(180deg)' : 'rotate(0deg)', transition: 'transform 0.3s' }}>
-                            <polyline points="15 18 9 12 15 6"></polyline>
-                        </svg>
-                    </button>
-                </div>
-            </div>
 
             <nav className="sidebar-nav">
                 {renderNavigation()}
             </nav>
 
             <div className="sidebar-footer">
-                <Link
-                    to="/profile"
-                    className={`nav-item ${isActiveLink('/profile') ? 'active' : ''}`}
+                <div
+                    ref={profileTriggerRef}
+                    className="nav-item"
                     title={isCollapsed ? "Profile" : ""}
-                    style={{ marginBottom: '0.5rem' }}
-                    onClick={handleLinkClick}
+                    style={{ marginBottom: '0.5rem', cursor: 'pointer' }}
+                    onClick={() => {
+                        setIsProfilePopupOpen(true);
+                        handleLinkClick();
+                    }}
                 >
-                    <UserIcon />
+                    {user?.profileImageUrl || user?.avatarUrl ? (
+                        <img
+                            src={user.profileImageUrl || user.avatarUrl}
+                            alt="Profile"
+                            style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                objectFit: 'cover',
+                                flexShrink: 0
+                            }}
+                        />
+                    ) : (
+                        <div
+                            style={{
+                                width: '20px',
+                                height: '20px',
+                                borderRadius: '50%',
+                                backgroundColor: '#6366f1',
+                                color: 'white',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                fontSize: '10px',
+                                fontWeight: '600',
+                                flexShrink: 0
+                            }}
+                        >
+                            {(user?.firstName?.[0] || user?.username?.[0] || 'U').toUpperCase()}
+                        </div>
+                    )}
                     {!isCollapsed && <span>Profile</span>}
-                </Link>
+                </div>
                 <button onClick={onLogout} className="logout-btn" title={isCollapsed ? "Logout" : ""}>
                     <LogoutIcon />
                     {!isCollapsed && <span>Logout</span>}
                 </button>
             </div>
+
+            <ProfilePopup
+                user={user}
+                isOpen={isProfilePopupOpen}
+                onClose={() => setIsProfilePopupOpen(false)}
+                onUserUpdate={onUserUpdate}
+                triggerRef={profileTriggerRef}
+            />
         </aside>
     );
 };

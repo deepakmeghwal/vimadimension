@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
+import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
 import { PROJECT_STAGES, PROJECT_CHARGE_TYPES, PROJECT_STATUSES, PROJECT_PRIORITIES } from '../../constants/projectEnums';
 
@@ -16,8 +17,11 @@ const EditProject = ({ user }) => {
     chargeType: '',
     status: '',
     projectStage: '',
+    lifecycleStages: [], // New field for custom stages
     description: '',
     budget: '',
+    totalFee: '',
+    targetProfitMargin: '',
     priority: ''
   });
   const [error, setError] = useState('');
@@ -59,8 +63,11 @@ const EditProject = ({ user }) => {
             chargeType: dto.chargeType || '',
             status: dto.status || '',
             projectStage: dto.projectStage || '',
+            lifecycleStages: dto.lifecycleStages || [], // Populate custom stages
             description: dto.description || '',
             budget: dto.budget ? dto.budget.toString() : '',
+            totalFee: dto.totalFee ? dto.totalFee.toString() : '',
+            targetProfitMargin: dto.targetProfitMargin ? (parseFloat(dto.targetProfitMargin) * 100).toString() : '20',
             priority: dto.priority || ''
           });
 
@@ -116,31 +123,50 @@ const EditProject = ({ user }) => {
     });
   };
 
+  const handleLifecycleStagesChange = (selectedOptions) => {
+    setFormData({
+      ...formData,
+      lifecycleStages: selectedOptions ? selectedOptions.map(option => option.value) : []
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setSubmitting(true);
 
     try {
+      // Prepare the body data
+      const bodyData = new URLSearchParams({
+        'name': formData.name,
+        'clientId': formData.clientId,
+        'startDate': formData.startDate,
+        'estimatedEndDate': formData.estimatedEndDate,
+        'location': formData.location,
+        'chargeType': formData.chargeType,
+        'status': formData.status,
+        'projectStage': formData.projectStage,
+        'description': formData.description,
+        'budget': formData.budget,
+        'totalFee': formData.totalFee,
+        'targetProfitMargin': formData.targetProfitMargin ? (parseFloat(formData.targetProfitMargin) / 100).toString() : '',
+        'priority': formData.priority
+      });
+
+      // Append lifecycle stages if any are selected
+      if (formData.lifecycleStages && formData.lifecycleStages.length > 0) {
+        formData.lifecycleStages.forEach(stage => {
+          bodyData.append('lifecycleStages', stage);
+        });
+      }
+
       const response = await fetch(`/api/projects/${id}/update`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
         credentials: 'include',
-        body: new URLSearchParams({
-          'name': formData.name,
-          'clientId': formData.clientId,
-          'startDate': formData.startDate,
-          'estimatedEndDate': formData.estimatedEndDate,
-          'location': formData.location,
-          'chargeType': formData.chargeType,
-          'status': formData.status,
-          'projectStage': formData.projectStage,
-          'description': formData.description,
-          'budget': formData.budget,
-          'priority': formData.priority
-        }),
+        body: bodyData,
         credentials: 'include'
       });
 
@@ -290,9 +316,25 @@ const EditProject = ({ user }) => {
             </div>
           </div>
 
+          <div className="form-group">
+            <label htmlFor="lifecycleStages">Project Stages *:</label>
+            <Select
+              isMulti
+              name="lifecycleStages"
+              options={PROJECT_STAGES}
+              value={PROJECT_STAGES.filter(option => formData.lifecycleStages.includes(option.value))}
+              onChange={handleLifecycleStagesChange}
+              placeholder="Select project stages..."
+              className="basic-multi-select"
+              classNamePrefix="select"
+            />
+            <small className="form-help">Select the stages for this project. These will be used in Resource Planning.</small>
+            {formData.lifecycleStages.length === 0 && <input tabIndex={-1} autoComplete="off" style={{ opacity: 0, height: 0, position: 'absolute' }} required={true} />}
+          </div>
+
           <div className="form-row">
             <div className="form-group">
-              <label htmlFor="projectStage">Project Lifecycle Stage *</label>
+              <label htmlFor="projectStage">Current Stage *</label>
               <select
                 id="projectStage"
                 name="projectStage"
@@ -300,8 +342,12 @@ const EditProject = ({ user }) => {
                 onChange={handleChange}
                 required
               >
-                <option value="">Select lifecycle stage</option>
-                {PROJECT_STAGES.map(stage => (
+                <option value="">Select current stage</option>
+                {/* Only show selected stages if custom stages are defined, otherwise show all */}
+                {(formData.lifecycleStages.length > 0
+                  ? PROJECT_STAGES.filter(stage => formData.lifecycleStages.includes(stage.value))
+                  : PROJECT_STAGES
+                ).map(stage => (
                   <option key={stage.value} value={stage.value}>
                     {stage.label}
                   </option>
@@ -327,22 +373,57 @@ const EditProject = ({ user }) => {
             </div>
           </div>
 
-          {isAdmin && (
-            <div className="form-group">
-              <label htmlFor="budget">Budget (₹):</label>
-              <input
-                type="number"
-                id="budget"
-                name="budget"
-                value={formData.budget}
-                onChange={handleChange}
-                placeholder="0.00"
-                step="0.01"
-                min="0"
-              />
-              <small className="form-help">Enter budget amount in Indian Rupees (optional)</small>
-            </div>
-          )}
+          {
+            isAdmin && (
+              <>
+                <div className="form-group">
+                  <label htmlFor="budget">Budget (₹):</label>
+                  <input
+                    type="number"
+                    id="budget"
+                    name="budget"
+                    value={formData.budget}
+                    onChange={handleChange}
+                    placeholder="0.00"
+                    step="0.01"
+                    min="0"
+                  />
+                  <small className="form-help">Enter budget amount in Indian Rupees (optional)</small>
+                </div>
+                <div className="form-row">
+                  <div className="form-group">
+                    <label htmlFor="totalFee">Total Fee (₹):</label>
+                    <input
+                      type="number"
+                      id="totalFee"
+                      name="totalFee"
+                      value={formData.totalFee}
+                      onChange={handleChange}
+                      placeholder="0.00"
+                      step="0.01"
+                      min="0"
+                    />
+                    <small className="form-help">Total fee charged to client</small>
+                  </div>
+                  <div className="form-group">
+                    <label htmlFor="targetProfitMargin">Target Profit Margin (%):</label>
+                    <input
+                      type="number"
+                      id="targetProfitMargin"
+                      name="targetProfitMargin"
+                      value={formData.targetProfitMargin}
+                      onChange={handleChange}
+                      placeholder="20"
+                      step="1"
+                      min="0"
+                      max="100"
+                    />
+                    <small className="form-help">Default: 20%</small>
+                  </div>
+                </div>
+              </>
+            )
+          }
 
           <div className="form-group">
             <label htmlFor="description">Description:</label>
@@ -373,9 +454,9 @@ const EditProject = ({ user }) => {
               Cancel
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </form >
+      </div >
+    </div >
   );
 };
 

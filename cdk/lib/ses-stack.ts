@@ -5,7 +5,7 @@ import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
 import { Construct } from 'constructs';
 
 interface SesStackProps extends cdk.StackProps {
-    senderEmail: string;  // e.g., "komorebiessentials@gmail.com"
+    senderEmail: string;  // e.g., "support@archiease.in"
 }
 
 export class SesStack extends cdk.Stack {
@@ -30,7 +30,7 @@ export class SesStack extends cdk.Stack {
         // 2. Create IAM User for SMTP
         // ===========================================
         this.smtpUser = new iam.User(this, 'SesSmtpUser', {
-            userName: 'ses-smtp-user-komorebi',
+            userName: `ses-smtp-user-archiease-${this.region}`,
         });
 
         // Grant SES send permissions
@@ -55,7 +55,7 @@ export class SesStack extends cdk.Stack {
         // The actual SMTP password needs to be generated using a specific algorithm
         // We'll store the access key and derive the SMTP password at runtime
         this.smtpCredentialsSecret = new secretsmanager.Secret(this, 'SmtpCredentialsSecret', {
-            secretName: 'komorebi/ses-smtp-credentials',
+            secretName: 'komorebi/ses-smtp-credentials',  // Keep original name to maintain cross-stack reference
             description: 'SES SMTP credentials for sending emails',
             secretObjectValue: {
                 accessKeyId: cdk.SecretValue.unsafePlainText(accessKey.accessKeyId),

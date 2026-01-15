@@ -293,10 +293,10 @@ const ResetPassword = () => {
                     <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                         <button
                             onClick={() => navigate('/forgot-password')}
-                            style={{ 
-                                ...styles.button, 
-                                backgroundColor: 'transparent', 
-                                color: '#6366f1', 
+                            style={{
+                                ...styles.button,
+                                backgroundColor: 'transparent',
+                                color: '#6366f1',
                                 border: '1px solid #6366f1',
                                 width: 'auto',
                                 padding: '0.75rem 1.5rem'
@@ -351,7 +351,7 @@ const ResetPassword = () => {
             {/* Left Panel - Form */}
             <div style={styles.leftPanel}>
                 <div>
-                    <h1 style={styles.brand}>KOMOREBI</h1>
+                    <h1 style={styles.brand}>ARCHIEASE</h1>
                     <h2 style={styles.heading}>Reset Password</h2>
                     <p style={styles.subtitle}>
                         Create a new password for <strong>{email}</strong>
@@ -367,9 +367,9 @@ const ResetPassword = () => {
                                     name="newPassword"
                                     value={formData.newPassword}
                                     onChange={handleChange}
-                                    style={{ 
-                                        ...styles.input, 
-                                        borderColor: errors.newPassword ? '#ef4444' : '#cbd5e1' 
+                                    style={{
+                                        ...styles.input,
+                                        borderColor: errors.newPassword ? '#ef4444' : '#cbd5e1'
                                     }}
                                     placeholder="Min. 8 characters"
                                     onFocus={(e) => e.target.style.borderColor = '#6366f1'}
@@ -405,9 +405,9 @@ const ResetPassword = () => {
                                     name="confirmPassword"
                                     value={formData.confirmPassword}
                                     onChange={handleChange}
-                                    style={{ 
-                                        ...styles.input, 
-                                        borderColor: errors.confirmPassword ? '#ef4444' : '#cbd5e1' 
+                                    style={{
+                                        ...styles.input,
+                                        borderColor: errors.confirmPassword ? '#ef4444' : '#cbd5e1'
                                     }}
                                     placeholder="Confirm your password"
                                     onFocus={(e) => e.target.style.borderColor = '#6366f1'}
@@ -435,13 +435,13 @@ const ResetPassword = () => {
                         </div>
 
                         {errors.submit && (
-                            <div style={{ 
-                                padding: '0.75rem', 
-                                background: '#fef2f2', 
-                                border: '1px solid #fecaca', 
-                                borderRadius: '8px', 
-                                color: '#ef4444', 
-                                fontSize: '0.875rem', 
+                            <div style={{
+                                padding: '0.75rem',
+                                background: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '8px',
+                                color: '#ef4444',
+                                fontSize: '0.875rem',
                                 textAlign: 'center',
                                 marginBottom: '1rem'
                             }}>
@@ -466,8 +466,8 @@ const ResetPassword = () => {
 
                     <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.875rem', color: '#64748b' }}>
                         Remember your password?{' '}
-                        <span 
-                            onClick={() => navigate('/login')} 
+                        <span
+                            onClick={() => navigate('/login')}
                             style={{ color: '#6366f1', cursor: 'pointer', fontWeight: '600' }}
                         >
                             Sign in
@@ -502,6 +502,7 @@ const ResetPassword = () => {
 };
 
 export default ResetPassword;
+
 
 
 

@@ -122,9 +122,9 @@ const EditPhase = () => {
     return (
         <div className="main-content">
             <div className="back-button-container">
-                <Link to={`/projects/${projectId}/details`} state={{ activeTab: 'resources' }} className="back-button">
-                    ← Back to Project
-                </Link>
+                <button onClick={() => navigate(-1)} className="back-button" style={{ background: 'none', border: 'none', padding: 0, color: 'inherit', cursor: 'pointer', textDecoration: 'underline' }}>
+                    ← Back
+                </button>
             </div>
 
             <h1 className="page-title">Edit Phase</h1>

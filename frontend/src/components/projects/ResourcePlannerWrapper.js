@@ -12,10 +12,10 @@ const ResourcePlannerWrapper = () => {
                 <h1 className="page-title">Resource Planner</h1>
                 <div className="page-actions">
                     <button
-                        onClick={() => navigate(`/projects/${projectId}/details`, { state: { activeTab: 'resources' } })}
+                        onClick={() => navigate(-1)}
                         className="btn-outline"
                     >
-                        Back to Project
+                        Back
                     </button>
                 </div>
             </div>

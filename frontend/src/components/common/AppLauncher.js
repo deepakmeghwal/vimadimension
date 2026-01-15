@@ -86,12 +86,27 @@ const AppLauncher = ({ user }) => {
                     <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
                 </svg>
             ),
-            path: '/admin/dashboard',
+            path: '/admin/organization',
             description: 'Manage users, roles, and system settings.',
             color: '#ef4444', // Red
             category: 'ADMINISTRATION',
             requiredPermissions: ['users.view', 'organization.view'],
             adminOnly: true
+        },
+        {
+            id: 'financial-health',
+            name: 'Financial Health',
+            icon: (
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
+                    <polyline points="17 6 23 6 23 12"></polyline>
+                </svg>
+            ),
+            path: '/finance/dashboard',
+            description: 'Comprehensive financial health dashboard with revenue insights.',
+            color: '#10b981', // Emerald
+            category: 'FINANCE',
+            adminOrManager: true
         },
         {
             id: 'invoices',
@@ -109,21 +124,6 @@ const AppLauncher = ({ user }) => {
             description: 'Create and manage client invoices.',
             color: '#f59e0b', // Amber
             category: 'FINANCE'
-        },
-        {
-            id: 'financial-health',
-            name: 'Financial Health',
-            icon: (
-                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"></polyline>
-                    <polyline points="17 6 23 6 23 12"></polyline>
-                </svg>
-            ),
-            path: '/finance/health',
-            description: 'Comprehensive financial health dashboard with revenue insights.',
-            color: '#10b981', // Emerald
-            category: 'FINANCE',
-            adminOrManager: true
         }
     ];
 
@@ -195,7 +195,7 @@ const AppLauncher = ({ user }) => {
             <button
                 className="app-launcher-trigger"
                 onClick={() => setIsOpen(true)}
-                title="Komorebi Apps"
+                title="ArchiEase Apps"
                 aria-label="App launcher"
             >
                 <svg width="24" height="24" viewBox="0 0 24 24" fill="currentColor">

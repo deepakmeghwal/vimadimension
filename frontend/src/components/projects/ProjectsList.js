@@ -1,14 +1,15 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import PageHeader from '../common/PageHeader';
 import ProjectsListSkeleton from './ProjectsListSkeleton';
 import './ProjectsList.css';
 
 const ProjectsList = ({ user }) => {
+  const navigate = useNavigate();
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
-  const [viewMode, setViewMode] = useState('grid'); // 'grid' or 'list'
+
   const [filters, setFilters] = useState({
     chargeType: '',
     priority: '',
@@ -127,108 +128,7 @@ const ProjectsList = ({ user }) => {
     return priority?.toLowerCase() || '';
   };
 
-  const renderGridView = () => (
-    <div className="projects-grid">
-      {projects.map(project => (
-        <Link
-          key={project.id}
-          to={`/projects/${project.id}/details`}
-          className="project-card-modern"
-        >
-          <div className="project-card-modern-header">
-            <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', marginBottom: '0.5rem' }}>
-              {project.projectNumber && (
-                <span className="project-card-number">#{project.projectNumber}</span>
-              )}
-              <span style={{ color: '#cbd5e1' }}>|</span>
-              <div className="project-hero-stage-pill" style={{ padding: '0.2rem 0.6rem', fontSize: '0.75rem' }}>
-                <span className={`project-hero-status-dot ${project.status === 'ACTIVE' ? 'status-dot-green' :
-                  project.status === 'ON_HOLD' ? 'status-dot-grey' :
-                    project.status === 'AT_RISK' ? 'status-dot-red' : 'status-dot-grey'
-                  }`} style={{ width: '8px', height: '8px', marginRight: '0.35rem' }}></span>
-                {project.projectStage?.replace(/_/g, ' ') || 'Concept Design'}
-              </div>
-            </div>
-            <h3 className="project-card-modern-title">{project.name}</h3>
-          </div>
 
-          <div className="project-card-modern-badges">
-            {/* Badges removed in favor of new header design */}
-          </div>
-
-          {project.description && (
-            <p className="project-card-description">
-              {project.description.length > 120 ? `${project.description.substring(0, 120)}...` : project.description}
-            </p>
-          )}
-
-          <div className="project-card-modern-meta">
-            <div className="project-card-modern-meta-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                <circle cx="9" cy="7" r="4"></circle>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-              </svg>
-              <div>
-                <span className="project-card-modern-meta-label">Client</span>
-                <span className="project-card-modern-meta-value">{project.clientName || 'N/A'}</span>
-              </div>
-            </div>
-            <div className="project-card-modern-meta-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                <circle cx="12" cy="10" r="3"></circle>
-              </svg>
-              <div>
-                <span className="project-card-modern-meta-label">Location</span>
-                <span className="project-card-modern-meta-value">{project.location || 'N/A'}</span>
-              </div>
-            </div>
-            <div className="project-card-modern-meta-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="16" y1="2" x2="16" y2="6"></line>
-                <line x1="8" y1="2" x2="8" y2="6"></line>
-                <line x1="3" y1="10" x2="21" y2="10"></line>
-              </svg>
-              <div>
-                <span className="project-card-modern-meta-label">Start Date</span>
-                <span className="project-card-modern-meta-value">
-                  {project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
-                </span>
-              </div>
-            </div>
-            <div className="project-card-modern-meta-item">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="1" x2="12" y2="23"></line>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"></path>
-              </svg>
-              <div>
-                <span className="project-card-modern-meta-label">Charge Type</span>
-                <span className="project-card-modern-meta-value">{project.chargeType?.replace(/_/g, ' ') || 'N/A'}</span>
-              </div>
-            </div>
-          </div>
-
-          <div className="project-card-modern-footer">
-            {isAdmin && project.budget && (
-              <div className="project-budget">
-                <span className="budget-label">Budget</span>
-                <span className="budget-value">₹{parseFloat(project.budget).toLocaleString('en-IN')}</span>
-              </div>
-            )}
-            <div className="project-card-arrow">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-                <polyline points="12 5 19 12 12 19"></polyline>
-              </svg>
-            </div>
-          </div>
-        </Link>
-      ))}
-    </div>
-  );
 
   const renderListView = () => (
     <div className="data-table-container">
@@ -248,7 +148,12 @@ const ProjectsList = ({ user }) => {
         </thead>
         <tbody>
           {projects.map(project => (
-            <tr key={project.id}>
+            <tr
+              key={project.id}
+              onClick={() => navigate(`/projects/${project.id}/details`)}
+              style={{ cursor: 'pointer' }}
+              className="project-list-row-clickable"
+            >
               <td>
                 <div style={{ fontWeight: 600, color: '#0f172a' }}>{project.name}</div>
                 {project.projectStage && (
@@ -312,34 +217,7 @@ const ProjectsList = ({ user }) => {
             Filter
             {hasActiveFilters && <span className="filter-badge"></span>}
           </button>
-          <div className="view-toggle-compact">
-            <button
-              className={`view-toggle-btn-compact ${viewMode === 'grid' ? 'active' : ''}`}
-              onClick={() => setViewMode('grid')}
-              title="Grid view"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="7" height="7"></rect>
-                <rect x="14" y="3" width="7" height="7"></rect>
-                <rect x="14" y="14" width="7" height="7"></rect>
-                <rect x="3" y="14" width="7" height="7"></rect>
-              </svg>
-            </button>
-            <button
-              className={`view-toggle-btn-compact ${viewMode === 'list' ? 'active' : ''}`}
-              onClick={() => setViewMode('list')}
-              title="List view"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="8" y1="6" x2="21" y2="6"></line>
-                <line x1="8" y1="12" x2="21" y2="12"></line>
-                <line x1="8" y1="18" x2="21" y2="18"></line>
-                <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                <line x1="3" y1="18" x2="3.01" y2="18"></line>
-              </svg>
-            </button>
-          </div>
+
           <Link to="/projects/new" className="btn-new-project-compact">
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
               <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -378,7 +256,7 @@ const ProjectsList = ({ user }) => {
           )}
         </div>
       ) : (
-        viewMode === 'grid' ? renderGridView() : renderListView()
+        renderListView()
       )}
 
       {pagination.totalPages > 1 && (

@@ -1,1 +1,1 @@
-rootProject.name = "vimadimension"
+rootProject.name = "archiease"

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
+import { Plus, MoreHorizontal, Phone, Mail, User, Trash2 } from 'lucide-react';
 
-const ClientContacts = ({ clientId }) => {
+const ClientContacts = ({ clientId, clientName }) => {
     const [contacts, setContacts] = useState([]);
     const [loading, setLoading] = useState(true);
     const [showForm, setShowForm] = useState(false);
@@ -54,7 +55,6 @@ const ClientContacts = ({ clientId }) => {
                 setShowForm(false);
                 setSuccess('Contact added successfully!');
                 setTimeout(() => setSuccess(''), 3000);
-                // Refresh contacts list
                 fetchContacts();
             } else {
                 const errorData = await response.json().catch(() => ({ error: 'Failed to add contact' }));
@@ -75,253 +75,137 @@ const ClientContacts = ({ clientId }) => {
         setSuccess('');
     };
 
+    // Custom grid style for contacts
+    const gridStyle = {
+        gridTemplateColumns: '1.5fr 1fr 1.5fr 1fr'
+    };
+
     if (!clientId) {
         return (
-            <div className="client-contacts-section">
+            <div className="project-tasks-tab">
                 <div className="empty-state-modern">
                     <div className="empty-state-icon" style={{ color: '#cbd5e1' }}>
-                        <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                            <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                            <circle cx="8.5" cy="7" r="4"></circle>
-                            <line x1="20" y1="8" x2="20" y2="14"></line>
-                            <line x1="23" y1="11" x2="17" y2="11"></line>
-                        </svg>
+                        <User size={64} strokeWidth={1.5} />
                     </div>
                     <h3>No Client Assigned</h3>
                     <p>This project is not currently associated with a client.</p>
-                    <p style={{ fontSize: '0.875rem', color: '#94a3b8', marginTop: '0.5rem' }}>
-                        Edit project details to assign a client and manage contacts.
-                    </p>
                 </div>
             </div>
         );
     }
 
     return (
-        <div className="client-contacts-section">
-            <div className="tab-header-standard">
-                <h3 className="tab-header-title">Client Contacts</h3>
-                {!showForm && (
-                    <button
-                        className="btn-primary-modern"
-                        onClick={() => setShowForm(true)}
-                        style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                            <line x1="12" y1="5" x2="12" y2="19"></line>
-                            <line x1="5" y1="12" x2="19" y2="12"></line>
-                        </svg>
-                        Add Contact
-                    </button>
-                )}
+        <div className="project-tasks-tab">
+            <div style={{ padding: '0.5rem 1rem 0.5rem' }}>
+                <h2 style={{ fontSize: '1.1rem', fontWeight: '600', color: '#1e293b', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    {clientName}
+                    <span className="board-column-count">{contacts.length}</span>
+                </h2>
             </div>
 
-            {success && (
-                <div className="modern-alert success" style={{ marginBottom: '1rem' }}>
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                        <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                    </svg>
-                    {success}
+            <div className="asana-task-list">
+                <div className="asana-list-header" style={gridStyle}>
+                    <div>Name</div>
+                    <div>Role</div>
+                    <div>Email</div>
+                    <div>Phone</div>
                 </div>
-            )}
 
-            {showForm && (
-                <div className="contact-form-container">
-                    <div className="contact-form-header">
-                        <h4>Add New Contact</h4>
-                        <button
-                            type="button"
-                            className="modal-close-button"
-                            onClick={handleCancel}
-                            aria-label="Close form"
-                        >
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <line x1="18" y1="6" x2="6" y2="18"></line>
-                                <line x1="6" y1="6" x2="18" y2="18"></line>
-                            </svg>
-                        </button>
-                    </div>
-
-                    {error && (
-                        <div className="modern-alert error" style={{ marginBottom: '1rem' }}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                            </svg>
-                            {error}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleSubmit} className="edit-form-modern">
-                        <div className="form-group-modern">
-                            <label htmlFor="contact-name">
-                                Name <span className="required-asterisk">*</span>
-                            </label>
-                            <input
-                                id="contact-name"
-                                type="text"
-                                className="form-input-modern"
-                                placeholder="e.g., Rahul Verma"
-                                value={newContact.name}
-                                onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
-                                required
-                                disabled={submitting}
-                            />
-                        </div>
-
-                        <div className="form-group-modern">
-                            <label htmlFor="contact-email">
-                                Email <span className="required-asterisk">*</span>
-                            </label>
-                            <input
-                                id="contact-email"
-                                type="email"
-                                className="form-input-modern"
-                                placeholder="e.g., rahul.verma@company.com"
-                                value={newContact.email}
-                                onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
-                                required
-                                disabled={submitting}
-                            />
-                        </div>
-
-                        <div className="form-group-modern">
-                            <label htmlFor="contact-phone">
-                                Phone Number
-                            </label>
-                            <input
-                                id="contact-phone"
-                                type="tel"
-                                className="form-input-modern"
-                                placeholder="e.g., +91 98765 43210"
-                                value={newContact.phone}
-                                onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
-                                disabled={submitting}
-                            />
-                        </div>
-
-                        <div className="form-group-modern">
-                            <label htmlFor="contact-designation">
-                                Designation
-                            </label>
-                            <input
-                                id="contact-designation"
-                                type="text"
-                                className="form-input-modern"
-                                placeholder="e.g., VP of Projects, Project Manager, CEO"
-                                value={newContact.role}
-                                onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
-                                disabled={submitting}
-                            />
-                            <div className="form-help-text">
-                                Job title or role within the client organization
-                            </div>
-                        </div>
-
-                        <div className="form-actions-modern">
-                            <button
-                                type="button"
-                                className="btn-outline-modern"
-                                onClick={handleCancel}
-                                disabled={submitting}
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                className="btn-primary-modern"
-                                disabled={submitting}
-                            >
-                                {submitting ? (
-                                    <>
-                                        <svg className="animate-spin" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M21 12a9 9 0 1 1-6.219-8.56"></path>
-                                        </svg>
-                                        Adding...
-                                    </>
-                                ) : (
-                                    <>
-                                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                            <path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"></path>
-                                            <polyline points="17 21 17 13 7 13 7 21"></polyline>
-                                            <polyline points="7 3 7 8 15 8"></polyline>
-                                        </svg>
-                                        Add Contact
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </form>
-                </div>
-            )}
-
-            <div className="contacts-list">
                 {loading ? (
                     <div className="loading-state">
                         <div className="loading-spinner"></div>
-                        <p>Loading contacts...</p>
-                    </div>
-                ) : contacts.length === 0 ? (
-                    <div className="empty-state-modern">
-                        <div className="empty-state-icon">
-                            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                <circle cx="9" cy="7" r="4"></circle>
-                                <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                            </svg>
-                        </div>
-                        <h3>No contacts added yet</h3>
-                        <p>Start by adding a contact for this client</p>
-                        {!showForm && (
-                            <button
-                                className="btn-primary-modern"
-                                onClick={() => setShowForm(true)}
-                                style={{ marginTop: '1rem' }}
-                            >
-                                Add First Contact
-                            </button>
-                        )}
                     </div>
                 ) : (
-                    <div className="contacts-grid-modern">
+                    <>
                         {contacts.map(contact => (
-                            <div key={contact.id} className="contact-card-modern">
-                                <div className="contact-card-header">
-                                    <div className="contact-avatar">
+                            <div key={contact.id} className="asana-task-row" style={gridStyle}>
+                                <div className="asana-task-name-cell">
+                                    <div className="asana-avatar-small" style={{ marginRight: '0.75rem' }}>
                                         {contact.name.charAt(0).toUpperCase()}
                                     </div>
-                                    <div className="contact-info">
-                                        <h4 className="contact-name-modern">{contact.name}</h4>
-                                        {contact.role && (
-                                            <p className="contact-designation-modern">{contact.role}</p>
-                                        )}
-                                    </div>
+                                    <span className="task-name-display">{contact.name}</span>
                                 </div>
-                                <div className="contact-details-modern">
-                                    {contact.email && (
-                                        <a href={`mailto:${contact.email}`} className="contact-detail-link">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                                <polyline points="22,6 12,13 2,6"></polyline>
-                                            </svg>
-                                            <span>{contact.email}</span>
+                                <div className="asana-task-date" style={{ color: '#334155' }}>
+                                    {contact.role || '—'}
+                                </div>
+                                <div className="asana-task-date">
+                                    {contact.email ? (
+                                        <a href={`mailto:${contact.email}`} style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <Mail size={12} />
+                                            {contact.email}
                                         </a>
-                                    )}
-                                    {contact.phone && (
-                                        <a href={`tel:${contact.phone}`} className="contact-detail-link">
-                                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"></path>
-                                            </svg>
-                                            <span>{contact.phone}</span>
+                                    ) : '—'}
+                                </div>
+                                <div className="asana-task-date">
+                                    {contact.phone ? (
+                                        <a href={`tel:${contact.phone}`} style={{ color: 'inherit', textDecoration: 'none', display: 'flex', alignItems: 'center', gap: '0.25rem' }}>
+                                            <Phone size={12} />
+                                            {contact.phone}
                                         </a>
-                                    )}
+                                    ) : '—'}
                                 </div>
                             </div>
                         ))}
-                    </div>
+
+                        {showForm ? (
+                            <div className="asana-task-row form-mode" style={{ ...gridStyle, alignItems: 'start', padding: '1rem' }}>
+                                <form onSubmit={handleSubmit} style={{ display: 'contents' }}>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Name *"
+                                            value={newContact.name}
+                                            onChange={(e) => setNewContact({ ...newContact, name: e.target.value })}
+                                            required
+                                            autoFocus
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <input
+                                            type="text"
+                                            className="form-input"
+                                            placeholder="Role"
+                                            value={newContact.role}
+                                            onChange={(e) => setNewContact({ ...newContact, role: e.target.value })}
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <input
+                                            type="email"
+                                            className="form-input"
+                                            placeholder="Email *"
+                                            value={newContact.email}
+                                            onChange={(e) => setNewContact({ ...newContact, email: e.target.value })}
+                                            required
+                                        />
+                                    </div>
+                                    <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+                                        <input
+                                            type="tel"
+                                            className="form-input"
+                                            placeholder="Phone"
+                                            value={newContact.phone}
+                                            onChange={(e) => setNewContact({ ...newContact, phone: e.target.value })}
+                                        />
+                                        <div style={{ display: 'flex', gap: '0.5rem', marginTop: '0.5rem' }}>
+                                            <button type="submit" className="btn-primary-modern" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }} disabled={submitting}>
+                                                {submitting ? 'Adding...' : 'Add'}
+                                            </button>
+                                            <button type="button" onClick={handleCancel} className="btn-outline-modern" style={{ padding: '0.25rem 0.75rem', fontSize: '0.8rem' }}>
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                </form>
+                            </div>
+                        ) : (
+                            <div className="asana-add-task-row" onClick={() => setShowForm(true)}>
+                                <Plus size={14} style={{ marginRight: '0.5rem' }} />
+                                Add contact...
+                            </div>
+                        )}
+                    </>
                 )}
             </div>
         </div>

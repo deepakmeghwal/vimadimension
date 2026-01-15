@@ -5,7 +5,7 @@ services:
   # MySQL Service disabled to use host database
   # mysql:
   #   image: mysql:8.0
-  #   container_name: vimadimension-mysql
+  #   container_name: archiease-mysql
   #   environment:
   #     MYSQL_ROOT_PASSWORD: rootpassword
   #     MYSQL_DATABASE: project_tracker_db
@@ -23,14 +23,14 @@ services:
   #     timeout: 5s
   #     retries: 5
   #   networks:
-  #     - vimadimension-network
+  #     - archiease-network
 
   # Spring Boot Application
   app:
     build:
       context: .
       dockerfile: Dockerfile
-    container_name: vimadimension-app
+    container_name: archiease-app
     # depends_on:
       # mysql:
       #   condition: service_healthy
@@ -60,7 +60,7 @@ services:
       - app_logs:/app/logs
       - app_uploads:/app/uploads
     networks:
-      - vimadimension-network
+      - archiease-network
     restart: unless-stopped
 
 volumes:
@@ -72,6 +72,6 @@ volumes:
     driver: local
 
 networks:
-  vimadimension-network:
+  archiease-network:
     driver: bridge
 

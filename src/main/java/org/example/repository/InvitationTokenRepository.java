@@ -48,3 +48,4 @@ public interface InvitationTokenRepository extends JpaRepository<InvitationToken
 
 
 
+

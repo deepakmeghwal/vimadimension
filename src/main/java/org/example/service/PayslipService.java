@@ -3,7 +3,7 @@ package org.example.service;
 import org.example.models.*;
 import org.example.models.enums.PayslipStatus;
 import org.example.repository.PayslipRepository;
-import org.example.repository.AttendanceEntryRepository;
+
 import org.example.repository.UserRepository;
 import org.example.repository.OrganizationRepository;
 import org.slf4j.Logger;
@@ -30,8 +30,7 @@ public class PayslipService {
     @Autowired
     private PayslipRepository payslipRepository;
 
-    @Autowired
-    private AttendanceEntryRepository attendanceEntryRepository;
+
 
     @Autowired
     private UserRepository userRepository;
@@ -286,77 +285,21 @@ public class PayslipService {
     }
 
     /**
-     * Calculate salary based on attendance records
+     * Calculate salary based on working days in period
+     * Note: Attendance tracking has been disabled. Returns working days in period as days worked.
      */
     private PayslipCalculationResult calculateSalaryFromAttendance(User user, LocalDate startDate, LocalDate endDate) {
-        // Get all attendance entries for the period
-        LocalDateTime startDateTime = startDate.atStartOfDay();
-        LocalDateTime endDateTime = endDate.plusDays(1).atStartOfDay();
-        
-        List<AttendanceEntry> entries = attendanceEntryRepository
-            .findByUserIdAndTimestampBetweenOrderByTimestampDesc(user.getId(), startDateTime, endDateTime);
-
-        // Group entries by date
-        Map<LocalDate, List<AttendanceEntry>> entriesByDate = entries.stream()
-            .collect(Collectors.groupingBy(entry -> entry.getTimestamp().toLocalDate()));
-
-        int daysWorked = 0;
+        // Attendance tracking disabled - calculate working days in period instead
+        int workingDays = (int) calculateWorkingDaysInPeriod(startDate, endDate);
         BigDecimal totalOvertimeHours = BigDecimal.ZERO;
+        
+        logger.info("Calculating payslip for user {} - using {} working days in period (attendance tracking disabled)", 
+            user.getUsername(), workingDays);
 
-        // Process each day
-        for (LocalDate date = startDate; !date.isAfter(endDate); date = date.plusDays(1)) {
-            List<AttendanceEntry> dayEntries = entriesByDate.get(date);
-            if (dayEntries != null && !dayEntries.isEmpty()) {
-                // Sort by timestamp
-                dayEntries.sort(Comparator.comparing(AttendanceEntry::getTimestamp));
-
-                // Calculate work hours for the day
-                WorkDayCalculation dayCalc = calculateWorkHoursForDay(dayEntries);
-                if (dayCalc.isWorked()) {
-                    daysWorked++;
-                    totalOvertimeHours = totalOvertimeHours.add(dayCalc.getOvertimeHours());
-                }
-            }
-        }
-
-        return new PayslipCalculationResult(daysWorked, totalOvertimeHours);
+        return new PayslipCalculationResult(workingDays, totalOvertimeHours);
     }
 
-    /**
-     * Calculate work hours for a single day
-     */
-    private WorkDayCalculation calculateWorkHoursForDay(List<AttendanceEntry> dayEntries) {
-        boolean worked = false;
-        BigDecimal totalHours = BigDecimal.ZERO;
-        BigDecimal overtimeHours = BigDecimal.ZERO;
 
-        // Expected work hours per day (8 hours)
-        BigDecimal expectedDailyHours = new BigDecimal("8");
-
-        // Process clock in/out pairs
-        for (int i = 0; i < dayEntries.size() - 1; i++) {
-            AttendanceEntry clockIn = dayEntries.get(i);
-            AttendanceEntry clockOut = dayEntries.get(i + 1);
-
-            if (clockIn.getEntryType() == AttendanceEntry.EntryType.CLOCK_IN &&
-                clockOut.getEntryType() == AttendanceEntry.EntryType.CLOCK_OUT) {
-                
-                // Calculate hours worked
-                long minutes = ChronoUnit.MINUTES.between(clockIn.getTimestamp(), clockOut.getTimestamp());
-                BigDecimal hours = BigDecimal.valueOf(minutes).divide(BigDecimal.valueOf(60), 2, BigDecimal.ROUND_HALF_UP);
-                
-                totalHours = totalHours.add(hours);
-                worked = true;
-
-                // Calculate overtime (hours beyond 8)
-                if (hours.compareTo(expectedDailyHours) > 0) {
-                    overtimeHours = overtimeHours.add(hours.subtract(expectedDailyHours));
-                }
-            }
-        }
-
-        return new WorkDayCalculation(worked, totalHours, overtimeHours);
-    }
 
     /**
      * Get payslips for a user

@@ -63,15 +63,19 @@ public class InvoiceController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<Map<String, Object>> getAllInvoices(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size,
-            @RequestParam(required = false) String status) {
+            @RequestParam(defaultValue = "50") int size,
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) Long projectId,
+            @RequestParam(required = false) Boolean overdue,
+            @RequestParam(required = false) String search) {
         
         try {
             User currentUser = getCurrentUser();
             Long organizationId = currentUser.getOrganization().getId();
 
             Pageable pageable = PageRequest.of(page, size);
-            Page<Invoice> invoicePage = invoiceService.getInvoicesByOrganizationWithFilters(organizationId, pageable, status, null);
+            Page<Invoice> invoicePage = invoiceService.getInvoicesByOrganizationWithFilters(
+                organizationId, pageable, status, search, projectId, overdue);
             
             Map<String, Object> response = new HashMap<>();
             response.put("invoices", invoicePage.getContent());
@@ -397,7 +401,10 @@ public class InvoiceController {
         }
     }
 
-    // Get invoices by status
+    /**
+     * @deprecated Use GET /api/invoices?status={status} instead
+     */
+    @Deprecated
     @GetMapping("/status/{status}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<List<Invoice>> getInvoicesByStatus(@PathVariable InvoiceStatus status) {
@@ -413,7 +420,10 @@ public class InvoiceController {
         }
     }
 
-    // Get invoices by project
+    /**
+     * @deprecated Use GET /api/invoices?projectId={projectId} instead
+     */
+    @Deprecated
     @GetMapping("/project/{projectId}")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<List<Invoice>> getInvoicesByProject(@PathVariable Long projectId) {
@@ -429,7 +439,10 @@ public class InvoiceController {
         }
     }
 
-    // Get overdue invoices
+    /**
+     * @deprecated Use GET /api/invoices?overdue=true instead
+     */
+    @Deprecated
     @GetMapping("/overdue")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<List<Invoice>> getOverdueInvoices() {

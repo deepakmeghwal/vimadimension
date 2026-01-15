@@ -52,6 +52,10 @@ public class Phase {
     @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private List<Task> tasks = new ArrayList<>();
 
+    @OneToMany(mappedBy = "phase", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("displayOrder ASC")
+    private List<PhaseSubstage> substages = new ArrayList<>();
+
     @Column(name = "created_at", nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
@@ -142,6 +146,14 @@ public class Phase {
 
     public void setTasks(List<Task> tasks) {
         this.tasks = tasks;
+    }
+
+    public List<PhaseSubstage> getSubstages() {
+        return substages;
+    }
+
+    public void setSubstages(List<PhaseSubstage> substages) {
+        this.substages = substages;
     }
 
     public LocalDateTime getCreatedAt() {

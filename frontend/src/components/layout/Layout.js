@@ -4,13 +4,18 @@ import Sidebar from './Sidebar';
 import AppLauncher from '../common/AppLauncher';
 import { getOrganizationLogoProps } from '../../utils/organizationLogo';
 
-const Layout = ({ user, onLogout }) => {
-    const [isCollapsed, setIsCollapsed] = useState(true);
+const Layout = ({ user, onLogout, onUserUpdate }) => {
+    const [isCollapsed, setIsCollapsed] = useState(false);
+    const [isSidebarVisible, setIsSidebarVisible] = useState(true);
     const [logoError, setLogoError] = useState(false);
     const navigate = useNavigate();
 
     const toggleSidebar = () => {
         setIsCollapsed(!isCollapsed);
+    };
+
+    const toggleSidebarVisibility = () => {
+        setIsSidebarVisible(!isSidebarVisible);
     };
 
     // Get organization name and logo
@@ -33,14 +38,30 @@ const Layout = ({ user, onLogout }) => {
 
     return (
         <div className="app-layout">
-            <Sidebar
-                user={user}
-                onLogout={onLogout}
-                isCollapsed={isCollapsed}
-                toggleSidebar={toggleSidebar}
-            />
-            <main className="main-content-area">
-                <header className="content-header">
+            <header className="content-header">
+                <div className="header-left-section" style={{ display: 'flex', alignItems: 'center' }}>
+                    <div className="content-header-left-controls" style={{ display: 'flex', alignItems: 'center', marginRight: '16px' }}>
+                        <button
+                            onClick={toggleSidebarVisibility}
+                            className="btn-sidebar-toggle"
+                            title={isSidebarVisible ? "Hide Sidebar" : "Show Sidebar"}
+                            style={{
+                                background: 'none',
+                                border: 'none',
+                                cursor: 'pointer',
+                                padding: '8px',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center'
+                            }}
+                        >
+                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <line x1="3" y1="12" x2="21" y2="12"></line>
+                                <line x1="3" y1="6" x2="21" y2="6"></line>
+                                <line x1="3" y1="18" x2="21" y2="18"></line>
+                            </svg>
+                        </button>
+                    </div>
                     <div className="content-header-logo">
                         {logoProps.hasLogo && !logoError ? (
                             <img
@@ -74,57 +95,28 @@ const Layout = ({ user, onLogout }) => {
                             {getOrganizationName()}
                         </span>
                     </div>
-                    <div className="content-header-actions">
-                        {/* User Profile */}
-                        <div
-                            className="header-user-profile"
-                            style={{
-                                display: 'flex',
-                                alignItems: 'center',
-                                gap: '0.5rem',
-                                marginRight: '0.5rem',
-                                cursor: 'pointer'
-                            }}
-                            onClick={() => navigate('/profile')}
-                        >
-                            {user?.profileImageUrl || user?.avatarUrl ? (
-                                <img
-                                    src={user.profileImageUrl || user.avatarUrl}
-                                    alt="User"
-                                    style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '50%',
-                                        objectFit: 'cover',
-                                        border: '1px solid #e2e8f0'
-                                    }}
-                                />
-                            ) : (
-                                <div
-                                    style={{
-                                        width: '32px',
-                                        height: '32px',
-                                        borderRadius: '50%',
-                                        backgroundColor: '#6366f1',
-                                        color: 'white',
-                                        display: 'flex',
-                                        alignItems: 'center',
-                                        justifyContent: 'center',
-                                        fontSize: '14px',
-                                        fontWeight: '600'
-                                    }}
-                                >
-                                    {(user?.firstName?.[0] || user?.username?.[0] || 'U').toUpperCase()}
-                                </div>
-                            )}
-                        </div>
-                        <AppLauncher user={user} />
-                    </div>
-                </header>
-                <div className="content-wrapper">
-                    <Outlet />
                 </div>
-            </main>
+                <div className="content-header-actions">
+                    <AppLauncher user={user} />
+                </div>
+            </header>
+
+            <div className="app-body">
+                {isSidebarVisible && (
+                    <Sidebar
+                        user={user}
+                        onLogout={onLogout}
+                        isCollapsed={isCollapsed}
+                        toggleSidebar={toggleSidebar}
+                        onUserUpdate={onUserUpdate}
+                    />
+                )}
+                <main className="main-content-area">
+                    <div className="content-wrapper">
+                        <Outlet />
+                    </div>
+                </main>
+            </div>
         </div>
     );
 };

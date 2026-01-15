@@ -33,7 +33,7 @@ public class EmailService {
     @Value("${app.frontend.url:http://localhost:3000}")
     private String frontendUrl;
 
-    @Value("${app.name:VimaDimension}")
+    @Value("${app.name:ArchiEase}")
     private String appName;
 
     @Value("${spring.mail.host:}")

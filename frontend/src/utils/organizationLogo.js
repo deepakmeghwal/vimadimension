@@ -64,3 +64,4 @@ export const getOrganizationLogoProps = (logoUrl, name, className = '', style = 
 
 
 
+

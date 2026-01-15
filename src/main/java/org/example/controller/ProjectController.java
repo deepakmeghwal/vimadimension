@@ -1,8 +1,12 @@
 package org.example.controller;
 
+import org.example.dto.PhaseResponseDto;
 import org.example.dto.ProjectCreateDto;
+import org.example.dto.ProjectResponseDto;
 import org.example.dto.ProjectUpdateDto;
 import org.example.dto.TaskCreateDto;
+import org.example.repository.UserRepository;
+import org.example.service.PermissionService;
 import org.example.models.Client;
 import org.example.models.Project;
 import org.example.models.Task;
@@ -39,15 +43,21 @@ public class ProjectController {
     private final TaskService taskService;
     private final org.example.service.PhaseService phaseService;
     private final org.example.service.ResourceAssignmentService resourceAssignmentService;
+    private final UserRepository userRepository;
+    private final PermissionService permissionService;
 
     @Autowired
     public ProjectController(ProjectService projectService, TaskService taskService, 
                             org.example.service.PhaseService phaseService,
-                            org.example.service.ResourceAssignmentService resourceAssignmentService) {
+                            org.example.service.ResourceAssignmentService resourceAssignmentService,
+                            UserRepository userRepository,
+                            PermissionService permissionService) {
         this.projectService = projectService;
         this.taskService = taskService;
         this.phaseService = phaseService;
         this.resourceAssignmentService = resourceAssignmentService;
+        this.userRepository = userRepository;
+        this.permissionService = permissionService;
     }
 
     @GetMapping("/health")
@@ -104,7 +114,7 @@ public class ProjectController {
     @GetMapping("/paginated")
     public ResponseEntity<Map<String, Object>> listProjectsPaginated(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "9") int size,
+            @RequestParam(defaultValue = "50") int size,
             @RequestParam(required = false) String category,
             @RequestParam(required = false) String priority,
             @RequestParam(required = false) String status,
@@ -179,16 +189,38 @@ public class ProjectController {
         }
     }
 
+    @GetMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getProjectById(@PathVariable("id") Long projectId) {
+        Optional<Project> projectOptional = projectService.findById(projectId);
+        if (projectOptional.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(projectOptional.get());
+    }
+
     @GetMapping("/{id}/details")
     public ResponseEntity<?> showProjectDetails(@PathVariable("id") Long projectId,
                                                 @RequestParam(defaultValue = "0") int page,
-                                                @RequestParam(defaultValue = "12") int size) {
+                                                @RequestParam(defaultValue = "50") int size,
+                                                Authentication authentication) {
         Optional<Project> projectOptional = projectService.findById(projectId);
         if (projectOptional.isEmpty()) {
             logger.warn("Attempted to view details for non-existent project ID: {}", projectId);
             return ResponseEntity.notFound().build();
         }
         Project project = projectOptional.get();
+
+        // Determine if current user is admin - admins can see financial data
+        boolean includeFinancials = false;
+        if (authentication != null && authentication.isAuthenticated()) {
+            String username = authentication.getName();
+            User currentUser = userRepository.findByUsername(username).orElse(null);
+            if (currentUser != null) {
+                includeFinancials = permissionService.isAdmin(currentUser);
+            }
+        }
+        logger.debug("User financial access for project {}: {}", projectId, includeFinancials);
 
         // Fetch and add tasks for this project with detailed information
         Map<String, Object> paginatedTasks;
@@ -213,9 +245,14 @@ public class ProjectController {
         long totalItems = ((Number) paginatedTasks.getOrDefault("totalItems", tasks.size())).longValue();
         logger.debug("Displaying details for project ID: {} with {} tasks (page {}).", projectId, totalItems, paginatedTasks.getOrDefault("currentPage", page));
         
+        // Convert to DTOs with role-based financial field filtering
+        ProjectResponseDto projectDto = ProjectResponseDto.fromEntity(project, includeFinancials);
+        List<PhaseResponseDto> phaseDtos = PhaseResponseDto.fromEntities(
+                phaseService.getPhasesByProjectId(projectId), includeFinancials);
+        
         Map<String, Object> response = new HashMap<>();
-        response.put("project", project);
-        response.put("phases", phaseService.getPhasesByProjectId(projectId)); // Add phases
+        response.put("project", projectDto);
+        response.put("phases", phaseDtos);
         response.put("tasks", taskResponses);
         
         // Add team roster (users who have access or are assigned to tasks)
@@ -252,7 +289,12 @@ public class ProjectController {
         projectUpdateDto.setDescription(project.getDescription());
         projectUpdateDto.setBudget(project.getBudget());
         projectUpdateDto.setActualCost(project.getActualCost());
+        projectUpdateDto.setBudget(project.getBudget());
+        projectUpdateDto.setActualCost(project.getActualCost());
         projectUpdateDto.setPriority(project.getPriority());
+        projectUpdateDto.setLifecycleStages(project.getLifecycleStages());
+        projectUpdateDto.setTotalFee(project.getTotalFee());
+        projectUpdateDto.setTargetProfitMargin(project.getTargetProfitMargin());
 
         logger.debug("Displaying edit form for project ID: {}", projectId);
         
@@ -329,24 +371,54 @@ public class ProjectController {
     @PostMapping("/{projectId}/tasks")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> createTaskForProject(@PathVariable Long projectId,
-                                                 @RequestParam Map<String, String> params) {
+                                                 @RequestBody Map<String, Object> payload) {
         logger.info("Received task creation request for project {}: name='{}'", 
-                   projectId, params.get("name"));
+                   projectId, payload.get("name"));
         
         try {
-            String name = params.get("name");
-            String description = params.get("description");
-            String projectStageStr = params.get("projectStage");
-            String phaseIdStr = params.get("phaseId");
-            String assigneeIdStr = params.get("assigneeId");
-            String checkedByIdStr = params.get("checkedById");
+            String name = (String) payload.get("name");
+            String description = (String) payload.get("description");
+            
+            // Handle projectStage which might be missing or null
+            String projectStageStr = (String) payload.get("projectStage");
+            
+            // Handle phaseId
+            Object phaseIdObj = payload.get("phaseId");
+            Long phaseId = null;
+            if (phaseIdObj instanceof Number) {
+                phaseId = ((Number) phaseIdObj).longValue();
+            } else if (phaseIdObj instanceof String) {
+                phaseId = Long.parseLong((String) phaseIdObj);
+            }
+
+            // Handle assigneeId
+            Object assigneeIdObj = payload.get("assigneeId");
+            Long assigneeId = null;
+            if (assigneeIdObj instanceof Number) {
+                assigneeId = ((Number) assigneeIdObj).longValue();
+            } else if (assigneeIdObj instanceof String) {
+                assigneeId = Long.parseLong((String) assigneeIdObj);
+            }
+
+            // Handle checkedById
+            Object checkedByIdObj = payload.get("checkedById");
+            Long checkedById = null;
+            if (checkedByIdObj instanceof Number) {
+                checkedById = ((Number) checkedByIdObj).longValue();
+            } else if (checkedByIdObj instanceof String) {
+                checkedById = Long.parseLong((String) checkedByIdObj);
+            }
             
             if (name == null || name.trim().isEmpty()) {
                 return ResponseEntity.badRequest().body(Map.of("error", "Task name is required."));
             }
             
+            // Default project stage if not provided
             if (projectStageStr == null || projectStageStr.trim().isEmpty()) {
-                return ResponseEntity.badRequest().body(Map.of("error", "Project stage is required."));
+                 // Try to get from project or default to CONCEPT (valid enum value)
+                 // For now, let's default to CONCEPT if not provided, or require it.
+                 // The frontend seems to send it, but let's be safe.
+                 projectStageStr = "CONCEPT"; 
             }
             
             org.example.models.enums.ProjectStage projectStage;
@@ -356,20 +428,14 @@ public class ProjectController {
                 return ResponseEntity.badRequest().body(Map.of("error", "Invalid project stage: " + projectStageStr));
             }
             
-            Optional<Long> phaseIdOpt = phaseIdStr != null && !phaseIdStr.trim().isEmpty() 
-                    ? Optional.of(Long.parseLong(phaseIdStr)) 
-                    : Optional.empty();
-            Optional<Long> assigneeIdOpt = assigneeIdStr != null && !assigneeIdStr.trim().isEmpty() 
-                    ? Optional.of(Long.parseLong(assigneeIdStr)) 
-                    : Optional.empty();
-            Optional<Long> checkedByIdOpt = checkedByIdStr != null && !checkedByIdStr.trim().isEmpty() 
-                    ? Optional.of(Long.parseLong(checkedByIdStr)) 
-                    : Optional.empty();
+            Optional<Long> phaseIdOpt = Optional.ofNullable(phaseId);
+            Optional<Long> assigneeIdOpt = Optional.ofNullable(assigneeId);
+            Optional<Long> checkedByIdOpt = Optional.ofNullable(checkedById);
             
             logger.info("Creating task with name: '{}' for project: {} (phase: {})", 
                        name, projectId, phaseIdOpt.orElse(null));
             
-            taskService.createTaskForProject(
+            Task createdTask = taskService.createTaskForProject(
                     name,
                     description,
                     projectStage,
@@ -378,7 +444,13 @@ public class ProjectController {
                     assigneeIdOpt,
                     checkedByIdOpt
             );
-            return ResponseEntity.ok(Map.of("message", "Task created successfully!"));
+            
+            Map<String, Object> response = new HashMap<>();
+            response.put("message", "Task created successfully!");
+            // Use helper to format response so frontend gets all fields (assignee, project, etc.)
+            response.put("task", buildTaskResponse(createdTask));
+            
+            return ResponseEntity.ok(response);
         } catch (NumberFormatException e) {
             logger.error("Error parsing numeric parameter: {}", e.getMessage());
             return ResponseEntity.badRequest().body(Map.of("error", "Invalid numeric parameter: " + e.getMessage()));

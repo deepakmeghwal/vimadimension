@@ -1,4 +1,4 @@
-# VimaDimension Project Tracker
+# ArchiEase Project Tracker
 
 ## Backend Implementation with Docker
 

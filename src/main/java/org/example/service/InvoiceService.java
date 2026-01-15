@@ -258,31 +258,32 @@ public class InvoiceService {
 
     // Get invoices with pagination and filters
     @Transactional(readOnly = true)
-    public Page<Invoice> getInvoicesByOrganizationWithFilters(Long organizationId, Pageable pageable, String status, String search) {
+    public Page<Invoice> getInvoicesByOrganizationWithFilters(Long organizationId, Pageable pageable, 
+                                                              String statusStr, String search, 
+                                                              Long projectId, Boolean overdue) {
         Organization organization = organizationRepository.findById(organizationId)
                 .orElseThrow(() -> new IllegalArgumentException("Organization not found"));
 
-        // If no filters, return all invoices
-        if ((status == null || status.trim().isEmpty()) && (search == null || search.trim().isEmpty())) {
-            return invoiceRepository.findByOrganizationOrderByCreatedAtDesc(organization, pageable);
+        InvoiceStatus status = null;
+        if (statusStr != null && !statusStr.trim().isEmpty()) {
+            try {
+                status = InvoiceStatus.valueOf(statusStr.toUpperCase());
+            } catch (IllegalArgumentException e) {
+                // Ignore invalid status
+            }
         }
 
-        // Apply filters
-        if (status != null && !status.trim().isEmpty() && (search == null || search.trim().isEmpty())) {
-            // Status filter only
-            InvoiceStatus invoiceStatus = InvoiceStatus.valueOf(status.toUpperCase());
-            return invoiceRepository.findByOrganizationAndStatusOrderByCreatedAtDesc(organization, invoiceStatus, pageable);
-        } else if ((status == null || status.trim().isEmpty()) && search != null && !search.trim().isEmpty()) {
-            // Search filter only
-            return invoiceRepository.findByOrganizationAndClientNameContaining(organization, search.trim(), pageable);
-        } else if (status != null && !status.trim().isEmpty() && search != null && !search.trim().isEmpty()) {
-            // Both filters
-            InvoiceStatus invoiceStatus = InvoiceStatus.valueOf(status.toUpperCase());
-            return invoiceRepository.findByOrganizationAndStatusAndClientNameContaining(organization, invoiceStatus, search.trim(), pageable);
-        }
-
-        // Fallback
-        return invoiceRepository.findByOrganizationOrderByCreatedAtDesc(organization, pageable);
+        String searchLower = (search != null && !search.trim().isEmpty()) ? search.trim().toLowerCase() : null;
+        
+        // Use the unified repository query
+        return invoiceRepository.findByOrganizationAndFilters(
+                organization, 
+                status, 
+                projectId, 
+                overdue != null ? overdue : false, 
+                LocalDate.now(), 
+                searchLower, 
+                pageable);
     }
 
     // Get invoices by status

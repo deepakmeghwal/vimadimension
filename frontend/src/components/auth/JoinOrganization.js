@@ -363,7 +363,7 @@ const JoinOrganization = () => {
         <div style={styles.container}>
             {/* Left Panel - Value Prop */}
             <div className="hidden-mobile" style={styles.leftPanel}>
-                <div style={styles.brand}>KOMOREBI</div>
+                <div style={styles.brand}>ARCHIEASE</div>
                 <h1 style={styles.heading}>
                     You're Invited! 🎉
                 </h1>
@@ -459,13 +459,13 @@ const JoinOrganization = () => {
                         </div>
 
                         {errors.submit && (
-                            <div style={{ 
-                                padding: '0.75rem', 
-                                background: '#fef2f2', 
-                                border: '1px solid #fecaca', 
-                                borderRadius: '8px', 
-                                color: '#ef4444', 
-                                fontSize: '0.875rem', 
+                            <div style={{
+                                padding: '0.75rem',
+                                background: '#fef2f2',
+                                border: '1px solid #fecaca',
+                                borderRadius: '8px',
+                                color: '#ef4444',
+                                fontSize: '0.875rem',
                                 textAlign: 'center',
                                 marginBottom: '1rem'
                             }}>
@@ -489,8 +489,8 @@ const JoinOrganization = () => {
 
                         <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.875rem', color: '#64748b' }}>
                             Already have an account?{' '}
-                            <span 
-                                onClick={() => navigate('/login')} 
+                            <span
+                                onClick={() => navigate('/login')}
                                 style={{ color: '#6366f1', cursor: 'pointer', fontWeight: '600' }}
                             >
                                 Sign in

@@ -18,7 +18,8 @@ const RolesList = ({ user, isPeopleContext = false }) => {
             const response = await axios.get('/api/admin/roles', {
                 withCredentials: true
             });
-            setRoles(response.data);
+            const filteredRoles = response.data.filter(role => !['ROLE_GUEST', 'ROLE_USER'].includes(role.name));
+            setRoles(filteredRoles);
             setError(null);
         } catch (err) {
             console.error('Error fetching roles:', err);

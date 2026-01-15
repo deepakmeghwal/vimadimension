@@ -53,6 +53,22 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     @Query("SELECT i FROM Invoice i WHERE i.organization = :organization AND i.status = :status AND LOWER(i.clientName) LIKE LOWER(CONCAT('%', :clientName, '%')) ORDER BY i.createdAt DESC")
     Page<Invoice> findByOrganizationAndStatusAndClientNameContaining(@Param("organization") Organization organization, @Param("status") InvoiceStatus status, @Param("clientName") String clientName, Pageable pageable);
 
+    // Unified filter query
+    @Query("SELECT i FROM Invoice i WHERE i.organization = :organization " +
+           "AND (:status IS NULL OR i.status = :status) " +
+           "AND (:projectId IS NULL OR i.project.id = :projectId) " +
+           "AND (:overdue IS FALSE OR (i.dueDate < :currentDate AND i.status NOT IN ('PAID', 'CANCELLED'))) " +
+           "AND (:search IS NULL OR LOWER(i.clientName) LIKE LOWER(CONCAT('%', :search, '%'))) " +
+           "ORDER BY i.createdAt DESC")
+    Page<Invoice> findByOrganizationAndFilters(
+            @Param("organization") Organization organization,
+            @Param("status") InvoiceStatus status,
+            @Param("projectId") Long projectId,
+            @Param("overdue") Boolean overdue,
+            @Param("currentDate") LocalDate currentDate,
+            @Param("search") String search,
+            Pageable pageable);
+
     // Get next invoice sequence number for organization and year
     @Query("SELECT COALESCE(MAX(CAST(SUBSTRING(i.invoiceNumber, LENGTH(:prefix) + 1) AS int)), 0) FROM Invoice i WHERE i.organization = :organization AND i.invoiceNumber LIKE :prefix%")
     Integer findMaxSequenceByOrganizationAndPrefix(@Param("organization") Organization organization, @Param("prefix") String prefix);

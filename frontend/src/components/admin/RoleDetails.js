@@ -76,10 +76,10 @@ const RoleDetails = ({ user, isPeopleContext = false }) => {
                         <h1 className="page-title-modern">Role Details</h1>
                     </div>
                     <button
-                        onClick={() => navigate(backPath)}
+                        onClick={() => navigate(-1)}
                         className="btn-outline-modern"
                     >
-                        <i className="fas fa-arrow-left"></i> Back to Roles
+                        <i className="fas fa-arrow-left"></i> Back
                     </button>
                 </div>
                 <div className="alert alert-danger">
@@ -104,7 +104,7 @@ const RoleDetails = ({ user, isPeopleContext = false }) => {
                     <p className="page-subtitle">{role.description || 'No description provided'}</p>
                 </div>
                 <button
-                    onClick={() => navigate(backPath)}
+                    onClick={() => navigate(-1)}
                     className="btn-outline-modern"
                     style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
                 >

@@ -10,7 +10,7 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
     const [showBulkGenerate, setShowBulkGenerate] = useState(false);
     const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
     const [statusFilter, setStatusFilter] = useState('active'); // 'active' (Draft/Approved), 'all', 'history'
-    
+
     const [currentPage, setCurrentPage] = useState(0);
     const [totalPages, setTotalPages] = useState(0);
     const [totalElements, setTotalElements] = useState(0);
@@ -69,12 +69,12 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
             // but acceptable if we assume we want to see "Active" ones mostly.
             // Ideally, backend should support status filtering.
             const url = `/api/payslips/organization?organizationId=${user.organizationId}&page=${currentPage}&size=50`; // Increased size to help with client-side filter visibility
-            
+
             const response = await fetch(url, {
                 credentials: 'include'
             });
             const data = await response.json();
-            
+
             if (data.success) {
                 setPayslips(data.payslips);
                 setTotalPages(data.totalPages);
@@ -135,7 +135,7 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
             if (response.ok) {
                 const blob = await response.blob();
                 downloadBlob(blob, `payslip_${generateForm.payPeriodStart}_to_${generateForm.payPeriodEnd}.pdf`);
-                
+
                 setSuccess('Payslip generated successfully!');
                 setShowGenerateForm(false);
                 resetGenerateForm();
@@ -233,7 +233,7 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
             });
 
             const data = await response.json();
-            
+
             if (data.success) {
                 setSuccess(`Payslip marked as ${status}!`);
                 fetchPayslips();
@@ -321,9 +321,9 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                 <h1 className="page-title">Payroll Management</h1>
                 <div className="page-actions">
                     {isPeopleContext ? (
-                        <button onClick={() => navigate('/people/directory')} className="btn-outline">Back to Directory</button>
+                        <button onClick={() => navigate(-1)} className="btn-outline">Back</button>
                     ) : (
-                        <button onClick={() => navigate('/admin/dashboard')} className="btn-outline">Back to Admin Dashboard</button>
+                        <button onClick={() => navigate(-1)} className="btn-outline">Back</button>
                     )}
                     <button className="btn-primary" onClick={() => setShowBulkGenerate(true)}>Bulk Generate</button>
                     <button className="btn-primary" onClick={() => setShowGenerateForm(true)}>Single Entry</button>
@@ -332,26 +332,26 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
 
             <div className="payslip-controls-bar">
                 <div className="view-toggles">
-                    <button 
-                        className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`} 
+                    <button
+                        className={`toggle-btn ${viewMode === 'list' ? 'active' : ''}`}
                         onClick={() => setViewMode('list')}
                         title="List View"
                     >
                         ☰
                     </button>
-                    <button 
-                        className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`} 
+                    <button
+                        className={`toggle-btn ${viewMode === 'grid' ? 'active' : ''}`}
                         onClick={() => setViewMode('grid')}
                         title="Grid View"
                     >
                         ☷
                     </button>
                 </div>
-                
+
                 <div className="filter-controls">
                     <label>Status: </label>
-                    <select 
-                        value={statusFilter} 
+                    <select
+                        value={statusFilter}
                         onChange={(e) => setStatusFilter(e.target.value)}
                         className="status-filter-select"
                     >
@@ -389,7 +389,7 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                                             <div className="detail-row"><span>Net Salary:</span><span className="net-salary">{formatCurrency(payslip.netSalary)}</span></div>
                                         </div>
                                         <div className="payslip-card-actions">
-                                            <select 
+                                            <select
                                                 onChange={(e) => confirmStatusUpdate(payslip.id, e.target.value)}
                                                 className="status-select-small"
                                                 value=""
@@ -431,7 +431,7 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                                                 </td>
                                                 <td>
                                                     <div className="table-actions">
-                                                        <select 
+                                                        <select
                                                             onChange={(e) => confirmStatusUpdate(payslip.id, e.target.value)}
                                                             className="status-select-small"
                                                             value=""
@@ -446,16 +446,16 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                                         ))}
                                     </tbody>
                                 </table>
-                </div>
-            )}
+                            </div>
+                        )}
 
                         {totalPages > 1 && (
                             <div className="pagination">
                                 <button className="btn btn-outline" onClick={() => setCurrentPage(p => Math.max(0, p - 1))} disabled={currentPage === 0}>Prev</button>
                                 <span className="page-info">Page {currentPage + 1} / {totalPages}</span>
                                 <button className="btn btn-outline" onClick={() => setCurrentPage(p => Math.min(totalPages - 1, p + 1))} disabled={currentPage >= totalPages - 1}>Next</button>
-                </div>
-            )}
+                            </div>
+                        )}
                     </>
                 )}
             </div>
@@ -468,17 +468,17 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                         <form onSubmit={handleGeneratePayslip} className="payslip-form">
                             <div className="form-group">
                                 <label>Employee:</label>
-                                <select value={generateForm.userId} onChange={e => setGenerateForm({...generateForm, userId: e.target.value})} required>
+                                <select value={generateForm.userId} onChange={e => setGenerateForm({ ...generateForm, userId: e.target.value })} required>
                                     <option value="">Select Employee</option>
                                     {users.map(u => <option key={u.id} value={u.id}>{u.name}</option>)}
                                 </select>
                             </div>
                             <div className="form-row">
-                                <div className="form-group"><label>Start Date:</label><input type="date" value={generateForm.payPeriodStart} onChange={e => setGenerateForm({...generateForm, payPeriodStart: e.target.value})} required /></div>
-                                <div className="form-group"><label>End Date:</label><input type="date" value={generateForm.payPeriodEnd} onChange={e => setGenerateForm({...generateForm, payPeriodEnd: e.target.value})} required /></div>
+                                <div className="form-group"><label>Start Date:</label><input type="date" value={generateForm.payPeriodStart} onChange={e => setGenerateForm({ ...generateForm, payPeriodStart: e.target.value })} required /></div>
+                                <div className="form-group"><label>End Date:</label><input type="date" value={generateForm.payPeriodEnd} onChange={e => setGenerateForm({ ...generateForm, payPeriodEnd: e.target.value })} required /></div>
                             </div>
-                            <div className="form-group"><label>Monthly Salary (₹):</label><input type="number" value={generateForm.monthlySalary} onChange={e => setGenerateForm({...generateForm, monthlySalary: e.target.value})} required /></div>
-                            <div className="form-group"><label>Allowances (₹):</label><input type="number" value={generateForm.allowances} onChange={e => setGenerateForm({...generateForm, allowances: e.target.value})} /></div>
+                            <div className="form-group"><label>Monthly Salary (₹):</label><input type="number" value={generateForm.monthlySalary} onChange={e => setGenerateForm({ ...generateForm, monthlySalary: e.target.value })} required /></div>
+                            <div className="form-group"><label>Allowances (₹):</label><input type="number" value={generateForm.allowances} onChange={e => setGenerateForm({ ...generateForm, allowances: e.target.value })} /></div>
                             <div className="form-actions">
                                 <button type="button" className="btn btn-secondary" onClick={() => setShowGenerateForm(false)}>Cancel</button>
                                 <button type="submit" className="btn btn-primary" disabled={loading}>{loading ? 'Generating...' : 'Generate'}</button>
@@ -495,8 +495,8 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                         <div className="modal-header"><h3>Bulk Generate Payslips</h3><button className="close-btn" onClick={() => setShowBulkGenerate(false)}>&times;</button></div>
                         <form onSubmit={handleBulkGenerate} className="payslip-form">
                             <div className="form-row">
-                                <div className="form-group"><label>Start Date:</label><input type="date" value={bulkForm.payPeriodStart} onChange={e => setBulkForm({...bulkForm, payPeriodStart: e.target.value})} required /></div>
-                                <div className="form-group"><label>End Date:</label><input type="date" value={bulkForm.payPeriodEnd} onChange={e => setBulkForm({...bulkForm, payPeriodEnd: e.target.value})} required /></div>
+                                <div className="form-group"><label>Start Date:</label><input type="date" value={bulkForm.payPeriodStart} onChange={e => setBulkForm({ ...bulkForm, payPeriodStart: e.target.value })} required /></div>
+                                <div className="form-group"><label>End Date:</label><input type="date" value={bulkForm.payPeriodEnd} onChange={e => setBulkForm({ ...bulkForm, payPeriodEnd: e.target.value })} required /></div>
                             </div>
                             <div className="form-group">
                                 <label>Select Employees ({bulkForm.selectedUserIds.length} selected):</label>
@@ -507,18 +507,18 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                                     </div>
                                     {users.map(u => (
                                         <div key={u.id} className="user-select-item">
-                                <input
-                                                type="checkbox" 
+                                            <input
+                                                type="checkbox"
                                                 checked={bulkForm.selectedUserIds.includes(u.id)}
                                                 onChange={() => toggleUserSelection(u.id)}
                                             />
                                             <span>{u.name}</span>
-                            </div>
+                                        </div>
                                     ))}
+                                </div>
                             </div>
-                            </div>
-                            <div className="form-group"><label>Notes (Applied to all):</label><textarea value={bulkForm.notes} onChange={e => setBulkForm({...bulkForm, notes: e.target.value})} rows="2" /></div>
-                            
+                            <div className="form-group"><label>Notes (Applied to all):</label><textarea value={bulkForm.notes} onChange={e => setBulkForm({ ...bulkForm, notes: e.target.value })} rows="2" /></div>
+
                             {loading && <div className="progress-bar"><div className="progress-fill" style={{ width: `${bulkProgress}%` }}></div></div>}
 
                             <div className="form-actions">
@@ -538,14 +538,14 @@ const AdminPayslipManagement = ({ user, isPeopleContext = false }) => {
                         <div className="modal-body">
                             <p>Are you sure you want to mark this payslip as <strong>{confirmAction.type}</strong>?</p>
                             <p className="text-sm text-muted">This action may be irreversible or affect financial records.</p>
-                                        </div>
+                        </div>
                         <div className="form-actions">
                             <button className="btn btn-secondary" onClick={() => setConfirmAction(null)}>No, Cancel</button>
                             <button className="btn btn-danger" onClick={proceedWithStatusUpdate}>Yes, Proceed</button>
                         </div>
                     </div>
-                            </div>
-                        )}
+                </div>
+            )}
         </div>
     );
 };

@@ -13,11 +13,38 @@ const Login = ({ onLogin }) => {
   const [showPassword, setShowPassword] = useState(false);
   const [searchParams] = useSearchParams();
 
+  // State for unverified account handling
+  const [isUnverified, setIsUnverified] = useState(false);
+  const [unverifiedEmail, setUnverifiedEmail] = useState('');
+  const [resendLoading, setResendLoading] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
+
   const handleChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value
     });
+    // Clear unverified state when user changes input
+    if (isUnverified) {
+      setIsUnverified(false);
+      setResendSuccess(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    setResendLoading(true);
+    setResendSuccess(false);
+    try {
+      const response = await apiPost('/api/organization/resend-verification', { email: unverifiedEmail });
+      const data = await response.json();
+      if (data.success) {
+        setResendSuccess(true);
+      }
+    } catch (error) {
+      console.error('Failed to resend verification:', error);
+    } finally {
+      setResendLoading(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -53,7 +80,14 @@ const Login = ({ onLogin }) => {
         }
       } else {
         const errorData = await response.json();
-        setError(errorData.message || 'Invalid username or password.');
+        // Check if account is not verified
+        if (errorData.code === 'ACCOUNT_NOT_VERIFIED') {
+          setIsUnverified(true);
+          setUnverifiedEmail(errorData.email || formData.username);
+          setError('');
+        } else {
+          setError(errorData.message || 'Invalid username or password.');
+        }
       }
     } catch (error) {
       console.error('Login error:', error);
@@ -63,33 +97,22 @@ const Login = ({ onLogin }) => {
     }
   };
 
-  // Styles matching register page
+  // Styles - non-responsive values only, responsive handled by CSS classes
   const styles = {
     container: {
-      display: 'flex',
-      minHeight: '100vh',
       fontFamily: "'Inter', sans-serif",
       backgroundColor: 'white'
     },
     leftPanel: {
-      flex: 1,
       backgroundColor: 'white',
       color: '#0f172a',
-      padding: '4rem 6rem',
       display: 'flex',
       flexDirection: 'column',
       justifyContent: 'center',
       position: 'relative',
-      overflow: 'hidden',
-      maxWidth: '50%'
+      overflow: 'hidden'
     },
     rightPanel: {
-      flex: 1,
-      display: 'flex',
-      alignItems: 'center',
-      justifyContent: 'flex-start',
-      padding: '0',
-      paddingLeft: '2rem',
       backgroundColor: 'white',
       position: 'relative'
     },
@@ -199,11 +222,11 @@ const Login = ({ onLogin }) => {
   };
 
   return (
-    <div style={styles.container}>
+    <div className="login-page-container" style={styles.container}>
       {/* Left Panel - Login Form */}
-      <div style={styles.leftPanel}>
+      <div className="login-left-panel" style={styles.leftPanel}>
         <div>
-          <h1 style={styles.brand}>KOMOREBI</h1>
+          <h1 style={styles.brand}>ARCHIEASE</h1>
           <h2 style={styles.heading}>Welcome Back</h2>
           <p style={styles.subtitle}>
             Sign in to your account to continue managing your projects and team.
@@ -212,6 +235,62 @@ const Login = ({ onLogin }) => {
           {(error || searchParams.get('error')) && (
             <div style={styles.errorBox}>
               {error || 'Invalid username or password.'}
+            </div>
+          )}
+
+          {isUnverified && (
+            <div style={{
+              padding: '1rem',
+              background: '#fffbeb',
+              border: '1px solid #fcd34d',
+              borderRadius: '8px',
+              marginBottom: '1.5rem'
+            }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: '0.75rem' }}>
+                <span style={{ fontSize: '1.25rem' }}>⚠️</span>
+                <div style={{ flex: 1 }}>
+                  <p style={{ margin: 0, fontWeight: '600', color: '#92400e', fontSize: '0.875rem' }}>
+                    Email Not Verified
+                  </p>
+                  <p style={{ margin: '0.5rem 0 0', color: '#a16207', fontSize: '0.875rem', lineHeight: '1.5' }}>
+                    Please verify your email address <strong>{unverifiedEmail}</strong> to activate your account.
+                  </p>
+
+                  {resendSuccess ? (
+                    <div style={{
+                      marginTop: '0.75rem',
+                      padding: '0.5rem 0.75rem',
+                      background: '#f0fdf4',
+                      border: '1px solid #bbf7d0',
+                      borderRadius: '6px',
+                      color: '#166534',
+                      fontSize: '0.875rem'
+                    }}>
+                      ✓ Verification email sent! Check your inbox.
+                    </div>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={handleResendVerification}
+                      disabled={resendLoading}
+                      style={{
+                        marginTop: '0.75rem',
+                        padding: '0.5rem 1rem',
+                        backgroundColor: '#6366f1',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '0.875rem',
+                        fontWeight: '500',
+                        cursor: resendLoading ? 'not-allowed' : 'pointer',
+                        opacity: resendLoading ? 0.7 : 1
+                      }}
+                    >
+                      {resendLoading ? 'Sending...' : 'Resend Verification Email'}
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
 
@@ -308,15 +387,11 @@ const Login = ({ onLogin }) => {
               {isLoading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
-
-          <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.875rem', color: '#64748b' }}>
-            Don't have an account? <span onClick={() => navigate('/register')} style={{ color: '#6366f1', cursor: 'pointer', fontWeight: '600' }}>Sign up</span>
-          </div>
         </div>
       </div>
 
       {/* Right Panel - Image */}
-      <div className="hidden-mobile" style={styles.rightPanel}>
+      <div className="login-right-panel" style={styles.rightPanel}>
         <div style={styles.imageContainer}>
           <img
             src="/images/login.png"

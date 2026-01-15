@@ -175,17 +175,6 @@ const VerifyEmail = () => {
                 </p>
                 <div style={{ display: 'flex', gap: '1rem', justifyContent: 'center', flexWrap: 'wrap' }}>
                     <button
-                        onClick={() => navigate('/register')}
-                        style={{ 
-                            ...styles.button, 
-                            backgroundColor: 'transparent', 
-                            color: '#6366f1', 
-                            border: '1px solid #6366f1' 
-                        }}
-                    >
-                        Register Again
-                    </button>
-                    <button
                         onClick={() => navigate('/login')}
                         style={styles.button}
                     >
@@ -212,6 +201,7 @@ const VerifyEmail = () => {
 };
 
 export default VerifyEmail;
+
 
 
 

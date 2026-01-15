@@ -1,5 +1,19 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
+import {
+  Plus,
+  FileText,
+  Eye,
+  Download,
+  Send,
+  MoreVertical,
+  Filter,
+  CheckCircle2,
+  AlertCircle,
+  X,
+  FileBox
+} from 'lucide-react';
+import '../projects/ProjectsList.css'; // Ensure we have the base styles available
 
 const InvoicesList = ({ user }) => {
   const [invoices, setInvoices] = useState([]);
@@ -16,10 +30,12 @@ const InvoicesList = ({ user }) => {
   const [selectedInvoice, setSelectedInvoice] = useState(null);
   const [isSendingEmail, setIsSendingEmail] = useState(false);
   const [message, setMessage] = useState(null);
+  const [activeActionMenu, setActiveActionMenu] = useState(null);
+
   const navigate = useNavigate();
 
   // Check if user has admin or manager role
-  const canManageInvoices = user?.authorities?.some(auth => 
+  const canManageInvoices = user?.authorities?.some(auth =>
     auth.authority === 'ROLE_ADMIN' || auth.authority === 'ROLE_MANAGER'
   ) || false;
 
@@ -29,21 +45,27 @@ const InvoicesList = ({ user }) => {
     }
   }, [canManageInvoices, currentPage, pageSize, filter]);
 
+  // Click outside to close action menu
+  useEffect(() => {
+    const handleClickOutside = () => setActiveActionMenu(null);
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, []);
+
   const fetchInvoices = async () => {
     try {
       setLoading(true);
-      
+
       // Build query parameters
       const params = new URLSearchParams({
         page: currentPage.toString(),
         size: pageSize.toString()
       });
-      
+
       if (filter && filter !== 'all') {
         params.append('status', filter);
       }
-      
-      
+
       const response = await fetch(`/api/invoices?${params.toString()}`, {
         method: 'GET',
         credentials: 'include',
@@ -94,8 +116,8 @@ const InvoicesList = ({ user }) => {
         const result = await response.json();
         if (result.success) {
           // Update the invoice in the list
-          setInvoices(invoices.map(invoice => 
-            invoice.id === invoiceId 
+          setInvoices(invoices.map(invoice =>
+            invoice.id === invoiceId
               ? { ...invoice, status: newStatus }
               : invoice
           ));
@@ -133,8 +155,8 @@ const InvoicesList = ({ user }) => {
 
       if (response.ok && result.success) {
         // Update the invoice in the list
-        setInvoices(invoices.map(invoice => 
-          invoice.id === selectedInvoice.id 
+        setInvoices(invoices.map(invoice =>
+          invoice.id === selectedInvoice.id
             ? { ...invoice, status: 'SENT' }
             : invoice
         ));
@@ -169,8 +191,8 @@ const InvoicesList = ({ user }) => {
         const result = await response.json();
         if (result.success) {
           // Update the invoice in the list
-          setInvoices(invoices.map(invoice => 
-            invoice.id === selectedInvoice.id 
+          setInvoices(invoices.map(invoice =>
+            invoice.id === selectedInvoice.id
               ? { ...invoice, status: 'SENT' }
               : invoice
           ));
@@ -227,7 +249,6 @@ const InvoicesList = ({ user }) => {
         const blob = await response.blob();
         const url = window.URL.createObjectURL(blob);
         window.open(url, '_blank');
-        // Clean up the URL after a delay to allow the browser to load it
         setTimeout(() => window.URL.revokeObjectURL(url), 1000);
       } else {
         setError('Failed to view PDF');
@@ -239,15 +260,22 @@ const InvoicesList = ({ user }) => {
   };
 
   const getStatusBadgeClass = (status) => {
+    // Map to badge-project-status style classes loosely
     switch (status) {
-      case 'DRAFT': return 'bg-secondary';
-      case 'SENT': return 'bg-primary';
-      case 'VIEWED': return 'bg-info';
-      case 'PAID': return 'bg-success';
-      case 'OVERDUE': return 'bg-danger';
-      case 'CANCELLED': return 'bg-dark';
-      default: return 'bg-secondary';
+      case 'DRAFT': return 'badge-project-status in-discussion'; // Yellow/Orange
+      case 'SENT': return 'badge-project-status progress'; // Blue
+      case 'VIEWED': return 'badge-project-status progress'; // Blue/Purple? Using progress for now
+      case 'PAID': return 'badge-project-status completed'; // Green
+      case 'OVERDUE': return 'badge-project-status on-hold'; // Red usage of on-hold/risk
+      case 'CANCELLED': return 'badge-project-status archived'; // Grey
+      default: return 'badge-project-status';
     }
+  };
+
+  const getCustomStatusStyle = (status) => {
+    if (status === 'OVERDUE') return { backgroundColor: '#fee2e2', color: '#991b1b' };
+    if (status === 'VIEWED') return { backgroundColor: '#f3e8ff', color: '#6b21a8' };
+    return {};
   };
 
   const formatCurrency = (amount) => {
@@ -270,552 +298,319 @@ const InvoicesList = ({ user }) => {
     setCurrentPage(newPage);
   };
 
-  const handlePageSizeChange = (newSize) => {
-    setPageSize(newSize);
-    setCurrentPage(0); // Reset to first page
-  };
-
   const handleFilterChange = (newFilter) => {
     setFilter(newFilter);
     setCurrentPage(0); // Reset to first page
   };
 
-
-
-  // Remove the old filtering logic since it's now done server-side
-  const filteredInvoices = invoices;
+  const toggleActionMenu = (e, invoiceId) => {
+    e.stopPropagation();
+    if (activeActionMenu === invoiceId) {
+      setActiveActionMenu(null);
+    } else {
+      setActiveActionMenu(invoiceId);
+    }
+  };
 
   if (!canManageInvoices) {
     return (
-      <div className="container mt-4">
-        <div className="alert alert-warning">
-          <h4>Access Denied</h4>
-          <p>You don't have permission to view invoices. Only administrators and managers can access this feature.</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (loading) {
-    return (
-      <div className="container mt-4">
-        <div className="text-center">
-          <div className="spinner-border" role="status">
-            <span className="visually-hidden">Loading...</span>
-          </div>
-          <p className="mt-2">Loading invoices...</p>
+      <div className="main-content" style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '60vh' }}>
+        <div style={{ textAlign: 'center', color: '#64748b' }}>
+          <AlertCircle size={48} style={{ margin: '0 auto 1rem' }} />
+          <h3>Access Denied</h3>
+          <p>You don't have permission to view invoices.</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mt-4">
-      <div className="d-flex justify-content-between align-items-center mb-4">
-        <div>
-          <h2 className="mb-2">Invoices</h2>
-          {invoices.length > 0 && (
-            <div className="d-flex gap-2 flex-wrap">
-              <span className="badge bg-primary fs-6">
-                Total: {invoices.length}
-              </span>
-              <span className="badge bg-success fs-6">
-                Paid: {invoices.filter(i => i.status === 'PAID').length}
-              </span>
-              <span className="badge bg-warning fs-6">
-                Pending: {invoices.filter(i => ['SENT', 'VIEWED', 'OVERDUE'].includes(i.status)).length}
-              </span>
-              <span className="badge bg-danger fs-6">
-                Overdue: {invoices.filter(i => 
-                  i.status !== 'PAID' && 
-                  i.status !== 'CANCELLED' && 
-                  new Date(i.dueDate) < new Date()
-                ).length}
-              </span>
-            </div>
-          )}
+    <div className="main-content projects-list-page fade-in">
+      <div className="projects-header-compact">
+        <div className="projects-header-left">
+          <h1 className="projects-title-compact">
+            Invoices
+            <span className="projects-count">({totalItems})</span>
+          </h1>
         </div>
-        <button 
-          className="btn btn-primary"
-          onClick={() => navigate('/invoices/new')}
-        >
-          <i className="fas fa-plus me-2"></i>
-          Create Invoice
-        </button>
+        <div className="projects-header-right">
+          <div style={{ position: 'relative' }}>
+            <select
+              className="form-input"
+              value={filter}
+              onChange={(e) => handleFilterChange(e.target.value)}
+              style={{ paddingRight: '2rem', minWidth: '150px' }}
+            >
+              <option value="all">All Status</option>
+              <option value="DRAFT">Draft</option>
+              <option value="SENT">Sent</option>
+              <option value="VIEWED">Viewed</option>
+              <option value="PAID">Paid</option>
+              <option value="OVERDUE">Overdue</option>
+              <option value="CANCELLED">Cancelled</option>
+            </select>
+            <Filter size={14} style={{ position: 'absolute', right: '10px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', color: '#64748b' }} />
+          </div>
+
+          <Link to="/invoices/new" className="btn-new-project-compact">
+            <Plus size={16} />
+            Create Invoice
+          </Link>
+        </div>
       </div>
 
       {error && (
-        <div className="alert alert-danger alert-dismissible fade show" role="alert">
-          {error}
-          <button 
-            type="button" 
-            className="btn-close" 
-            onClick={() => setError('')}
-          ></button>
-        </div>
+        <div className="alert alert-danger" style={{ margin: '0 0 1.5rem 0' }}>{error}</div>
       )}
 
       {message && (
-        <div className={`alert alert-${message.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
-          {message.text}
-          <button 
-            type="button" 
-            className="btn-close" 
-            onClick={() => setMessage(null)}
-          ></button>
-        </div>
+        <div className={`alert alert-${message.type}`} style={{ margin: '0 0 1.5rem 0' }}>{message.text}</div>
       )}
 
-      {/* Email Confirmation Modal */}
-      {showEmailConfirm && selectedInvoice && (
-        <div className="modal fade show" style={{ display: 'block' }} tabIndex="-1" role="dialog">
-          <div className="modal-dialog" role="document">
-            <div className="modal-content">
-              <div className="modal-header">
-                <h5 className="modal-title">Send Invoice Email</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
-                  onClick={() => {
-                    setShowEmailConfirm(false);
-                    setSelectedInvoice(null);
-                  }}
-                  disabled={isSendingEmail}
-                ></button>
-              </div>
-              <div className="modal-body">
-                <p>Do you want to send an email to the client with the invoice PDF?</p>
-                {selectedInvoice?.clientEmail ? (
-                  <p><strong>Client Email:</strong> {selectedInvoice.clientEmail}</p>
-                ) : (
-                  <p className="text-warning"><strong>Note:</strong> Client email is not available for this invoice.</p>
-                )}
-              </div>
-              <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
-                  onClick={handleSkipEmail}
-                  disabled={isSendingEmail}
-                >
-                  Skip Email
-                </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
-                  onClick={handleSendEmail}
-                  disabled={isSendingEmail || !selectedInvoice?.clientEmail}
-                >
-                  {isSendingEmail ? (
-                    <>
-                      <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
-                      Sending...
-                    </>
-                  ) : (
-                    'Yes, Send Email'
-                  )}
-                </button>
-              </div>
-            </div>
-          </div>
+      {loading ? (
+        <div style={{ padding: '3rem', textAlign: 'center', color: '#64748b' }}>
+          <div className="spinner-border" style={{ width: '2rem', height: '2rem', marginBottom: '1rem', border: '3px solid #e2e8f0', borderTopColor: '#3b82f6', borderRadius: '50%', animation: 'spin 1s linear infinite' }}></div>
+          <p>Loading invoices...</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
         </div>
-      )}
-      {showEmailConfirm && <div className="modal-backdrop fade show"></div>}
-
-      {/* Filters */}
-      <div className="row mb-4">
-        <div className="col-md-6">
-          <select
-            className="form-select"
-            value={filter}
-            onChange={(e) => handleFilterChange(e.target.value)}
-          >
-            <option value="all">All Invoices</option>
-            <option value="DRAFT">Draft</option>
-            <option value="SENT">Sent</option>
-            <option value="VIEWED">Viewed</option>
-            <option value="PAID">Paid</option>
-            <option value="OVERDUE">Overdue</option>
-            <option value="CANCELLED">Cancelled</option>
-          </select>
-        </div>
-        <div className="col-md-6">
-          <div className="d-flex align-items-center">
-            <label className="form-label me-2 mb-0">Show:</label>
-            <select
-              className="form-select"
-              value={pageSize}
-              onChange={(e) => handlePageSizeChange(parseInt(e.target.value))}
-              style={{ width: 'auto' }}
-            >
-              <option value="5">5</option>
-              <option value="10">10</option>
-              <option value="20">20</option>
-              <option value="50">50</option>
-            </select>
-            <span className="ms-2 text-muted">per page</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Results Info */}
-      {totalItems > 0 && (
-        <div className="d-flex justify-content-between align-items-center mb-3">
-          <div className="text-muted">
-            Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalItems)} of {totalItems} invoices
-          </div>
-          <div className="text-muted">
-            Page {currentPage + 1} of {totalPages}
-          </div>
-        </div>
-      )}
-
-      {/* Invoices Table */}
-      <div className="card">
-        <div className="card-body">
-          {filteredInvoices.length === 0 ? (
-            <div className="text-center py-4">
-              <i className="fas fa-file-invoice fa-3x text-muted mb-3"></i>
-              <h5>No invoices found</h5>
-              <p className="text-muted">
-                {invoices.length === 0 
-                  ? "You haven't created any invoices yet." 
-                  : "No invoices match your current filter criteria."
-                }
-              </p>
-              {invoices.length === 0 && (
-                <button 
-                  className="btn btn-primary"
-                  onClick={() => navigate('/invoices/new')}
-                >
-                  Create Your First Invoice
-                </button>
-              )}
-            </div>
-          ) : (
-            <div className="table-responsive">
-              <table className="table table-hover">
-                <thead>
-                  <tr>
-                    <th>Invoice #</th>
-                    <th>Client</th>
-                    <th>Project</th>
-                    <th>Issue Date</th>
-                    <th>Due Date</th>
-                    <th>Amount</th>
-                    <th>Status</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredInvoices.map(invoice => (
-                    <tr key={invoice.id}>
-                      <td>
-                        <strong>{invoice.invoiceNumber}</strong>
-                      </td>
-                      <td>{invoice.clientName}</td>
-                      <td>
-                        {invoice.projectName ? (
-                          <span className="badge bg-light text-dark">
-                            {invoice.projectName}
-                          </span>
-                        ) : (
-                          <span className="text-muted">-</span>
-                        )}
-                      </td>
-                      <td>{formatDate(invoice.issueDate)}</td>
-                      <td>
-                        {formatDate(invoice.dueDate)}
-                        {invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && 
-                         new Date(invoice.dueDate) < new Date() && (
-                          <span className="badge bg-danger ms-2">Overdue</span>
-                        )}
-                      </td>
-                      <td>
-                        <strong>{formatCurrency(invoice.totalAmount)}</strong>
-                        {invoice.paidAmount > 0 && (
-                          <div className="small text-success">
-                            Paid: {formatCurrency(invoice.paidAmount)}
-                          </div>
-                        )}
-                      </td>
-                      <td>
-                        <span className={`badge ${getStatusBadgeClass(invoice.status)} text-white`}>
-                          {invoice.status.replace(/_/g, ' ').toLowerCase().replace(/\b\w/g, l => l.toUpperCase())}
-                        </span>
-                      </td>
-                      <td>
-                        <div className="d-flex flex-wrap gap-1">
-                          <button
-                            className="btn btn-sm btn-outline-primary"
-                            onClick={() => navigate(`/invoices/${invoice.id}/details`)}
-                            title="View Details"
-                          >
-                            <i className="fas fa-eye me-1"></i>
-                            View
-                          </button>
-                          <button
-                            className="btn btn-sm btn-success"
-                            onClick={() => handleViewPdf(invoice.id, invoice.invoiceNumber)}
-                            title="View PDF in new tab"
-                          >
-                            <i className="fas fa-file-pdf me-1"></i>
-                            PDF
-                          </button>
-                          <button
-                            className="btn btn-sm btn-outline-secondary"
-                            onClick={() => handleDownloadPdf(invoice.id, invoice.invoiceNumber)}
-                            title="Download PDF"
-                          >
-                            <i className="fas fa-download me-1"></i>
-                            Download
-                          </button>
-                          {invoice.status === 'DRAFT' && (
-                            <button
-                              className="btn btn-sm btn-outline-warning"
-                              onClick={() => navigate(`/invoices/${invoice.id}/edit`)}
-                              title="Edit"
-                            >
-                              <i className="fas fa-edit me-1"></i>
-                              Edit
-                            </button>
-                          )}
-                          <div className="btn-group" role="group" style={{ position: 'relative' }}>
-                            <button
-                              className="btn btn-sm btn-outline-info dropdown-toggle"
-                              type="button"
-                              data-bs-toggle="dropdown"
-                              aria-expanded="false"
-                              title="Update Status"
-                            >
-                              <i className="fas fa-cog"></i>
-                            </button>
-                            <ul className="dropdown-menu" style={{ zIndex: 1050, minWidth: '200px' }}>
-                              {/* DRAFT Status Options */}
-                              {invoice.status === 'DRAFT' && (
-                                <>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'SENT')}
-                                    >
-                                      <i className="fas fa-paper-plane me-2"></i>
-                                      Mark as Sent
-                                    </button>
-                                  </li>
-                                  <li><hr className="dropdown-divider" /></li>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item text-danger"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'CANCELLED')}
-                                    >
-                                      <i className="fas fa-times me-2"></i>
-                                      Cancel Invoice
-                                    </button>
-                                  </li>
-                                </>
-                              )}
-
-                              {/* SENT Status Options */}
-                              {invoice.status === 'SENT' && (
-                                <>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'VIEWED')}
-                                    >
-                                      <i className="fas fa-eye me-2"></i>
-                                      Mark as Viewed
-                                    </button>
-                                  </li>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item"
-                                      onClick={() => navigate(`/invoices/${invoice.id}/payment`)}
-                                    >
-                                      <i className="fas fa-rupee-sign me-2"></i>
-                                      Record Payment
-                                    </button>
-                                  </li>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item text-warning"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'OVERDUE')}
-                                    >
-                                      <i className="fas fa-exclamation-triangle me-2"></i>
-                                      Mark Overdue
-                                    </button>
-                                  </li>
-                                  <li><hr className="dropdown-divider" /></li>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item text-danger"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'CANCELLED')}
-                                    >
-                                      <i className="fas fa-times me-2"></i>
-                                      Cancel Invoice
-                                    </button>
-                                  </li>
-                                </>
-                              )}
-
-                              {/* VIEWED Status Options */}
-                              {invoice.status === 'VIEWED' && (
-                                <>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item"
-                                      onClick={() => navigate(`/invoices/${invoice.id}/payment`)}
-                                    >
-                                      <i className="fas fa-rupee-sign me-2"></i>
-                                      Record Payment
-                                    </button>
-                                  </li>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item text-warning"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'OVERDUE')}
-                                    >
-                                      <i className="fas fa-exclamation-triangle me-2"></i>
-                                      Mark Overdue
-                                    </button>
-                                  </li>
-                                  <li><hr className="dropdown-divider" /></li>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item text-danger"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'CANCELLED')}
-                                    >
-                                      <i className="fas fa-times me-2"></i>
-                                      Cancel Invoice
-                                    </button>
-                                  </li>
-                                </>
-                              )}
-
-                              {/* OVERDUE Status Options */}
-                              {invoice.status === 'OVERDUE' && (
-                                <>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item"
-                                      onClick={() => navigate(`/invoices/${invoice.id}/payment`)}
-                                    >
-                                      <i className="fas fa-rupee-sign me-2"></i>
-                                      Record Payment
-                                    </button>
-                                  </li>
-                                  <li><hr className="dropdown-divider" /></li>
-                                  <li>
-                                    <button 
-                                      className="dropdown-item text-danger"
-                                      onClick={() => handleStatusUpdate(invoice.id, 'CANCELLED')}
-                                    >
-                                      <i className="fas fa-times me-2"></i>
-                                      Cancel Invoice
-                                    </button>
-                                  </li>
-                                </>
-                              )}
-
-                              {/* PAID and CANCELLED have no status change options */}
-                              {(invoice.status === 'PAID' || invoice.status === 'CANCELLED') && (
-                                <li>
-                                  <span className="dropdown-item-text text-muted">
-                                    <i className="fas fa-lock me-2"></i>
-                                    No actions available
-                                  </span>
-                                </li>
-                              )}
-                            </ul>
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+      ) : invoices.length === 0 ? (
+        <div className="text-center" style={{ padding: '4rem 2rem', background: 'white', borderRadius: '12px', border: '1px solid #e2e8f0' }}>
+          <FileBox size={48} color="#cbd5e1" style={{ margin: '0 auto 1rem' }} />
+          <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#1e293b', marginBottom: '0.5rem' }}>No invoices found</h3>
+          <p style={{ color: '#64748b', marginBottom: '1.5rem' }}>
+            {filter !== 'all' ? 'No invoices match your selected filters.' : 'Get started by creating your first invoice.'}
+          </p>
+          {filter === 'all' && (
+            <Link to="/invoices/new" className="btn-primary-modern">
+              <Plus size={16} style={{ marginRight: '0.5rem' }} />
+              Create Invoice
+            </Link>
           )}
         </div>
-        
-        {/* Pagination Controls */}
-        {totalPages > 1 && (
-          <div className="card-footer">
-            <div className="d-flex justify-content-between align-items-center">
-              <div className="text-muted">
-                Showing {currentPage * pageSize + 1} to {Math.min((currentPage + 1) * pageSize, totalItems)} of {totalItems} invoices
-              </div>
-              <nav aria-label="Invoice pagination">
-                <ul className="pagination mb-0">
-                  <li className={`page-item ${!hasPrevious ? 'disabled' : ''}`}>
-                    <button 
-                      className="page-link" 
-                      onClick={() => handlePageChange(0)}
-                      disabled={!hasPrevious}
-                    >
-                      <i className="fas fa-angle-double-left"></i>
-                    </button>
-                  </li>
-                  <li className={`page-item ${!hasPrevious ? 'disabled' : ''}`}>
-                    <button 
-                      className="page-link" 
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={!hasPrevious}
-                    >
-                      <i className="fas fa-angle-left"></i>
-                    </button>
-                  </li>
-                  
-                  {/* Page numbers */}
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    let pageNum;
-                    if (totalPages <= 5) {
-                      pageNum = i;
-                    } else if (currentPage <= 2) {
-                      pageNum = i;
-                    } else if (currentPage >= totalPages - 3) {
-                      pageNum = totalPages - 5 + i;
-                    } else {
-                      pageNum = currentPage - 2 + i;
-                    }
-                    
-                    return (
-                      <li key={pageNum} className={`page-item ${currentPage === pageNum ? 'active' : ''}`}>
-                        <button 
-                          className="page-link" 
-                          onClick={() => handlePageChange(pageNum)}
+      ) : (
+        <>
+          <div className="data-table-container">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Invoice #</th>
+                  <th>Client</th>
+                  <th>Project</th>
+                  <th>Date</th>
+                  <th>Due Date</th>
+                  <th>Amount</th>
+                  <th>Status</th>
+                  <th style={{ textAlign: 'right' }}>Actions</th>
+                </tr>
+              </thead>
+              <tbody>
+                {invoices.map(invoice => (
+                  <tr
+                    key={invoice.id}
+                    onClick={() => navigate(`/invoices/${invoice.id}/details`)}
+                    style={{ cursor: 'pointer' }}
+                  >
+                    <td style={{ fontWeight: 600, color: '#0f172a' }}>{invoice.invoiceNumber}</td>
+                    <td>{invoice.clientName}</td>
+                    <td>{invoice.projectName || <span style={{ color: '#94a3b8' }}>-</span>}</td>
+                    <td>{formatDate(invoice.issueDate)}</td>
+                    <td>
+                      <span style={{
+                        color: (invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && new Date(invoice.dueDate) < new Date()) ? '#ef4444' : 'inherit',
+                        fontWeight: (invoice.status !== 'PAID' && invoice.status !== 'CANCELLED' && new Date(invoice.dueDate) < new Date()) ? 600 : 400
+                      }}>
+                        {formatDate(invoice.dueDate)}
+                      </span>
+                    </td>
+                    <td style={{ fontFamily: 'Inter, sans-serif', fontWeight: 600 }}>
+                      {formatCurrency(invoice.totalAmount)}
+                      {invoice.paidAmount > 0 && invoice.status !== 'PAID' && (
+                        <div style={{ fontSize: '0.75rem', color: '#16a34a', fontWeight: 500 }}>
+                          Paid: {formatCurrency(invoice.paidAmount)}
+                        </div>
+                      )}
+                    </td>
+                    <td>
+                      <span
+                        className={`badge ${getStatusBadgeClass(invoice.status)}`}
+                        style={getCustomStatusStyle(invoice.status)}
+                      >
+                        {invoice.status?.replace(/_/g, ' ').toLowerCase()}
+                      </span>
+                    </td>
+                    <td style={{ textAlign: 'right' }}>
+                      <div style={{ position: 'relative', display: 'inline-block' }}>
+                        <button
+                          className="btn-icon"
+                          onClick={(e) => toggleActionMenu(e, invoice.id)}
+                          style={{ padding: '0.25rem', color: '#64748b' }}
                         >
-                          {pageNum + 1}
+                          <MoreVertical size={18} />
                         </button>
-                      </li>
-                    );
-                  })}
-                  
-                  <li className={`page-item ${!hasNext ? 'disabled' : ''}`}>
-                    <button 
-                      className="page-link" 
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={!hasNext}
-                    >
-                      <i className="fas fa-angle-right"></i>
-                    </button>
-                  </li>
-                  <li className={`page-item ${!hasNext ? 'disabled' : ''}`}>
-                    <button 
-                      className="page-link" 
-                      onClick={() => handlePageChange(totalPages - 1)}
-                      disabled={!hasNext}
-                    >
-                      <i className="fas fa-angle-double-right"></i>
-                    </button>
-                  </li>
-                </ul>
-              </nav>
+
+                        {activeActionMenu === invoice.id && (
+                          <div className="dropdown-menu-modern" style={{
+                            position: 'absolute',
+                            right: 0,
+                            top: '100%',
+                            zIndex: 50,
+                            background: 'white',
+                            border: '1px solid #e2e8f0',
+                            borderRadius: '8px',
+                            boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)',
+                            minWidth: '180px',
+                            overflow: 'hidden',
+                            marginTop: '0.25rem'
+                          }}>
+                            <div
+                              className="dropdown-item-modern"
+                              onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${invoice.id}/details`); setActiveActionMenu(null); }}
+                              style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}
+                            >
+                              <Eye size={14} /> View Details
+                            </div>
+                            <div
+                              className="dropdown-item-modern"
+                              onClick={(e) => { e.stopPropagation(); handleViewPdf(invoice.id, invoice.invoiceNumber); setActiveActionMenu(null); }}
+                              style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}
+                            >
+                              <FileText size={14} /> View PDF
+                            </div>
+                            <div
+                              className="dropdown-item-modern"
+                              onClick={(e) => { e.stopPropagation(); handleDownloadPdf(invoice.id, invoice.invoiceNumber); setActiveActionMenu(null); }}
+                              style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}
+                            >
+                              <Download size={14} /> Download PDF
+                            </div>
+
+                            {invoice.status === 'DRAFT' && (
+                              <>
+                                <div className="dropdown-divider" style={{ borderTop: '1px solid #f1f5f9', margin: '0.25rem 0' }}></div>
+                                <div
+                                  className="dropdown-item-modern"
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${invoice.id}/edit`); setActiveActionMenu(null); }}
+                                  style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem' }}
+                                >
+                                  <FileText size={14} /> Edit Invoice
+                                </div>
+                                <div
+                                  className="dropdown-item-modern"
+                                  onClick={(e) => { e.stopPropagation(); handleStatusUpdate(invoice.id, 'SENT'); setActiveActionMenu(null); }}
+                                  style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#2563eb' }}
+                                >
+                                  <Send size={14} /> Mark as Sent
+                                </div>
+                              </>
+                            )}
+
+                            {['SENT', 'VIEWED', 'OVERDUE'].includes(invoice.status) && (
+                              <>
+                                <div className="dropdown-divider" style={{ borderTop: '1px solid #f1f5f9', margin: '0.25rem 0' }}></div>
+                                <div
+                                  className="dropdown-item-modern"
+                                  onClick={(e) => { e.stopPropagation(); navigate(`/invoices/${invoice.id}/payment`); setActiveActionMenu(null); }}
+                                  style={{ padding: '0.5rem 1rem', display: 'flex', alignItems: 'center', gap: '0.5rem', cursor: 'pointer', fontSize: '0.875rem', color: '#16a34a' }}
+                                >
+                                  <CheckCircle2 size={14} /> Record Payment
+                                </div>
+                              </>
+                            )}
+
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Pagination */}
+          {totalPages > 1 && (
+            <div className="pagination-controls" style={{ marginTop: '1.5rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '0.5rem' }}>
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={!hasPrevious}
+                className="btn-small btn-outline"
+              >
+                Previous
+              </button>
+              <span style={{ fontSize: '0.875rem', color: '#64748b' }}>
+                Page {currentPage + 1} of {totalPages}
+              </span>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={!hasNext}
+                className="btn-small btn-outline"
+              >
+                Next
+              </button>
+            </div>
+          )}
+        </>
+      )}
+
+      {/* Email Confirmation Modal - Custom Style */}
+      {showEmailConfirm && selectedInvoice && (
+        <div style={{
+          position: 'fixed',
+          top: 0, left: 0, right: 0, bottom: 0,
+          backgroundColor: 'rgba(0,0,0,0.5)',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          zIndex: 1000
+        }} onClick={() => setShowEmailConfirm(false)}>
+          <div style={{
+            background: 'white',
+            borderRadius: '12px',
+            width: '100%',
+            maxWidth: '500px',
+            padding: '1.5rem',
+            boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.1)'
+          }} onClick={e => e.stopPropagation()}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ margin: 0, fontSize: '1.25rem', fontWeight: 600 }}>Send Invoice Email</h3>
+              <button onClick={() => setShowEmailConfirm(false)} style={{ border: 'none', background: 'none', cursor: 'pointer', color: '#94a3b8' }}>
+                <X size={20} />
+              </button>
+            </div>
+
+            <div style={{ marginBottom: '1.5rem', color: '#334155' }}>
+              <p style={{ marginBottom: '0.5rem' }}>Do you want to send an email to the client with the invoice PDF?</p>
+              {selectedInvoice?.clientEmail ? (
+                <div style={{ background: '#f8fafc', padding: '0.75rem', borderRadius: '6px', border: '1px solid #e2e8f0' }}>
+                  <span style={{ fontWeight: 500, color: '#0f172a' }}>Client Email:</span> {selectedInvoice.clientEmail}
+                </div>
+              ) : (
+                <div style={{ background: '#fffbeb', color: '#b45309', padding: '0.75rem', borderRadius: '6px', fontSize: '0.875rem' }}>
+                  <AlertCircle size={16} style={{ display: 'inline', verticalAlign: 'text-bottom', marginRight: '0.25rem' }} />
+                  Client email is not available for this invoice.
+                </div>
+              )}
+            </div>
+
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.75rem' }}>
+              <button
+                onClick={handleSkipEmail}
+                disabled={isSendingEmail}
+                className="btn-outline-modern"
+              >
+                Skip Email
+              </button>
+              <button
+                onClick={handleSendEmail}
+                disabled={isSendingEmail || !selectedInvoice?.clientEmail}
+                className="btn-primary-modern"
+              >
+                {isSendingEmail ? 'Sending...' : 'Yes, Send Email'}
+              </button>
             </div>
           </div>
-        )}
-      </div>
+        </div>
+      )}
 
     </div>
   );

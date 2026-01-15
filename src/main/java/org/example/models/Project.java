@@ -66,11 +66,24 @@ public class Project {
 
     // --- NEW CRITICAL FIELDS ---
     
+    @ElementCollection(fetch = FetchType.EAGER)
+    @CollectionTable(name = "project_lifecycle_stages", joinColumns = @JoinColumn(name = "project_id"))
+    @Column(name = "stage_value")
+    @Enumerated(EnumType.STRING)
+    private List<ProjectStage> lifecycleStages = new ArrayList<>();
+
     @Column(precision = 15, scale = 2)
     private BigDecimal budget; // Project budget in currency units
     
     @Column(name = "actual_cost", precision = 15, scale = 2)
     private BigDecimal actualCost; // Actual cost incurred so far
+    
+    // --- Financial Resource Planning fields ---
+    @Column(name = "total_fee", precision = 15, scale = 2)
+    private BigDecimal totalFee;  // Total project fee charged to client
+    
+    @Column(name = "target_profit_margin", precision = 5, scale = 2)
+    private BigDecimal targetProfitMargin = new BigDecimal("0.20"); // Default 20% profit margin
     
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -94,6 +107,10 @@ public class Project {
     private Set<User> accessibleByUsers = new HashSet<>();
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<ProjectAttachment> attachments = new ArrayList<>();
+
+    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore // Prevent lazy loading exception during JSON serialization
     private List<Phase> phases = new ArrayList<>();
 
@@ -103,6 +120,14 @@ public class Project {
     }
 
     // --- NEW GETTERS AND SETTERS FOR CRITICAL FIELDS ---
+    
+    public List<ProjectStage> getLifecycleStages() {
+        return lifecycleStages;
+    }
+
+    public void setLifecycleStages(List<ProjectStage> lifecycleStages) {
+        this.lifecycleStages = lifecycleStages;
+    }
     
     public BigDecimal getBudget() {
         return budget;
@@ -269,6 +294,14 @@ public class Project {
         this.phases = phases;
     }
 
+    public List<ProjectAttachment> getAttachments() {
+        return attachments;
+    }
+
+    public void setAttachments(List<ProjectAttachment> attachments) {
+        this.attachments = attachments;
+    }
+
     public ProjectStatus getStatus() {
         return status;
     }
@@ -299,5 +332,36 @@ public class Project {
 
     public void setOrganization(Organization organization) {
         this.organization = organization;
+    }
+
+    public BigDecimal getTotalFee() {
+        return totalFee;
+    }
+
+    public void setTotalFee(BigDecimal totalFee) {
+        this.totalFee = totalFee;
+    }
+
+    public BigDecimal getTargetProfitMargin() {
+        return targetProfitMargin;
+    }
+
+    public void setTargetProfitMargin(BigDecimal targetProfitMargin) {
+        this.targetProfitMargin = targetProfitMargin;
+    }
+
+    /**
+     * Calculates the production budget based on total fee and profit margin.
+     * Formula: totalFee * (1 - targetProfitMargin)
+     * Falls back to budget field if totalFee is not set.
+     */
+    public BigDecimal getProductionBudget() {
+        // Use totalFee if available, otherwise fall back to budget
+        BigDecimal fee = totalFee != null ? totalFee : budget;
+        if (fee == null) {
+            return BigDecimal.ZERO;
+        }
+        BigDecimal margin = targetProfitMargin != null ? targetProfitMargin : new BigDecimal("0.20");
+        return fee.multiply(BigDecimal.ONE.subtract(margin)).setScale(2, java.math.RoundingMode.HALF_UP);
     }
 }

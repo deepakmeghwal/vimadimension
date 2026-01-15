@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import Select from 'react-select';
 import AsyncSelect from 'react-select/async';
 import CreateClientModal from '../clients/CreateClientModal';
 import { PROJECT_STAGES, PROJECT_CHARGE_TYPES, PROJECT_STATUSES, PROJECT_PRIORITIES } from '../../constants/projectEnums';
@@ -14,8 +15,11 @@ const CreateProject = ({ user }) => {
     chargeType: '',
     status: '',
     projectStage: '',
+    lifecycleStages: [], // New field for custom stages
     description: '',
     budget: '',
+    totalFee: '',
+    targetProfitMargin: '20',
     priority: 'MEDIUM'
   });
   const [error, setError] = useState('');
@@ -75,30 +79,49 @@ const CreateProject = ({ user }) => {
     }));
   };
 
+  const handleLifecycleStagesChange = (selectedOptions) => {
+    setFormData({
+      ...formData,
+      lifecycleStages: selectedOptions ? selectedOptions.map(option => option.value) : []
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
     try {
+      // Prepare the body data
+      const bodyData = new URLSearchParams({
+        'name': formData.name,
+        'clientId': formData.clientId,
+        'startDate': formData.startDate,
+        'estimatedEndDate': formData.estimatedEndDate,
+        'location': formData.location,
+        'chargeType': formData.chargeType,
+        'status': formData.status,
+        'projectStage': formData.projectStage,
+        'description': formData.description,
+        'budget': formData.budget,
+        'totalFee': formData.totalFee,
+        'targetProfitMargin': formData.targetProfitMargin ? (parseFloat(formData.targetProfitMargin) / 100).toString() : '',
+        'priority': formData.priority
+      });
+
+      // Append lifecycle stages if any are selected
+      if (formData.lifecycleStages && formData.lifecycleStages.length > 0) {
+        formData.lifecycleStages.forEach(stage => {
+          bodyData.append('lifecycleStages', stage);
+        });
+      }
+
       const response = await fetch('/api/projects/save', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/x-www-form-urlencoded',
         },
-        body: new URLSearchParams({
-          'name': formData.name,
-          'clientId': formData.clientId,
-          'startDate': formData.startDate,
-          'estimatedEndDate': formData.estimatedEndDate,
-          'location': formData.location,
-          'chargeType': formData.chargeType,
-          'status': formData.status,
-          'projectStage': formData.projectStage,
-          'description': formData.description,
-          'budget': formData.budget,
-          'priority': formData.priority
-        }),
+        body: bodyData,
         credentials: 'include'
       });
 
@@ -137,10 +160,10 @@ const CreateProject = ({ user }) => {
         <button
           type="button"
           className="btn-outline"
-          onClick={() => navigate('/projects')}
+          onClick={() => navigate(-1)}
           style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}
         >
-          <i className="fas fa-arrow-left"></i> Back to Projects
+          <i className="fas fa-arrow-left"></i> Back
         </button>
       </div>
 
@@ -319,77 +342,149 @@ const CreateProject = ({ user }) => {
                 </div>
               </div>
 
-              <div className="form-row-modern">
-                <div className="form-group-modern">
-                  <label htmlFor="projectStage">
-                    Project Lifecycle Stage <span className="required-asterisk">*</span>
-                  </label>
-                  <select
-                    id="projectStage"
-                    name="projectStage"
-                    value={formData.projectStage}
-                    onChange={handleChange}
-                    required
-                    className="form-input-modern"
-                  >
-                    <option value="">Select lifecycle stage</option>
-                    {PROJECT_STAGES.map(stage => (
-                      <option key={stage.value} value={stage.value}>
-                        {stage.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+              <div className="form-group-modern">
+                <label htmlFor="lifecycleStages">
+                  Project Stages <span className="required-asterisk">*</span>
+                </label>
+                <Select
+                  isMulti
+                  name="lifecycleStages"
+                  options={PROJECT_STAGES}
+                  className="basic-multi-select"
+                  classNamePrefix="select"
+                  onChange={handleLifecycleStagesChange}
+                  placeholder="Select project stages..."
+                  styles={{
+                    control: (base) => ({
+                      ...base,
+                      border: '2px solid #e5e7eb',
+                      borderRadius: '10px',
+                      padding: '2px',
+                      '&:hover': {
+                        borderColor: '#cbd5e1'
+                      }
+                    }),
+                    placeholder: (base) => ({
+                      ...base,
+                      color: '#9ca3af'
+                    })
+                  }}
+                />
+                <small className="form-help-text">Select the stages for this project. These will be used in Resource Planning.</small>
+                {formData.lifecycleStages.length === 0 && <input tabIndex={-1} autoComplete="off" style={{ opacity: 0, height: 0, position: 'absolute' }} required={true} />}
+              </div>
+            </div>
 
-                <div className="form-group-modern">
-                  <label htmlFor="priority">
-                    Priority <span className="required-asterisk">*</span>
-                  </label>
-                  <select
-                    id="priority"
-                    name="priority"
-                    value={formData.priority}
-                    onChange={handleChange}
-                    required
-                    className="form-input-modern"
-                  >
-                    {PROJECT_PRIORITIES.map(priority => (
-                      <option key={priority.value} value={priority.value}>
-                        {priority.label}
-                      </option>
-                    ))}
-                  </select>
-                </div>
+            <div className="form-row-modern">
+              <div className="form-group-modern">
+                <label htmlFor="projectStage">
+                  Current Stage <span className="required-asterisk">*</span>
+                </label>
+                <select
+                  id="projectStage"
+                  name="projectStage"
+                  value={formData.projectStage}
+                  onChange={handleChange}
+                  required
+                  className="form-input-modern"
+                >
+                  <option value="">Select current stage</option>
+                  {/* Only show selected stages if custom stages are defined, otherwise show all */}
+                  {(formData.lifecycleStages.length > 0
+                    ? PROJECT_STAGES.filter(stage => formData.lifecycleStages.includes(stage.value))
+                    : PROJECT_STAGES
+                  ).map(stage => (
+                    <option key={stage.value} value={stage.value}>
+                      {stage.label}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="form-group-modern">
+                <label htmlFor="priority">
+                  Priority <span className="required-asterisk">*</span>
+                </label>
+                <select
+                  id="priority"
+                  name="priority"
+                  value={formData.priority}
+                  onChange={handleChange}
+                  required
+                  className="form-input-modern"
+                >
+                  {PROJECT_PRIORITIES.map(priority => (
+                    <option key={priority.value} value={priority.value}>
+                      {priority.label}
+                    </option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
 
+
           {/* Financial Information Section (Admin Only) */}
-          {isAdmin && (
-            <div className="form-section">
-              <div className="form-section-header">
-                <i className="fas fa-rupee-sign form-section-icon"></i>
-                <h3 className="form-section-title">Financial Information</h3>
-              </div>
-              <div className="form-section-content">
-                <div className="form-group-modern">
-                  <label htmlFor="budget">Budget (₹)</label>
-                  <input
-                    type="number"
-                    id="budget"
-                    name="budget"
-                    value={formData.budget}
-                    onChange={handleChange}
-                    step="0.01"
-                    min="0"
-                    placeholder="0.00"
-                    className="form-input-modern"
-                  />
-                  <small className="form-help-text">Enter the total project budget in Indian Rupees</small>
+          {
+            isAdmin && (
+              <div className="form-section">
+                <div className="form-section-header">
+                  <i className="fas fa-rupee-sign form-section-icon"></i>
+                  <h3 className="form-section-title">Financial Information</h3>
+                </div>
+                <div className="form-section-content">
+                  <div className="form-group-modern">
+                    <label htmlFor="budget">Budget (₹)</label>
+                    <input
+                      type="number"
+                      id="budget"
+                      name="budget"
+                      value={formData.budget}
+                      onChange={handleChange}
+                      step="0.01"
+                      min="0"
+                      placeholder="0.00"
+                      className="form-input-modern"
+                    />
+                    <small className="form-help-text">Enter the total project budget in Indian Rupees</small>
+                  </div>
+                  <div className="form-row-modern">
+                    <div className="form-group-modern">
+                      <label htmlFor="totalFee">Total Fee (₹)</label>
+                      <input
+                        type="number"
+                        id="totalFee"
+                        name="totalFee"
+                        value={formData.totalFee}
+                        onChange={handleChange}
+                        step="0.01"
+                        min="0"
+                        placeholder="0.00"
+                        className="form-input-modern"
+                      />
+                      <small className="form-help-text">Total fee charged to client</small>
+                    </div>
+                    <div className="form-group-modern">
+                      <label htmlFor="targetProfitMargin">Target Profit Margin (%)</label>
+                      <input
+                        type="number"
+                        id="targetProfitMargin"
+                        name="targetProfitMargin"
+                        value={formData.targetProfitMargin}
+                        onChange={handleChange}
+                        step="1"
+                        min="0"
+                        max="100"
+                        placeholder="20"
+                        className="form-input-modern"
+                      />
+                      <small className="form-help-text">Default: 20%</small>
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
-          )}
+            )
+          }
 
           {/* Description Section */}
           <div className="form-section">
@@ -434,21 +529,21 @@ const CreateProject = ({ user }) => {
             <button
               type="button"
               className="btn-outline-modern"
-              onClick={() => navigate('/projects')}
+              onClick={() => navigate(-1)}
               disabled={loading}
             >
               Cancel
             </button>
           </div>
-        </form>
-      </div>
+        </form >
+      </div >
 
       <CreateClientModal
         isOpen={isClientModalOpen}
         onClose={() => setIsClientModalOpen(false)}
         onClientCreated={handleClientCreated}
       />
-    </div>
+    </div >
   );
 };
 

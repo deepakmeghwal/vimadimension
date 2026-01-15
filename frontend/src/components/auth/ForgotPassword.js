@@ -184,12 +184,12 @@ const ForgotPassword = () => {
                         The link will expire in 1 hour for security.
                     </p>
                     <button
-                        onClick={() => navigate('/login')}
+                        onClick={() => navigate(-1)}
                         style={styles.button}
                         onMouseEnter={(e) => e.target.style.backgroundColor = '#4f46e5'}
                         onMouseLeave={(e) => e.target.style.backgroundColor = '#6366f1'}
                     >
-                        Back to Login
+                        Back
                     </button>
                     <p style={{ marginTop: '2rem', color: '#94a3b8', fontSize: '0.75rem' }}>
                         Didn't receive the email? Check your spam folder.
@@ -204,7 +204,7 @@ const ForgotPassword = () => {
             {/* Left Panel - Form */}
             <div style={styles.leftPanel}>
                 <div>
-                    <h1 style={styles.brand}>KOMOREBI</h1>
+                    <h1 style={styles.brand}>ARCHIEASE</h1>
                     <h2 style={styles.heading}>Forgot Password?</h2>
                     <p style={styles.subtitle}>
                         No worries! Enter your email address and we'll send you a link to reset your password.
@@ -250,8 +250,8 @@ const ForgotPassword = () => {
 
                     <div style={{ marginTop: '2rem', textAlign: 'center', fontSize: '0.875rem', color: '#64748b' }}>
                         Remember your password?{' '}
-                        <span 
-                            onClick={() => navigate('/login')} 
+                        <span
+                            onClick={() => navigate('/login')}
                             style={{ color: '#6366f1', cursor: 'pointer', fontWeight: '600' }}
                         >
                             Sign in

@@ -9,10 +9,12 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Service for handling authentication-related operations:
@@ -221,16 +223,17 @@ public class AuthService {
             return false;
         }
 
-        // Invalidate existing tokens
-        Optional<VerificationToken> existingToken = verificationTokenRepository.findByOrganizationId(organization.getId());
-        existingToken.ifPresent(token -> {
-            token.setUsed(true);
-            verificationTokenRepository.save(token);
-        });
+        // Get existing token or create new one (Upsert to avoid duplicates)
+        VerificationToken token = verificationTokenRepository.findByOrganizationId(organization.getId())
+                .orElseGet(() -> new VerificationToken(organization, user));
 
-        // Create new token
-        VerificationToken newToken = new VerificationToken(organization, user);
-        verificationTokenRepository.save(newToken);
+        // Update token details
+        token.setToken(UUID.randomUUID().toString());
+        token.setCreatedAt(LocalDateTime.now());
+        token.setExpiresAt(LocalDateTime.now().plusHours(24));
+        token.setUsed(false);
+        
+        verificationTokenRepository.save(token);
 
         // Send email
         try {
@@ -238,12 +241,12 @@ public class AuthService {
                     user.getEmail(),
                     organization.getName(),
                     user.getName(),
-                    newToken.getToken()
+                    token.getToken()
             );
             return true;
         } catch (Exception e) {
             logger.error("Failed to resend verification email: {}", e.getMessage());
-            return false;
+            throw new RuntimeException("Failed to send verification email: " + e.getMessage());
         }
     }
 
@@ -592,6 +595,7 @@ public class AuthService {
         }
     }
 }
+
 
 
 

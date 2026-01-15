@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import AttendanceCalendar from './AttendanceCalendar';
 import GeneratePayslipModal from '../payslips/GeneratePayslipModal';
 
 const UserDetails = ({ isPeopleContext = false }) => {
@@ -21,7 +20,7 @@ const UserDetails = ({ isPeopleContext = false }) => {
       setCheckingAuth(false);
       return;
     }
-    
+
     // Validate that userId is numeric
     const userIdNum = parseInt(userId, 10);
     if (isNaN(userIdNum) || userIdNum <= 0) {
@@ -30,7 +29,7 @@ const UserDetails = ({ isPeopleContext = false }) => {
       setCheckingAuth(false);
       return;
     }
-    
+
     checkAccess();
   }, [userId]);
 
@@ -42,12 +41,12 @@ const UserDetails = ({ isPeopleContext = false }) => {
       const response = await fetch('/api/auth/status', {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const userData = await response.json();
         const isAdmin = userData.authorities?.some(auth => auth.authority === 'ROLE_ADMIN');
         const hasViewPermission = userData.authorities?.some(auth => auth.authority === 'users.view' || auth.authority === 'ROLE_ADMIN');
-        
+
         if (isPeopleContext ? hasViewPermission : isAdmin) {
           setAuthorized(true);
           await fetchUserDetails();
@@ -147,8 +146,8 @@ const UserDetails = ({ isPeopleContext = false }) => {
         <div className="error-container">
           <h2>Error</h2>
           <p>{error}</p>
-          <button onClick={() => navigate(backPath)} className="btn-primary">
-            Back to Directory
+          <button onClick={() => navigate(-1)} className="btn-primary">
+            Back
           </button>
         </div>
       </div>
@@ -174,20 +173,20 @@ const UserDetails = ({ isPeopleContext = false }) => {
       <div className="page-header">
         <h1 className="page-title">Person Details</h1>
         <div className="page-actions">
-          <button 
-            onClick={() => navigate(backPath)} 
+          <button
+            onClick={() => navigate(-1)}
             className="btn-outline"
           >
-            Back to Directory
+            Back
           </button>
-          <button 
-            onClick={() => setShowPayslipModal(true)} 
+          <button
+            onClick={() => setShowPayslipModal(true)}
             className="btn-primary"
           >
             Generate Payslip
           </button>
-          <button 
-            onClick={() => navigate(editPath)} 
+          <button
+            onClick={() => navigate(editPath)}
             className="btn-primary"
           >
             Edit Person
@@ -196,16 +195,10 @@ const UserDetails = ({ isPeopleContext = false }) => {
       </div>
 
       <div className="user-details-container">
-        {/* Attendance Calendar - Moved to Top */}
-        <div className="detail-section">
-          <h3>Attendance Calendar</h3>
-          <AttendanceCalendar userId={userId} />
-        </div>
-
         {/* Personal Information - Improved UI */}
         <div className="detail-section personal-info-section">
           <h3>Personal Information</h3>
-          
+
           {/* Basic Information Card */}
           <div className="info-card">
             <div className="info-card-header">
@@ -257,8 +250,8 @@ const UserDetails = ({ isPeopleContext = false }) => {
                 <div className="info-field">
                   <span className="field-label">Role</span>
                   <span className="field-value">
-                    {user.roles && user.roles.length > 0 
-                      ? user.roles[0].replace('ROLE_', '') 
+                    {user.roles && user.roles.length > 0
+                      ? user.roles[0].replace('ROLE_', '')
                       : 'Not set'
                     }
                   </span>

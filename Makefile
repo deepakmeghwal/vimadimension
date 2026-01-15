@@ -1,10 +1,10 @@
-# Makefile for VimaDimension Docker Operations
+# Makefile for ArchiEase Docker Operations
 
 .PHONY: help build up down logs clean dev prod deploy
 
 # Default target
 help:
-	@echo "VimaDimension Docker Commands:"
+	@echo "ArchiEase Docker Commands:"
 	@echo ""
 	@echo "Development:"
 	@echo "  make dev          - Start development environment"
@@ -75,7 +75,7 @@ prod-status:
 # Build commands
 build:
 	@echo "Building application image..."
-	docker build -t vimadimension:latest .
+	docker build -t archiease:latest .
 
 # Cleanup commands
 clean:
@@ -86,8 +86,8 @@ clean:
 
 clean-all: clean
 	@echo "Removing all images..."
-	docker rmi vimadimension:latest || true
-	docker rmi vimadimension-app-prod || true
+	docker rmi archiease:latest || true
+	docker rmi archiease-app-prod || true
 
 # Health check
 health:
@@ -98,8 +98,8 @@ health:
 backup-db:
 	@echo "Backing up database..."
 	@mkdir -p backups
-	@docker exec vimadimension-mysql-prod mysqldump -u root -p$${MYSQL_ROOT_PASSWORD} project_tracker_db > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql || \
-	 docker exec vimadimension-mysql-prod mysqldump -u root project_tracker_db > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql
+	@docker exec archiease-mysql-prod mysqldump -u root -p$${MYSQL_ROOT_PASSWORD} project_tracker_db > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql || \
+	 docker exec archiease-mysql-prod mysqldump -u root project_tracker_db > backups/db_backup_$$(date +%Y%m%d_%H%M%S).sql
 	@echo "Backup completed"
 
 # Full deployment (for AWS)

@@ -6,7 +6,7 @@ import PageHeader from '../common/PageHeader';
 const InviteEmployees = ({ user }) => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState('invite'); // 'invite' or 'pending'
-    
+
     // Invite form state
     const [emails, setEmails] = useState('');
     const [roleName, setRoleName] = useState('ROLE_EMPLOYEE');
@@ -14,7 +14,7 @@ const InviteEmployees = ({ user }) => {
     const [success, setSuccess] = useState(null);
     const [error, setError] = useState('');
     const [results, setResults] = useState([]);
-    
+
     // Pending invitations state
     const [pendingInvitations, setPendingInvitations] = useState([]);
     const [loadingInvitations, setLoadingInvitations] = useState(false);
@@ -78,7 +78,7 @@ const InviteEmployees = ({ user }) => {
                     roleName
                 });
                 const data = await response.json();
-                
+
                 if (data.success) {
                     setSuccess(`Invitation sent to ${emailList[0]}`);
                     setEmails('');
@@ -92,7 +92,7 @@ const InviteEmployees = ({ user }) => {
                     roleName
                 });
                 const data = await response.json();
-                
+
                 setResults(data.results || []);
                 if (data.successCount > 0) {
                     setSuccess(`${data.successCount} of ${emailList.length} invitations sent successfully`);
@@ -114,7 +114,7 @@ const InviteEmployees = ({ user }) => {
         try {
             const response = await apiDelete(`/api/invitations/${token}`);
             const data = await response.json();
-            
+
             if (data.success) {
                 setPendingInvitations(prev => prev.filter(inv => inv.token !== token));
             }
@@ -151,8 +151,8 @@ const InviteEmployees = ({ user }) => {
             padding: '1rem 1.5rem',
             background: 'none',
             border: 'none',
-            borderBottom: active ? '3px solid #6366f1' : '3px solid transparent',
-            color: active ? '#6366f1' : '#64748b',
+            borderBottom: active ? '3px solid #546E7A' : '3px solid transparent',
+            color: active ? '#546E7A' : '#64748b',
             fontWeight: active ? '600' : '500',
             cursor: 'pointer',
             fontSize: '0.95rem',
@@ -218,8 +218,8 @@ const InviteEmployees = ({ user }) => {
             lineHeight: '1.6'
         },
         textareaFocused: {
-            borderColor: '#6366f1',
-            boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)'
+            borderColor: '#546E7A',
+            boxShadow: '0 0 0 3px rgba(84, 110, 122, 0.1)'
         },
         select: {
             width: '100%',
@@ -234,12 +234,12 @@ const InviteEmployees = ({ user }) => {
             fontFamily: 'inherit'
         },
         selectFocused: {
-            borderColor: '#6366f1',
-            boxShadow: '0 0 0 3px rgba(99, 102, 241, 0.1)'
+            borderColor: '#546E7A',
+            boxShadow: '0 0 0 3px rgba(84, 110, 122, 0.1)'
         },
         button: {
             padding: '1rem 2.5rem',
-            backgroundColor: '#6366f1',
+            backgroundColor: '#546E7A',
             color: 'white',
             border: 'none',
             borderRadius: '0.625rem',
@@ -250,12 +250,12 @@ const InviteEmployees = ({ user }) => {
             display: 'inline-flex',
             alignItems: 'center',
             gap: '0.5rem',
-            boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.3), 0 2px 4px -1px rgba(99, 102, 241, 0.2)'
+            boxShadow: '0 4px 6px -1px rgba(84, 110, 122, 0.3), 0 2px 4px -1px rgba(84, 110, 122, 0.2)'
         },
         buttonHover: {
-            backgroundColor: '#4f46e5',
+            backgroundColor: '#455A64',
             transform: 'translateY(-1px)',
-            boxShadow: '0 6px 8px -1px rgba(99, 102, 241, 0.4), 0 4px 6px -1px rgba(99, 102, 241, 0.3)'
+            boxShadow: '0 6px 8px -1px rgba(84, 110, 122, 0.4), 0 4px 6px -1px rgba(84, 110, 122, 0.3)'
         },
         successBox: {
             padding: '1rem 1.25rem',
@@ -443,7 +443,7 @@ const InviteEmployees = ({ user }) => {
 
     const getRoleColor = (roleValue) => {
         const role = roles.find(r => r.value === roleValue);
-        return role ? role.color : '#6366f1';
+        return role ? role.color : '#546E7A';
     };
 
     return (
@@ -454,376 +454,376 @@ const InviteEmployees = ({ user }) => {
                 }
             `}</style>
             <div style={styles.container}>
-                <PageHeader 
-                    title="Invite Team Members" 
+                <PageHeader
+                    title="Invite Team Members"
                     subtitle="Invite employees to join your organization"
                 />
 
-            <div style={styles.tabs}>
-                <button 
-                    style={styles.tab(activeTab === 'invite')}
-                    onClick={() => setActiveTab('invite')}
-                    onMouseEnter={(e) => {
-                        if (activeTab !== 'invite') {
-                            e.target.style.color = '#475569';
-                        }
-                    }}
-                    onMouseLeave={(e) => {
-                        if (activeTab !== 'invite') {
-                            e.target.style.color = '#64748b';
-                        }
-                    }}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                        <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="8.5" cy="7" r="4"></circle>
-                        <line x1="20" y1="8" x2="20" y2="14"></line>
-                        <line x1="23" y1="11" x2="17" y2="11"></line>
-                    </svg>
-                    Send Invitations
-                </button>
-                <button 
-                    style={styles.tab(activeTab === 'pending')}
-                    onClick={() => setActiveTab('pending')}
-                    onMouseEnter={(e) => {
-                        if (activeTab !== 'pending') {
-                            e.target.style.color = '#475569';
-                        }
-                    }}
-                    onMouseLeave={(e) => {
-                        if (activeTab !== 'pending') {
-                            e.target.style.color = '#64748b';
-                        }
-                    }}
-                >
-                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle' }}>
-                        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
-                        <path d="M13 8H7"></path>
-                        <path d="M17 12H7"></path>
-                    </svg>
-                    Pending Invitations 
-                    {pendingInvitations.length > 0 && (
-                        <span style={{
-                            marginLeft: '0.5rem',
-                            backgroundColor: activeTab === 'pending' ? '#6366f1' : '#cbd5e1',
-                            color: 'white',
-                            borderRadius: '9999px',
-                            padding: '0.125rem 0.5rem',
-                            fontSize: '0.75rem',
-                            fontWeight: '600'
-                        }}>
-                            {pendingInvitations.length}
-                        </span>
-                    )}
-                </button>
-            </div>
-
-            {activeTab === 'invite' && (
-                <div style={styles.card}>
-                    <h2 style={styles.heading}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <div style={styles.tabs}>
+                    <button
+                        style={styles.tab(activeTab === 'invite')}
+                        onClick={() => setActiveTab('invite')}
+                        onMouseEnter={(e) => {
+                            if (activeTab !== 'invite') {
+                                e.target.style.color = '#475569';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (activeTab !== 'invite') {
+                                e.target.style.color = '#64748b';
+                            }
+                        }}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle' }}>
                             <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
                             <circle cx="8.5" cy="7" r="4"></circle>
                             <line x1="20" y1="8" x2="20" y2="14"></line>
                             <line x1="23" y1="11" x2="17" y2="11"></line>
                         </svg>
-                        Invite New Members
-                    </h2>
-                    <p style={styles.subtitle}>
-                        Enter email addresses to send invitations. You can invite multiple people at once by separating emails with commas or new lines.
-                    </p>
-
-                    {success && (
-                        <div style={styles.successBox}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <polyline points="20 6 9 17 4 12"></polyline>
-                            </svg>
-                            {success}
-                        </div>
-                    )}
-                    {error && (
-                        <div style={styles.errorBox}>
-                            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                            </svg>
-                            {error}
-                        </div>
-                    )}
-
-                    <form onSubmit={handleSubmit}>
-                        <div style={styles.inputGroup}>
-                            <label style={styles.label}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                    <polyline points="22,6 12,13 2,6"></polyline>
-                                </svg>
-                                Email Addresses
-                            </label>
-                            <textarea
-                                value={emails}
-                                onChange={(e) => setEmails(e.target.value)}
-                                onFocus={() => setFocusedInput('textarea')}
-                                onBlur={() => setFocusedInput(null)}
-                                onMouseEnter={(e) => {
-                                    if (focusedInput !== 'textarea') {
-                                        e.target.style.borderColor = '#cbd5e1';
-                                    }
-                                }}
-                                style={{
-                                    ...styles.textarea,
-                                    ...(focusedInput === 'textarea' ? styles.textareaFocused : {})
-                                }}
-                                placeholder="john@company.com&#10;jane@company.com&#10;bob@company.com"
-                            />
-                            <p style={styles.helpText}>
-                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <circle cx="12" cy="12" r="10"></circle>
-                                    <line x1="12" y1="16" x2="12" y2="12"></line>
-                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
-                                </svg>
-                                Separate multiple emails with commas or new lines
-                            </p>
-                        </div>
-
-                        <div style={styles.inputGroup}>
-                            <label style={styles.label}>
-                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                    <circle cx="9" cy="7" r="4"></circle>
-                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                </svg>
-                                Role
-                            </label>
-                            <select
-                                value={roleName}
-                                onChange={(e) => setRoleName(e.target.value)}
-                                onFocus={() => setFocusedInput('select')}
-                                onBlur={() => setFocusedInput(null)}
-                                onMouseEnter={(e) => {
-                                    if (focusedInput !== 'select') {
-                                        e.target.style.borderColor = '#cbd5e1';
-                                    }
-                                }}
-                                style={{
-                                    ...styles.select,
-                                    ...(focusedInput === 'select' ? styles.selectFocused : {})
-                                }}
-                            >
-                                {roles.map(role => (
-                                    <option key={role.value} value={role.value}>
-                                        {role.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <button
-                            type="submit"
-                            style={{
-                                ...styles.button,
-                                opacity: loading ? 0.7 : 1,
-                                cursor: loading ? 'not-allowed' : 'pointer'
-                            }}
-                            disabled={loading}
-                            onMouseEnter={(e) => {
-                                if (!loading) {
-                                    Object.assign(e.target.style, styles.buttonHover);
-                                }
-                            }}
-                            onMouseLeave={(e) => {
-                                if (!loading) {
-                                    e.target.style.backgroundColor = '#6366f1';
-                                    e.target.style.transform = 'none';
-                                    e.target.style.boxShadow = '0 4px 6px -1px rgba(99, 102, 241, 0.3), 0 2px 4px -1px rgba(99, 102, 241, 0.2)';
-                                }
-                            }}
-                        >
-                            {loading ? (
-                                <>
-                                    <span style={styles.loadingSpinner}></span>
-                                    Sending Invitations...
-                                </>
-                            ) : (
-                                <>
-                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                        <line x1="22" y1="2" x2="11" y2="13"></line>
-                                        <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-                                    </svg>
-                                    Send Invitations
-                                </>
-                            )}
-                        </button>
-                    </form>
-
-                    {results.length > 0 && (
-                        <div style={styles.resultsList}>
-                            <h3 style={styles.resultsTitle}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                    <polyline points="9 11 12 14 22 4"></polyline>
-                                    <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
-                                </svg>
-                                Invitation Results
-                            </h3>
-                            {results.map((result, index) => (
-                                <div key={index} style={styles.resultItem(result.success === 'true')}>
-                                    <span style={{ fontWeight: '500' }}>{result.email}</span>
-                                    <span style={styles.resultStatus}>
-                                        {result.success === 'true' ? (
-                                            <>
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <polyline points="20 6 9 17 4 12"></polyline>
-                                                </svg>
-                                                <span style={{ color: '#166534' }}>Sent</span>
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <circle cx="12" cy="12" r="10"></circle>
-                                                    <line x1="15" y1="9" x2="9" y2="15"></line>
-                                                    <line x1="9" y1="9" x2="15" y2="15"></line>
-                                                </svg>
-                                                <span style={{ color: '#dc2626' }}>{result.message || 'Failed'}</span>
-                                            </>
-                                        )}
-                                    </span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {activeTab === 'pending' && (
-                <div style={styles.card}>
-                    <h2 style={styles.heading}>
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                        Send Invitations
+                    </button>
+                    <button
+                        style={styles.tab(activeTab === 'pending')}
+                        onClick={() => setActiveTab('pending')}
+                        onMouseEnter={(e) => {
+                            if (activeTab !== 'pending') {
+                                e.target.style.color = '#475569';
+                            }
+                        }}
+                        onMouseLeave={(e) => {
+                            if (activeTab !== 'pending') {
+                                e.target.style.color = '#64748b';
+                            }
+                        }}
+                    >
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ display: 'inline-block', marginRight: '0.5rem', verticalAlign: 'middle' }}>
                             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
                             <path d="M13 8H7"></path>
                             <path d="M17 12H7"></path>
                         </svg>
                         Pending Invitations
-                    </h2>
-                    <p style={styles.subtitle}>
-                        Manage invitations that haven't been accepted yet. You can cancel invitations before they expire.
-                    </p>
-
-                    {loadingInvitations ? (
-                        <div style={styles.emptyState}>
-                            <div style={{
-                                ...styles.loadingSpinner,
-                                border: '3px solid #e2e8f0',
-                                borderTopColor: '#6366f1',
-                                width: '2rem',
-                                height: '2rem',
-                                margin: '0 auto 1rem'
-                            }}></div>
-                            <p style={{ ...styles.emptyStateText, marginTop: '1rem' }}>Loading invitations...</p>
-                        </div>
-                    ) : pendingInvitations.length === 0 ? (
-                        <div style={styles.emptyState}>
-                            <div style={styles.emptyStateIcon}>
-                                <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                    <polyline points="22,6 12,13 2,6"></polyline>
-                                </svg>
-                            </div>
-                            <p style={styles.emptyStateText}>No pending invitations</p>
-                            <p style={styles.emptyStateSubtext}>All invitations have been accepted or expired</p>
-                        </div>
-                    ) : (
-                        <div>
-                            {pendingInvitations.map((invitation) => (
-                                <div 
-                                    key={invitation.token} 
-                                    style={{
-                                        ...styles.invitationCard,
-                                        ...(hoveredCard === invitation.token ? styles.invitationCardHover : {})
-                                    }}
-                                    onMouseEnter={() => setHoveredCard(invitation.token)}
-                                    onMouseLeave={() => setHoveredCard(null)}
-                                >
-                                    <div style={styles.invitationInfo}>
-                                        <p style={styles.invitationEmail}>
-                                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
-                                                <polyline points="22,6 12,13 2,6"></polyline>
-                                            </svg>
-                                            {invitation.email}
-                                        </p>
-                                        <div style={styles.invitationMeta}>
-                                            <span style={styles.badgeWithColor(getRoleColor(invitation.roleName))}>
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                                    <circle cx="9" cy="7" r="4"></circle>
-                                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                                </svg>
-                                                {formatRole(invitation.roleName)}
-                                            </span>
-                                            <span style={styles.metaItem}>
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                                                    <circle cx="9" cy="7" r="4"></circle>
-                                                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                                                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                                                </svg>
-                                                Invited by {invitation.invitedBy}
-                                            </span>
-                                            <span style={styles.metaItem}>
-                                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <circle cx="12" cy="12" r="10"></circle>
-                                                    <polyline points="12 6 12 12 16 14"></polyline>
-                                                </svg>
-                                                Expires {invitation.expiresAt}
-                                            </span>
-                                        </div>
-                                    </div>
-                                    <button
-                                        onClick={() => handleCancelInvitation(invitation.token)}
-                                        disabled={cancellingToken === invitation.token}
-                                        style={{
-                                            ...styles.cancelButton,
-                                            opacity: cancellingToken === invitation.token ? 0.6 : 1,
-                                            cursor: cancellingToken === invitation.token ? 'not-allowed' : 'pointer'
-                                        }}
-                                        onMouseEnter={(e) => {
-                                            if (cancellingToken !== invitation.token) {
-                                                Object.assign(e.target.style, styles.cancelButtonHover);
-                                            }
-                                        }}
-                                        onMouseLeave={(e) => {
-                                            if (cancellingToken !== invitation.token) {
-                                                e.target.style.backgroundColor = 'transparent';
-                                                e.target.style.color = '#ef4444';
-                                                e.target.style.transform = 'none';
-                                                e.target.style.boxShadow = 'none';
-                                            }
-                                        }}
-                                    >
-                                        {cancellingToken === invitation.token ? (
-                                            <>
-                                                <span style={styles.loadingSpinner}></span>
-                                                Cancelling...
-                                            </>
-                                        ) : (
-                                            <>
-                                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                                                    <line x1="18" y1="6" x2="6" y2="18"></line>
-                                                    <line x1="6" y1="6" x2="18" y2="18"></line>
-                                                </svg>
-                                                Cancel
-                                            </>
-                                        )}
-                                    </button>
-                                </div>
-                            ))}
-                        </div>
-                    )}
+                        {pendingInvitations.length > 0 && (
+                            <span style={{
+                                marginLeft: '0.5rem',
+                                backgroundColor: activeTab === 'pending' ? '#546E7A' : '#cbd5e1',
+                                color: 'white',
+                                borderRadius: '9999px',
+                                padding: '0.125rem 0.5rem',
+                                fontSize: '0.75rem',
+                                fontWeight: '600'
+                            }}>
+                                {pendingInvitations.length}
+                            </span>
+                        )}
+                    </button>
                 </div>
-            )}
+
+                {activeTab === 'invite' && (
+                    <div style={styles.card}>
+                        <h2 style={styles.heading}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                <circle cx="8.5" cy="7" r="4"></circle>
+                                <line x1="20" y1="8" x2="20" y2="14"></line>
+                                <line x1="23" y1="11" x2="17" y2="11"></line>
+                            </svg>
+                            Invite New Members
+                        </h2>
+                        <p style={styles.subtitle}>
+                            Enter email addresses to send invitations. You can invite multiple people at once by separating emails with commas or new lines.
+                        </p>
+
+                        {success && (
+                            <div style={styles.successBox}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <polyline points="20 6 9 17 4 12"></polyline>
+                                </svg>
+                                {success}
+                            </div>
+                        )}
+                        {error && (
+                            <div style={styles.errorBox}>
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                {error}
+                            </div>
+                        )}
+
+                        <form onSubmit={handleSubmit}>
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                        <polyline points="22,6 12,13 2,6"></polyline>
+                                    </svg>
+                                    Email Addresses
+                                </label>
+                                <textarea
+                                    value={emails}
+                                    onChange={(e) => setEmails(e.target.value)}
+                                    onFocus={() => setFocusedInput('textarea')}
+                                    onBlur={() => setFocusedInput(null)}
+                                    onMouseEnter={(e) => {
+                                        if (focusedInput !== 'textarea') {
+                                            e.target.style.borderColor = '#cbd5e1';
+                                        }
+                                    }}
+                                    style={{
+                                        ...styles.textarea,
+                                        ...(focusedInput === 'textarea' ? styles.textareaFocused : {})
+                                    }}
+                                    placeholder="john@company.com&#10;jane@company.com&#10;bob@company.com"
+                                />
+                                <p style={styles.helpText}>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <circle cx="12" cy="12" r="10"></circle>
+                                        <line x1="12" y1="16" x2="12" y2="12"></line>
+                                        <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                    </svg>
+                                    Separate multiple emails with commas or new lines
+                                </p>
+                            </div>
+
+                            <div style={styles.inputGroup}>
+                                <label style={styles.label}>
+                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                        <circle cx="9" cy="7" r="4"></circle>
+                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                    </svg>
+                                    Role
+                                </label>
+                                <select
+                                    value={roleName}
+                                    onChange={(e) => setRoleName(e.target.value)}
+                                    onFocus={() => setFocusedInput('select')}
+                                    onBlur={() => setFocusedInput(null)}
+                                    onMouseEnter={(e) => {
+                                        if (focusedInput !== 'select') {
+                                            e.target.style.borderColor = '#cbd5e1';
+                                        }
+                                    }}
+                                    style={{
+                                        ...styles.select,
+                                        ...(focusedInput === 'select' ? styles.selectFocused : {})
+                                    }}
+                                >
+                                    {roles.map(role => (
+                                        <option key={role.value} value={role.value}>
+                                            {role.label}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+
+                            <button
+                                type="submit"
+                                style={{
+                                    ...styles.button,
+                                    opacity: loading ? 0.7 : 1,
+                                    cursor: loading ? 'not-allowed' : 'pointer'
+                                }}
+                                disabled={loading}
+                                onMouseEnter={(e) => {
+                                    if (!loading) {
+                                        Object.assign(e.target.style, styles.buttonHover);
+                                    }
+                                }}
+                                onMouseLeave={(e) => {
+                                    if (!loading) {
+                                        e.target.style.backgroundColor = '#546E7A';
+                                        e.target.style.transform = 'none';
+                                        e.target.style.boxShadow = '0 4px 6px -1px rgba(84, 110, 122, 0.3), 0 2px 4px -1px rgba(84, 110, 122, 0.2)';
+                                    }
+                                }}
+                            >
+                                {loading ? (
+                                    <>
+                                        <span style={styles.loadingSpinner}></span>
+                                        Sending Invitations...
+                                    </>
+                                ) : (
+                                    <>
+                                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                            <line x1="22" y1="2" x2="11" y2="13"></line>
+                                            <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                                        </svg>
+                                        Send Invitations
+                                    </>
+                                )}
+                            </button>
+                        </form>
+
+                        {results.length > 0 && (
+                            <div style={styles.resultsList}>
+                                <h3 style={styles.resultsTitle}>
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                        <polyline points="9 11 12 14 22 4"></polyline>
+                                        <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                                    </svg>
+                                    Invitation Results
+                                </h3>
+                                {results.map((result, index) => (
+                                    <div key={index} style={styles.resultItem(result.success === 'true')}>
+                                        <span style={{ fontWeight: '500' }}>{result.email}</span>
+                                        <span style={styles.resultStatus}>
+                                            {result.success === 'true' ? (
+                                                <>
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <polyline points="20 6 9 17 4 12"></polyline>
+                                                    </svg>
+                                                    <span style={{ color: '#166534' }}>Sent</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <line x1="15" y1="9" x2="9" y2="15"></line>
+                                                        <line x1="9" y1="9" x2="15" y2="15"></line>
+                                                    </svg>
+                                                    <span style={{ color: '#dc2626' }}>{result.message || 'Failed'}</span>
+                                                </>
+                                            )}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'pending' && (
+                    <div style={styles.card}>
+                        <h2 style={styles.heading}>
+                            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"></path>
+                                <path d="M13 8H7"></path>
+                                <path d="M17 12H7"></path>
+                            </svg>
+                            Pending Invitations
+                        </h2>
+                        <p style={styles.subtitle}>
+                            Manage invitations that haven't been accepted yet. You can cancel invitations before they expire.
+                        </p>
+
+                        {loadingInvitations ? (
+                            <div style={styles.emptyState}>
+                                <div style={{
+                                    ...styles.loadingSpinner,
+                                    border: '3px solid #e2e8f0',
+                                    borderTopColor: '#546E7A',
+                                    width: '2rem',
+                                    height: '2rem',
+                                    margin: '0 auto 1rem'
+                                }}></div>
+                                <p style={{ ...styles.emptyStateText, marginTop: '1rem' }}>Loading invitations...</p>
+                            </div>
+                        ) : pendingInvitations.length === 0 ? (
+                            <div style={styles.emptyState}>
+                                <div style={styles.emptyStateIcon}>
+                                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                        <polyline points="22,6 12,13 2,6"></polyline>
+                                    </svg>
+                                </div>
+                                <p style={styles.emptyStateText}>No pending invitations</p>
+                                <p style={styles.emptyStateSubtext}>All invitations have been accepted or expired</p>
+                            </div>
+                        ) : (
+                            <div>
+                                {pendingInvitations.map((invitation) => (
+                                    <div
+                                        key={invitation.token}
+                                        style={{
+                                            ...styles.invitationCard,
+                                            ...(hoveredCard === invitation.token ? styles.invitationCardHover : {})
+                                        }}
+                                        onMouseEnter={() => setHoveredCard(invitation.token)}
+                                        onMouseLeave={() => setHoveredCard(null)}
+                                    >
+                                        <div style={styles.invitationInfo}>
+                                            <p style={styles.invitationEmail}>
+                                                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                    <path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"></path>
+                                                    <polyline points="22,6 12,13 2,6"></polyline>
+                                                </svg>
+                                                {invitation.email}
+                                            </p>
+                                            <div style={styles.invitationMeta}>
+                                                <span style={styles.badgeWithColor(getRoleColor(invitation.roleName))}>
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                                        <circle cx="9" cy="7" r="4"></circle>
+                                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                                    </svg>
+                                                    {formatRole(invitation.roleName)}
+                                                </span>
+                                                <span style={styles.metaItem}>
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                                                        <circle cx="9" cy="7" r="4"></circle>
+                                                        <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                                                        <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                                                    </svg>
+                                                    Invited by {invitation.invitedBy}
+                                                </span>
+                                                <span style={styles.metaItem}>
+                                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <circle cx="12" cy="12" r="10"></circle>
+                                                        <polyline points="12 6 12 12 16 14"></polyline>
+                                                    </svg>
+                                                    Expires {invitation.expiresAt}
+                                                </span>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() => handleCancelInvitation(invitation.token)}
+                                            disabled={cancellingToken === invitation.token}
+                                            style={{
+                                                ...styles.cancelButton,
+                                                opacity: cancellingToken === invitation.token ? 0.6 : 1,
+                                                cursor: cancellingToken === invitation.token ? 'not-allowed' : 'pointer'
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                if (cancellingToken !== invitation.token) {
+                                                    Object.assign(e.target.style, styles.cancelButtonHover);
+                                                }
+                                            }}
+                                            onMouseLeave={(e) => {
+                                                if (cancellingToken !== invitation.token) {
+                                                    e.target.style.backgroundColor = 'transparent';
+                                                    e.target.style.color = '#ef4444';
+                                                    e.target.style.transform = 'none';
+                                                    e.target.style.boxShadow = 'none';
+                                                }
+                                            }}
+                                        >
+                                            {cancellingToken === invitation.token ? (
+                                                <>
+                                                    <span style={styles.loadingSpinner}></span>
+                                                    Cancelling...
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                                                        <line x1="18" y1="6" x2="6" y2="18"></line>
+                                                        <line x1="6" y1="6" x2="18" y2="18"></line>
+                                                    </svg>
+                                                    Cancel
+                                                </>
+                                            )}
+                                        </button>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                )}
             </div>
         </>
     );

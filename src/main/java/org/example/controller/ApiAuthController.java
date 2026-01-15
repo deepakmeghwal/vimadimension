@@ -2,6 +2,7 @@ package org.example.controller;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.authentication.DisabledException;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -94,6 +95,13 @@ public class ApiAuthController {
                 return ResponseEntity.status(401).body(response);
             }
             
+        } catch (DisabledException e) {
+            // User account is disabled (unverified email)
+            response.put("success", false);
+            response.put("code", "ACCOUNT_NOT_VERIFIED");
+            response.put("message", "Your email has not been verified. Please check your inbox or request a new verification email.");
+            response.put("email", loginRequest.get("username"));
+            return ResponseEntity.status(403).body(response);
         } catch (AuthenticationException e) {
             response.put("success", false);
             response.put("message", "Invalid username or password");

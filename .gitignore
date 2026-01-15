@@ -104,3 +104,10 @@ rebuild-trigger.txt
 
 # MySQL data
 mysql/data/
+
+# Agentic AI
+.claude/
+
+# Editor temp files
+*.swp
+*.bak

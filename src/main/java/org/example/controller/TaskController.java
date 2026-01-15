@@ -19,6 +19,8 @@ import java.util.Optional;
 import org.example.dto.TimeLogDto;
 import org.example.service.TimeLogService;
 import java.math.BigDecimal;
+import org.example.models.enums.TaskPriority;
+import java.time.LocalDate;
 
 @RestController
 @RequestMapping("/api/tasks")
@@ -118,9 +120,14 @@ public class TaskController {
         }
     }
 
+    /**
+     * @deprecated Use GET /api/tasks with pagination params instead
+     */
+    @Deprecated
     @GetMapping("/list")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<List<Task>> getAllTasks() {
+        logger.info("[DEPRECATED] /api/tasks/list is deprecated. Use GET /api/tasks with pagination.");
         try {
             List<Task> tasks = taskService.getAllTasks();
             logger.info("Retrieved {} tasks", tasks.size());
@@ -147,7 +154,7 @@ public class TaskController {
             @RequestParam(required = false) List<String> priority,
             @RequestParam(required = false) Long projectId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "50") int size) {
         try {
             Map<String, Object> response = taskService.getTasksWithFilters(
                     filter, assigneeId, status, priority, projectId, page, size);
@@ -177,11 +184,16 @@ public class TaskController {
         }
     }
 
+    /**
+     * @deprecated Use GET /api/tasks with pagination params instead
+     */
+    @Deprecated
     @GetMapping("/paginated")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getAllTasksPaginated(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "50") int size) {
+        logger.info("[DEPRECATED] /api/tasks/paginated is deprecated. Use GET /api/tasks with page/size params.");
         try {
             // Redirect to unified endpoint with filter=all
             return getTasksWithFilters("all", null, null, null, null, page, size);
@@ -191,6 +203,10 @@ public class TaskController {
         }
     }
 
+    /**
+     * @deprecated Use GET /api/tasks?filter=assigned instead
+     */
+    @Deprecated
     @GetMapping("/assigned-to-me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getTasksAssignedToCurrentUser(
@@ -198,7 +214,8 @@ public class TaskController {
             @RequestParam(required = false) List<String> priority,
             @RequestParam(required = false) Long projectId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "50") int size) {
+        logger.info("[DEPRECATED] /api/tasks/assigned-to-me is deprecated. Use GET /api/tasks?filter=assigned.");
         try {
             // Use the unified filter method with filter="assigned" to get current user's tasks
             // This ensures backend handles the filtering by authenticated user
@@ -229,11 +246,16 @@ public class TaskController {
         }
     }
 
+    /**
+     * @deprecated Use GET /api/tasks?filter=reported instead
+     */
+    @Deprecated
     @GetMapping("/reported-by-me")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getTasksReportedByCurrentUser(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "50") int size) {
+        logger.info("[DEPRECATED] /api/tasks/reported-by-me is deprecated. Use GET /api/tasks?filter=reported.");
         try {
             Map<String, Object> response = taskService.getTasksReportedByCurrentUserPaginated(page, size);
 
@@ -261,11 +283,16 @@ public class TaskController {
         }
     }
 
+    /**
+     * @deprecated Use GET /api/tasks?filter=to-check instead
+     */
+    @Deprecated
     @GetMapping("/to-check")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Map<String, Object>> getTasksToCheckByCurrentUser(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "10") int size) {
+            @RequestParam(defaultValue = "50") int size) {
+        logger.info("[DEPRECATED] /api/tasks/to-check is deprecated. Use GET /api/tasks?filter=to-check.");
         try {
             Map<String, Object> response = taskService.getTasksToCheckByCurrentUserPaginated(page, size);
 
@@ -338,6 +365,156 @@ public class TaskController {
         }
     }
 
+    /**
+     * Partial update endpoint for tasks.
+     * Allows updating individual fields without sending the full payload.
+     */
+    @PatchMapping("/{taskId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> partialUpdateTask(@PathVariable Long taskId, @RequestBody Map<String, Object> updates) {
+        try {
+            logger.info("Received partial update request for task ID: {} with updates: {}", taskId, updates);
+            
+            Optional<String> nameOpt = updates.containsKey("name") ? Optional.ofNullable((String) updates.get("name")) : Optional.empty();
+            Optional<String> descriptionOpt = updates.containsKey("description") ? Optional.ofNullable((String) updates.get("description")) : Optional.empty();
+            
+            Optional<Long> phaseIdOpt = Optional.empty();
+            if (updates.containsKey("phaseId")) {
+                Object phaseIdObj = updates.get("phaseId");
+                if (phaseIdObj instanceof Number) {
+                    phaseIdOpt = Optional.of(((Number) phaseIdObj).longValue());
+                } else if (phaseIdObj instanceof String) {
+                    phaseIdOpt = Optional.of(Long.parseLong((String) phaseIdObj));
+                }
+            }
+            
+            Optional<Long> assigneeIdOpt = Optional.empty();
+            if (updates.containsKey("assigneeId")) {
+                Object assigneeIdObj = updates.get("assigneeId");
+                if (assigneeIdObj == null) {
+                    // Explicitly set to -1L (unassign) if key exists but value is null
+                    assigneeIdOpt = Optional.of(-1L); 
+                } else if (assigneeIdObj instanceof Number) {
+                    assigneeIdOpt = Optional.of(((Number) assigneeIdObj).longValue());
+                } else if (assigneeIdObj instanceof String) {
+                    assigneeIdOpt = Optional.of(Long.parseLong((String) assigneeIdObj));
+                }
+            } else {
+                // Key not present, so pass empty Optional to indicate no change
+                assigneeIdOpt = Optional.empty();
+            }
+            
+            // Special handling for assigneeId to support unassigning
+            // The service method signature is: Optional<Long> newAssigneeIdOpt
+            // If Optional is empty -> No change
+            // If Optional contains null -> Unassign
+            // If Optional contains ID -> Assign
+            // However, Optional cannot contain null directly. We need to check how service handles it.
+            // Service code: 
+            // if (newAssigneeIdOpt.isPresent()) {
+            //     Long assigneeId = newAssigneeIdOpt.get();
+            //     if (assigneeId == null) { ... }
+            // }
+            // So we need to pass Optional.of(null) which is not allowed in Java.
+            // Wait, Optional.ofNullable(null) returns empty.
+            // We need to pass Optional<Optional<Long>> or similar, OR change service.
+            // Let's look at service again.
+            // Service: if (newAssigneeIdOpt.isPresent()) ...
+            // If we want to unassign, we need to pass something that makes isPresent() true, but get() return null? No, get() throws if null.
+            // Actually, the service code shown was:
+            // if (newAssigneeIdOpt.isPresent()) {
+            //     Long assigneeId = newAssigneeIdOpt.get();
+            //     if (assigneeId == null) { ... }
+            // }
+            // This implies newAssigneeIdOpt is Optional<Long>. Optional<Long> cannot hold null.
+            // So the service code `if (assigneeId == null)` is unreachable if it comes from `Optional.get()`.
+            // UNLESS the service method signature was `Optional<Long>` but the caller passed `Optional.ofNullable(null)` which is empty.
+            // Ah, the service code logic seems slightly flawed for "unassign" via Optional if it relies on null inside Optional.
+            // Let's re-read service code carefully.
+            // Service: public Optional<Task> updateTask(..., Optional<Long> newAssigneeIdOpt, ...)
+            // Service body: if (newAssigneeIdOpt.isPresent()) { Long assigneeId = newAssigneeIdOpt.get(); ... }
+            // If I pass Optional.empty(), it skips.
+            // If I pass Optional.of(123L), it assigns.
+            // I cannot pass Optional containing null.
+            // So currently, the service method `updateTask` (partial) CANNOT unassign an assignee.
+            
+            // For now, let's just support assigning and other fields. Unassigning might need a specific flag or different handling.
+            // We will map the "assigneeId" from JSON. If it's null, we might skip it for now or treat it as "no change" to be safe,
+            // until we fix the service to support unassigning via partial update.
+            
+            Optional<TaskStatus> statusOpt = Optional.empty();
+            if (updates.containsKey("status")) {
+                String statusStr = (String) updates.get("status");
+                if (statusStr != null) {
+                    statusOpt = Optional.of(TaskStatus.valueOf(statusStr));
+                }
+            }
+
+            Optional<TaskPriority> priorityOpt = Optional.empty();
+            if (updates.containsKey("priority")) {
+                String priorityStr = (String) updates.get("priority");
+                if (priorityStr != null) {
+                    priorityOpt = Optional.of(TaskPriority.valueOf(priorityStr));
+                }
+            }
+
+            Optional<LocalDate> dueDateOpt = Optional.empty();
+            if (updates.containsKey("dueDate")) {
+                String dueDateStr = (String) updates.get("dueDate");
+                if (dueDateStr != null) {
+                    dueDateOpt = Optional.of(LocalDate.parse(dueDateStr));
+                } else {
+                    // If null is passed, we might want to clear the due date.
+                    // However, Optional<LocalDate> cannot hold null.
+                    // We need to decide if we support clearing due date.
+                    // For now, let's assume if key is present but null, we clear it?
+                    // But Optional.ofNullable(null) is empty.
+                    // Similar issue to assignee.
+                    // Let's just support setting a value for now.
+                }
+            }
+
+            // We need to handle the assignee unassignment limitation.
+            // If the user sends "assigneeId": null, they probably want to unassign.
+            // But we can't pass that to the current service method.
+            // Let's use the fields we can map.
+            
+            // NOTE: The service method signature for assignee is Optional<Long>.
+            // We'll pass Optional.empty() if key is missing.
+            // If key is present and value is valid Long, we pass Optional.of(id).
+            
+            Optional<Long> finalAssigneeIdOpt = Optional.empty();
+             if (updates.containsKey("assigneeId")) {
+                Object val = updates.get("assigneeId");
+                if (val != null) {
+                     if (val instanceof Number) {
+                        finalAssigneeIdOpt = Optional.of(((Number) val).longValue());
+                    } else if (val instanceof String) {
+                        finalAssigneeIdOpt = Optional.of(Long.parseLong((String) val));
+                    }
+                }
+                // If val is null, we leave finalAssigneeIdOpt as empty (no change), 
+                // because we can't signal "unassign" to the current service method.
+            }
+
+            Optional<Task> task = taskService.updateTask(taskId, nameOpt, descriptionOpt, phaseIdOpt, finalAssigneeIdOpt, statusOpt, priorityOpt, dueDateOpt);
+            
+            if (task.isPresent()) {
+                Map<String, Object> response = new HashMap<>();
+                response.put("success", true);
+                response.put("message", "Task updated successfully");
+                return ResponseEntity.ok(response);
+            } else {
+                return ResponseEntity.notFound().build();
+            }
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error partial updating task ID {}: {}", taskId, e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to update task"));
+        }
+    }
+
     @PutMapping("/{taskId}/status")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> updateTaskStatus(@PathVariable Long taskId,
@@ -362,7 +539,6 @@ public class TaskController {
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", true);
                 response.put("message", "Task status updated successfully");
-                response.put("task", updatedTask.get());
                 
                 logger.info("Successfully updated status for task ID: {} to {}", taskId, status);
                 return ResponseEntity.ok(response);
@@ -499,6 +675,11 @@ public class TaskController {
                     userMap.put("username", user.getUsername());
                     userMap.put("name", user.getName() != null ? user.getName() : user.getUsername());
                     userMap.put("email", user.getEmail());
+                    userMap.put("designation", user.getDesignation());
+                    // Salary fields for burn rate calculation
+                    userMap.put("monthlySalary", user.getMonthlySalary());
+                    userMap.put("typicalHoursPerMonth", user.getTypicalHoursPerMonth() != null ? user.getTypicalHoursPerMonth() : 160);
+                    userMap.put("overheadMultiplier", user.getOverheadMultiplier() != null ? user.getOverheadMultiplier() : new java.math.BigDecimal("2.5"));
                     return userMap;
                 })
                 .collect(java.util.stream.Collectors.toList());

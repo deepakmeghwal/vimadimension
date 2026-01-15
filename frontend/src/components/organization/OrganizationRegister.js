@@ -388,7 +388,7 @@ const OrganizationRegister = () => {
         <div style={styles.container}>
             {/* Left Panel - Value Prop */}
             <div className="hidden-mobile" style={styles.leftPanel}>
-                <div style={styles.brand}>KOMOREBI</div>
+                <div style={styles.brand}>ARCHIEASE</div>
                 <h1 style={styles.heading}>
                     Manage projects, track tasks, handle payroll, and connect your team—all in one unified platform.
                 </h1>
@@ -397,7 +397,7 @@ const OrganizationRegister = () => {
                 <div style={styles.imageContainer}>
                     <img
                         src="/images/register.png?v=3"
-                        alt="Komorebi Dashboard"
+                        alt="ArchiEase Dashboard"
                         style={styles.dashboardImage}
                         onError={(e) => {
                             e.target.style.display = 'none';
@@ -414,7 +414,7 @@ const OrganizationRegister = () => {
                             {step === 1 ? 'Create your account' : 'Setup your workspace'}
                         </h2>
                         <p style={{ color: '#64748b' }}>
-                            {step === 1 ? 'Get started with Komorebi today.' : 'Tell us a bit about your company.'}
+                            {step === 1 ? 'Get started with ArchiEase today.' : 'Tell us a bit about your company.'}
                         </p>
                     </div>
 

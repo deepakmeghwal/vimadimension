@@ -1,8 +1,9 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org">
+
 <head>
     <meta charset="UTF-8">
-    <title>VimaDimension - Register</title>
+    <title>ArchiEase - Register</title>
     <style>
         body {
             font-family: Arial, sans-serif;
@@ -12,43 +13,54 @@
             align-items: center;
             min-height: 100vh;
             margin: 0;
-            padding: 20px 0; /* Add some padding for scrollable content */
+            padding: 20px 0;
+            /* Add some padding for scrollable content */
         }
+
         .register-container {
             background-color: #fff;
             padding: 30px;
             border-radius: 8px;
             box-shadow: 0 0 15px rgba(0, 0, 0, 0.1);
-            width: 400px; /* Slightly wider for more fields */
+            width: 400px;
+            /* Slightly wider for more fields */
         }
+
         .register-container h1 {
             text-align: center;
             color: #333;
             margin-bottom: 20px;
         }
+
         .form-group {
             margin-bottom: 15px;
         }
+
         .form-group label {
             display: block;
             margin-bottom: 5px;
             color: #555;
         }
+
         .form-group input[type="text"],
         .form-group input[type="email"],
         .form-group input[type="password"],
-        .form-group select { /* Added select for consistent styling */
+        .form-group select {
+            /* Added select for consistent styling */
             width: 100%;
             padding: 10px;
             border: 1px solid #ddd;
             border-radius: 4px;
             box-sizing: border-box;
-            background-color: white; /* Ensure select background is white */
+            background-color: white;
+            /* Ensure select background is white */
         }
+
         .btn-register {
             width: 100%;
             padding: 10px;
-            background-color: #28a745; /* Green for registration */
+            background-color: #28a745;
+            /* Green for registration */
             border: none;
             border-radius: 4px;
             color: white;
@@ -56,121 +68,140 @@
             cursor: pointer;
             transition: background-color 0.3s ease;
         }
+
         .btn-register:hover {
             background-color: #218838;
         }
+
         .alert {
             padding: 10px;
             margin-bottom: 15px;
             border-radius: 4px;
             font-size: 0.9em;
         }
+
         .alert-danger {
             background-color: #f8d7da;
             color: #721c24;
             border: 1px solid #f5c6cb;
         }
+
         .login-link {
             text-align: center;
             margin-top: 15px;
         }
+
         .login-link a {
             color: #007bff;
             text-decoration: none;
         }
+
         .login-link a:hover {
             text-decoration: underline;
         }
-        .back-link { margin-bottom: 20px; display: inline-block; }
-        .back-link a { color: #0056b3; text-decoration: none; }
-        .back-link a:hover { text-decoration: underline; }
+
+        .back-link {
+            margin-bottom: 20px;
+            display: inline-block;
+        }
+
+        .back-link a {
+            color: #0056b3;
+            text-decoration: none;
+        }
+
+        .back-link a:hover {
+            text-decoration: underline;
+        }
     </style>
 </head>
+
 <body>
 
-<div class="register-container">
-   <h1>Register User</h1>
+    <div class="register-container">
+        <h1>Register User</h1>
 
-   <!-- Display registration error message -->
-    <div th:if="${registrationError}" class="alert alert-danger" th:text="${registrationError}">
-        Error placeholder
-    </div>
-    <!-- For query param based error (if you redirect with ?error) -->
-    <!-- <div th:if="${param.error}" class="alert alert-danger">
+        <!-- Display registration error message -->
+        <div th:if="${registrationError}" class="alert alert-danger" th:text="${registrationError}">
+            Error placeholder
+        </div>
+        <!-- For query param based error (if you redirect with ?error) -->
+        <!-- <div th:if="${param.error}" class="alert alert-danger">
         An error occurred during registration. Please try again.
     </div> -->
 
 
 
-    <form th:action="@{/register}" th:object="${user}" method="post">
-        <div class="form-group">
-            <label for="username">Username:</label>
-            <input type="text" id="username" th:field="*{username}" required autofocus />
-            <!-- Add th:errors="*{username}" here for field-specific validation errors later -->
-        </div>
+        <form th:action="@{/register}" th:object="${user}" method="post">
+            <div class="form-group">
+                <label for="username">Username:</label>
+                <input type="text" id="username" th:field="*{username}" required autofocus />
+                <!-- Add th:errors="*{username}" here for field-specific validation errors later -->
+            </div>
 
-        <div class="form-group">
-            <label for="email">Email:</label>
-            <input type="email" id="email" th:field="*{email}" required />
-            <!-- Add th:errors="*{email}" here for field-specific validation errors later -->
-        </div>
+            <div class="form-group">
+                <label for="email">Email:</label>
+                <input type="email" id="email" th:field="*{email}" required />
+                <!-- Add th:errors="*{email}" here for field-specific validation errors later -->
+            </div>
 
-        <div class="form-group">
-            <label for="password">Password:</label>
-            <input type="password" id="password" th:field="*{password}" required />
-            <!-- Add th:errors="*{password}" here for field-specific validation errors later -->
-        </div>
+            <div class="form-group">
+                <label for="password">Password:</label>
+                <input type="password" id="password" th:field="*{password}" required />
+                <!-- Add th:errors="*{password}" here for field-specific validation errors later -->
+            </div>
 
-        <div class="form-group">
-            <label for="confirmPassword">Confirm Password:</label>
-            <input type="password" id="confirmPassword" th:field="*{confirmPassword}" required />
-        </div>
+            <div class="form-group">
+                <label for="confirmPassword">Confirm Password:</label>
+                <input type="password" id="confirmPassword" th:field="*{confirmPassword}" required />
+            </div>
 
-        <!-- New Designation Dropdown -->
-        <div class="form-group">
-            <label for="designation">Designation:</label>
-            <select id="designation" th:field="*{designation}">
-                <option value="">-- Select Designation --</option>
-                <option value="Principal Architect">Principal Architect</option>
-                <option value="Project Architect">Project Architect</option>
-                <option value="Senior Architect">Senior Architect</option>
-                <option value="Junior Architect">Junior Architect</option>
-                <option value="Architectural Designer">Architectural Designer</option>
-                <option value="Draftsperson">Draftsperson</option>
-                <option value="Intern Architect">Intern Architect</option>
-                <option value="Other">Other</option>
-            </select>
-            <!-- Add th:errors="*{designation}" here for field-specific validation errors later -->
-        </div>
+            <!-- New Designation Dropdown -->
+            <div class="form-group">
+                <label for="designation">Designation:</label>
+                <select id="designation" th:field="*{designation}">
+                    <option value="">-- Select Designation --</option>
+                    <option value="Principal Architect">Principal Architect</option>
+                    <option value="Project Architect">Project Architect</option>
+                    <option value="Senior Architect">Senior Architect</option>
+                    <option value="Junior Architect">Junior Architect</option>
+                    <option value="Architectural Designer">Architectural Designer</option>
+                    <option value="Draftsperson">Draftsperson</option>
+                    <option value="Intern Architect">Intern Architect</option>
+                    <option value="Other">Other</option>
+                </select>
+                <!-- Add th:errors="*{designation}" here for field-specific validation errors later -->
+            </div>
 
-        <!-- New Specialization Dropdown -->
-        <div class="form-group">
-            <label for="specialization">Specialization:</label>
-            <select id="specialization" th:field="*{specialization}">
-                <option value="">-- Select Specialization --</option>
-                <option value="Sustainable Design">Sustainable Design</option>
-                <option value="Urban Planning">Urban Planning</option>
-                <option value="Interior Architecture">Interior Architecture</option>
-                <option value="Landscape Architecture">Landscape Architecture</option>
-                <option value="Residential Design">Residential Design</option>
-                <option value="Commercial Design">Commercial Design</option>
-                <option value="Healthcare Design">Healthcare Design</option>
-                <option value="Historic Preservation">Historic Preservation</option>
-                <option value="Other">Other</option>
-            </select>
-            <!-- Add th:errors="*{specialization}" here for field-specific validation errors later -->
-        </div>
+            <!-- New Specialization Dropdown -->
+            <div class="form-group">
+                <label for="specialization">Specialization:</label>
+                <select id="specialization" th:field="*{specialization}">
+                    <option value="">-- Select Specialization --</option>
+                    <option value="Sustainable Design">Sustainable Design</option>
+                    <option value="Urban Planning">Urban Planning</option>
+                    <option value="Interior Architecture">Interior Architecture</option>
+                    <option value="Landscape Architecture">Landscape Architecture</option>
+                    <option value="Residential Design">Residential Design</option>
+                    <option value="Commercial Design">Commercial Design</option>
+                    <option value="Healthcare Design">Healthcare Design</option>
+                    <option value="Historic Preservation">Historic Preservation</option>
+                    <option value="Other">Other</option>
+                </select>
+                <!-- Add th:errors="*{specialization}" here for field-specific validation errors later -->
+            </div>
 
-        <div>
-            <button type="submit" class="btn-register">Register</button>
-        </div>
+            <div>
+                <button type="submit" class="btn-register">Register</button>
+            </div>
 
-        <div class="back-link">
-            <a th:href="@{/profile}">&laquo; Back to User Profile</a>
-        </div>
-    </form>
+            <div class="back-link">
+                <a th:href="@{/profile}">&laquo; Back to User Profile</a>
+            </div>
+        </form>
 
-</div>
--->
+    </div>
+    -->
 </body>
+
 </html>

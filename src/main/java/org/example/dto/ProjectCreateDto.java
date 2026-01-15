@@ -22,7 +22,11 @@ public class ProjectCreateDto {
     // --- NEW CRITICAL FIELDS ---
     private BigDecimal budget;
     private BigDecimal actualCost;
+    private BigDecimal totalFee;
+    private BigDecimal targetProfitMargin;
     private ProjectPriority priority;
+    
+    private java.util.List<ProjectStage> lifecycleStages;
 
     // Constructors
     public ProjectCreateDto() {
@@ -65,12 +69,36 @@ public class ProjectCreateDto {
         this.actualCost = actualCost;
     }
 
+    public BigDecimal getTotalFee() {
+        return totalFee;
+    }
+
+    public void setTotalFee(BigDecimal totalFee) {
+        this.totalFee = totalFee;
+    }
+
+    public BigDecimal getTargetProfitMargin() {
+        return targetProfitMargin;
+    }
+
+    public void setTargetProfitMargin(BigDecimal targetProfitMargin) {
+        this.targetProfitMargin = targetProfitMargin;
+    }
+
     public ProjectPriority getPriority() {
         return priority;
     }
 
     public void setPriority(ProjectPriority priority) {
         this.priority = priority;
+    }
+
+    public java.util.List<ProjectStage> getLifecycleStages() {
+        return lifecycleStages;
+    }
+
+    public void setLifecycleStages(java.util.List<ProjectStage> lifecycleStages) {
+        this.lifecycleStages = lifecycleStages;
     }
 
     // --- EXISTING GETTERS AND SETTERS ---

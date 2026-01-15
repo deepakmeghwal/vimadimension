@@ -24,14 +24,14 @@ const EditInvoice = ({ user }) => {
       }
     ]
   });
-  
+
   const [projects, setProjects] = useState([]);
   const [loading, setLoading] = useState(false);
   const [fetchLoading, setFetchLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Check if user has admin or manager role
-  const canManageInvoices = user?.authorities?.some(auth => 
+  const canManageInvoices = user?.authorities?.some(auth =>
     auth.authority === 'ROLE_ADMIN' || auth.authority === 'ROLE_MANAGER'
   ) || false;
 
@@ -76,7 +76,7 @@ const EditInvoice = ({ user }) => {
 
       if (response.ok) {
         const invoice = await response.json();
-        
+
         // Check if invoice can be edited
         if (invoice.status !== 'DRAFT') {
           setError('Only draft invoices can be edited');
@@ -262,8 +262,8 @@ const EditInvoice = ({ user }) => {
         <div className="alert alert-danger">
           <h4>Error</h4>
           <p>{error}</p>
-          <button className="btn btn-primary" onClick={() => navigate('/invoices')}>
-            Back to Invoices
+          <button className="btn btn-primary" onClick={() => navigate(-1)}>
+            Back
           </button>
         </div>
       </div>
@@ -274,12 +274,12 @@ const EditInvoice = ({ user }) => {
     <div className="container mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <button 
+          <button
             className="btn btn-outline-secondary mb-2"
-            onClick={() => navigate(`/invoices/${id}/details`)}
+            onClick={() => navigate(-1)}
           >
             <i className="fas fa-arrow-left me-2"></i>
-            Back to Invoice
+            Back
           </button>
           <h2>Edit Invoice</h2>
         </div>
@@ -288,9 +288,9 @@ const EditInvoice = ({ user }) => {
       {error && (
         <div className="alert alert-danger alert-dismissible fade show" role="alert">
           {error}
-          <button 
-            type="button" 
-            className="btn-close" 
+          <button
+            type="button"
+            className="btn-close"
             onClick={() => setError('')}
           ></button>
         </div>
@@ -438,7 +438,7 @@ const EditInvoice = ({ user }) => {
                         </button>
                       )}
                     </div>
-                    
+
                     <div className="row">
                       <div className="col-md-6">
                         <div className="mb-3">
@@ -468,7 +468,7 @@ const EditInvoice = ({ user }) => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="row">
                       <div className="col-md-3">
                         <div className="mb-3">
@@ -531,7 +531,7 @@ const EditInvoice = ({ user }) => {
                     placeholder="Any additional notes for the client..."
                   ></textarea>
                 </div>
-                
+
                 <div className="mb-3">
                   <label htmlFor="termsAndConditions" className="form-label">Terms and Conditions</label>
                   <textarea
@@ -574,16 +574,16 @@ const EditInvoice = ({ user }) => {
                   <span>Subtotal:</span>
                   <span>₹{totals.subtotal}</span>
                 </div>
-                
+
                 {parseFloat(formData.taxRate) > 0 && (
                   <div className="d-flex justify-content-between mb-2">
                     <span>Tax ({formData.taxRate}%):</span>
                     <span>₹{totals.taxAmount}</span>
                   </div>
                 )}
-                
+
                 <hr />
-                
+
                 <div className="d-flex justify-content-between mb-3">
                   <strong>Total:</strong>
                   <strong>₹{totals.total}</strong>
@@ -607,11 +607,11 @@ const EditInvoice = ({ user }) => {
                       </>
                     )}
                   </button>
-                  
+
                   <button
                     type="button"
                     className="btn btn-outline-secondary"
-                    onClick={() => navigate(`/invoices/${id}/details`)}
+                    onClick={() => navigate(-1)}
                   >
                     Cancel
                   </button>

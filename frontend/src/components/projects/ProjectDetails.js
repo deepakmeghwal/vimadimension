@@ -1,19 +1,163 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useParams, Link, useNavigate, useLocation } from 'react-router-dom';
+import {
+  Plus,
+  MoreHorizontal,
+  Calendar,
+  CheckCircle2,
+  ChevronDown,
+  X,
+  AlignLeft,
+  Paperclip,
+  Send,
+  ClipboardCheck,
+  Check,
+  ChevronRight,
+  Layout,
+  ListTodo,
+  Kanban,
+  Users,
+  Contact,
+  Receipt,
+  CalendarRange,
+  FileUp,
+  File,
+  Trash2,
+  Download
+} from 'lucide-react';
 import AuditLogList from '../common/AuditLogList';
-import ActivityLog from './ActivityLog';
 import TeamRoster from './TeamRoster';
 import ClientContacts from './ClientContacts';
 import ResourcePlanner from './ResourcePlanner';
-import ProjectLifecycleChevron from './ProjectLifecycleChevron';
+import ResourceAllocator from './ResourceAllocator';
 import FinancialScorecard from './FinancialScorecard';
 import ProjectFinancialsTab from './ProjectFinancialsTab';
 import ProjectInvoicesTab from './ProjectInvoicesTab';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ProjectDetailsSkeleton from './ProjectDetailsSkeleton';
+import TaskDetailPanel from './TaskDetailPanel';
+import { AsanaSection, AsanaTaskRow, formatStatus, formatPriority, PriorityIcon } from './AsanaListComponents';
+import { PROJECT_STAGES, PROJECT_STATUSES, PROJECT_PRIORITIES, PROJECT_CHARGE_TYPES } from '../../constants/projectEnums';
 import './ProjectDetails.css';
 
 const PAGE_SIZE = 12;
+
+
+
+// --- Task Modal Component ---
+const TaskModal = ({ task, onClose, onSave }) => {
+  const [desc, setDesc] = useState(task.description || '');
+
+  return (
+    <div className="task-modal-overlay">
+      <div className="task-modal">
+        <div className="task-modal-header">
+          <div className="task-modal-actions-left">
+            <button className="btn-complete">
+              <CheckCircle2 size={16} />
+              Mark Complete
+            </button>
+          </div>
+          <div className="task-modal-actions-right">
+            <button className="btn-icon-modal" onClick={onClose}><X size={20} /></button>
+          </div>
+        </div>
+
+        <div className="task-modal-body">
+          <div className="task-modal-main">
+            <h1 className="task-modal-title">{task.name}</h1>
+
+            <div className="task-modal-fields">
+              <div className="task-field-row">
+                <div className="task-field-label">Assignee</div>
+                <div className="task-field-value">
+                  {task.assignee ? (
+                    <div className="assignee-display">
+                      <div className="assignee-avatar-modal">
+                        {task.assignee.name ? task.assignee.name.charAt(0).toUpperCase() : 'U'}
+                      </div>
+                      <span>{task.assignee.name || task.assignee.username}</span>
+                    </div>
+                  ) : (
+                    <span className="task-field-empty">Unassigned</span>
+                  )}
+                </div>
+              </div>
+              <div className="task-field-row">
+                <div className="task-field-label">Due date</div>
+                <div className="task-field-value">
+                  <Calendar size={16} className="field-icon" />
+                  {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No due date'}
+                </div>
+              </div>
+              <div className="task-field-row">
+                <div className="task-field-label">Priority</div>
+                <div className="task-field-value">
+                  <PriorityIcon priority={task.priority} />
+                  <span>{task.priority || 'None'}</span>
+                </div>
+              </div>
+              <div className="task-field-row">
+                <div className="task-field-label">Status</div>
+                <div className="task-field-value">
+                  <span className="status-badge-modal">{task.status?.replace(/_/g, ' ') || 'To Do'}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="task-description-section">
+              <div className="task-description-header">
+                <AlignLeft size={18} />
+                <span>Description</span>
+              </div>
+              <textarea
+                className="task-description-input"
+                placeholder="What is this task about?"
+                value={desc}
+                onChange={(e) => {
+                  setDesc(e.target.value);
+                  onSave(task.id, { description: e.target.value });
+                }}
+              />
+            </div>
+          </div>
+
+          <div className="task-modal-sidebar">
+            <h3 className="sidebar-title">Meta Data</h3>
+            <div className="sidebar-content">
+              <div className="sidebar-row">
+                <span>Created on</span>
+                <span>{task.createdAt ? new Date(task.createdAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'N/A'}</span>
+              </div>
+              <div className="sidebar-row">
+                <span>Created by</span>
+                <span>{task.reporter?.name || 'System'}</span>
+              </div>
+              <div className="sidebar-divider"></div>
+              <div className="sidebar-id">
+                Task ID: #{task.id.toString().substring(0, 6)}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="task-modal-footer">
+          <div className="comment-avatar">ME</div>
+          <div className="comment-input-wrapper">
+            <input
+              type="text"
+              placeholder="Ask a question or post an update..."
+              className="comment-input"
+            />
+            <button className="comment-send-btn">
+              <Send size={16} />
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 const ProjectDetails = ({ user }) => {
   const { id } = useParams();
@@ -21,6 +165,7 @@ const ProjectDetails = ({ user }) => {
   const [project, setProject] = useState(null);
   const [phases, setPhases] = useState([]);
   const [tasks, setTasks] = useState([]);
+  const [teamMembers, setTeamMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [page, setPage] = useState(0);
@@ -36,6 +181,72 @@ const ProjectDetails = ({ user }) => {
   const location = useLocation();
   const [activeTab, setActiveTab] = useState('overview');
   const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [isHeaderDropdownOpen, setIsHeaderDropdownOpen] = useState(false);
+
+  // Overview Tab State
+  const [isEditingDescription, setIsEditingDescription] = useState(false);
+  const [description, setDescription] = useState('');
+  const [showStageSelector, setShowStageSelector] = useState(false);
+  const [showOverviewStatusSelector, setShowOverviewStatusSelector] = useState(false);
+  const [showPrioritySelector, setShowPrioritySelector] = useState(false);
+
+  const [selectedTaskForPanel, setSelectedTaskForPanel] = useState(null);
+  const [selectedTask, setSelectedTask] = useState(null);
+
+  // Deliverables Tab State
+  const [expandedPhase, setExpandedPhase] = useState(null);
+  const [substages, setSubstages] = useState({});
+  const [completionStatus, setCompletionStatus] = useState({});
+  const [expandedSubstageAttachments, setExpandedSubstageAttachments] = useState({}); // { substageId: boolean }
+
+  // Drawings Tab State
+  const [attachments, setAttachments] = useState([]);
+
+  // Column Resizing State
+  const [columnWidths, setColumnWidths] = useState({
+    name: '1.5fr', // Default flexible width
+    assignee: '180px', // Increased from 150px
+    dueDate: '120px',
+    priority: '100px',
+    status: '120px',
+    actions: '100px'
+  });
+  const [isResizing, setIsResizing] = useState(false);
+  const resizeRef = useRef(null);
+
+  const handleResizeStart = (e, column) => {
+    e.preventDefault();
+    setIsResizing(true);
+    const startX = e.pageX;
+    // Use offsetWidth to get the exact current pixel width, handling both px and fr values correctly
+    const startWidth = e.target.parentElement.offsetWidth;
+
+    const handleMouseMove = (moveEvent) => {
+      const newWidth = startWidth + (moveEvent.pageX - startX);
+      setColumnWidths(prev => ({
+        ...prev,
+        [column]: `${Math.max(50, newWidth)}px`
+      }));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+
+    document.addEventListener('mousemove', handleMouseMove);
+    document.addEventListener('mouseup', handleMouseUp);
+  };
+
+  const gridTemplateColumns = `${columnWidths.name} ${columnWidths.assignee} ${columnWidths.dueDate} ${columnWidths.priority} ${columnWidths.status} ${columnWidths.actions}`;
+
+  // Board view states
+  const [draggingId, setDraggingId] = useState(null);
+  const [newTaskColumn, setNewTaskColumn] = useState(null);
+  const [newTaskContent, setNewTaskContent] = useState('');
+  const dragItem = useRef();
+  const dragNode = useRef();
 
   const totalTasks = pagination.totalItems ?? tasks.length;
   const isTaskListEmpty = totalTasks === 0;
@@ -51,12 +262,15 @@ const ProjectDetails = ({ user }) => {
     try {
       setLoading(true);
       setError('');
-      const response = await fetch(`/api/projects/${id}/details?page=${pageToLoad}&size=${PAGE_SIZE}`, {
-        credentials: 'include'
-      });
 
-      if (response.ok) {
-        const data = await response.json();
+      // Fetch project details and team members in parallel
+      const [projectResponse, teamResponse] = await Promise.all([
+        fetch(`/api/projects/${id}/details?page=${pageToLoad}&size=${PAGE_SIZE}`, { credentials: 'include' }),
+        fetch(`/api/projects/${id}/team`, { credentials: 'include' })
+      ]);
+
+      if (projectResponse.ok) {
+        const data = await projectResponse.json();
         setProject(data.project);
         setPhases(data.phases || []);
         const taskList = data.tasks || [];
@@ -75,13 +289,21 @@ const ProjectDetails = ({ user }) => {
           setPage(prev => (prev === normalizedPagination.currentPage ? prev : normalizedPagination.currentPage));
         }
       } else {
-        if (response.status === 404) {
+        if (projectResponse.status === 404) {
           setError('Project not found');
         } else {
-          const errorData = await response.json().catch(() => null);
+          const errorData = await projectResponse.json().catch(() => null);
           setError(errorData?.error || errorData?.message || 'Failed to load project details');
         }
       }
+
+      if (teamResponse.ok) {
+        const teamData = await teamResponse.json();
+        if (teamData.success && teamData.team) {
+          setTeamMembers(teamData.team);
+        }
+      }
+
     } catch (error) {
       console.error('Error fetching project details:', error);
       setError('Failed to load project details');
@@ -123,14 +345,213 @@ const ProjectDetails = ({ user }) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
-  const formatStatus = (status) => {
-    if (!status) return 'to-do';
-    return status.toLowerCase().replace(/_/g, '-');
+  // Substages are now included in the phases data from /api/projects/{id}/details
+  // Initialize substages and completionStatus state from phases when they load
+  useEffect(() => {
+    if (phases.length > 0) {
+      const substagesMap = {};
+      const completionStatusMap = {};
+      phases.forEach(phase => {
+        substagesMap[phase.id] = phase.substages || [];
+        completionStatusMap[phase.id] = phase.completionStatus || { total: 0, completed: 0, percentage: 0, allComplete: false };
+      });
+      setSubstages(substagesMap);
+      setCompletionStatus(completionStatusMap);
+    }
+  }, [phases]);
+
+  const fetchAttachments = async () => {
+    try {
+      const response = await fetch(`/api/projects/${id}/attachments`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        setAttachments(data);
+      }
+    } catch (err) {
+      console.error("Failed to fetch attachments", err);
+    }
   };
 
-  const formatPriority = (priority) => {
-    if (!priority) return 'medium';
-    return priority.toLowerCase();
+  useEffect(() => {
+    if (activeTab === 'drawings' && id) {
+      fetchAttachments();
+    }
+  }, [activeTab, id]);
+
+  const handleDrawingsFileUpload = async (files) => {
+    if (!files || files.length === 0) return;
+
+    // Upload each file
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i];
+      const formData = new FormData();
+      formData.append('file', file);
+
+      try {
+        const response = await fetch(`/api/projects/${id}/attachments`, {
+          method: 'POST',
+          credentials: 'include',
+          body: formData
+        });
+
+        if (!response.ok) {
+          console.error("Upload failed for " + file.name);
+          alert("Upload failed for " + file.name);
+        }
+      } catch (err) {
+        console.error("Upload error", err);
+      }
+    }
+    // Refresh list
+    fetchAttachments();
+  };
+
+  const handleDownloadAttachment = async (attachmentId) => {
+    try {
+      const response = await fetch(`/api/projects/${id}/attachments/${attachmentId}/sign-url`, {
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.url) {
+          window.open(data.url, '_blank');
+        } else {
+          alert("Download URL not found");
+        }
+      } else {
+        alert("Failed to get download URL");
+      }
+    } catch (err) {
+      console.error("Download failed", err);
+    }
+  };
+
+  const handleProjectDeleteAttachment = async (attachmentId) => {
+    if (!window.confirm("Are you sure you want to delete this file?")) return;
+    try {
+      const response = await fetch(`/api/projects/${id}/attachments/${attachmentId}`, {
+        method: 'DELETE',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        setAttachments(prev => prev.filter(a => a.id !== attachmentId));
+      } else {
+        alert("Failed to delete file");
+      }
+    } catch (err) {
+      console.error("Delete failed", err);
+    }
+  };
+
+  // Deliverables Tab Functions
+  // Note: fetchPhaseSubstages removed - substages are now included in project details response
+
+  const createDefaultSubstages = async (phaseId) => {
+    try {
+      const response = await fetch(`/api/phases/${phaseId}/substages/create-defaults`, {
+        method: 'POST',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Use the substages returned from the create-defaults response
+          setSubstages(prev => ({ ...prev, [phaseId]: data.substages || [] }));
+          setCompletionStatus(prev => ({ ...prev, [phaseId]: data.completionStatus }));
+        }
+      }
+    } catch (err) {
+      console.error('Error creating substages:', err);
+    }
+  };
+
+  const toggleSubstageComplete = async (phaseId, substageId, isComplete) => {
+    try {
+      const endpoint = isComplete ? 'incomplete' : 'complete';
+      const response = await fetch(`/api/phases/${phaseId}/substages/${substageId}/${endpoint}`, {
+        method: 'PUT',
+        credentials: 'include'
+      });
+      if (response.ok) {
+        const data = await response.json();
+        if (data.success) {
+          // Normalize the substage response to use 'completed' field (API returns 'isCompleted')
+          const normalizedSubstage = {
+            ...data.substage,
+            completed: data.substage.isCompleted || data.substage.completed
+          };
+          setSubstages(prev => ({
+            ...prev,
+            [phaseId]: prev[phaseId].map(s =>
+              s.id === substageId ? normalizedSubstage : s
+            )
+          }));
+          setCompletionStatus(prev => ({ ...prev, [phaseId]: data.completionStatus }));
+        }
+      }
+    } catch (err) {
+      console.error('Error toggling substage:', err);
+    }
+  };
+
+  const togglePhaseExpand = (phaseId) => {
+    setExpandedPhase(expandedPhase === phaseId ? null : phaseId);
+  };
+
+  const toggleSubstageAttachments = (substageId) => {
+    setExpandedSubstageAttachments(prev => ({
+      ...prev,
+      [substageId]: !prev[substageId]
+    }));
+  };
+
+  const handleFileUpload = (substageId) => {
+    // This will mock the click of a hidden file input or just alert for now
+    const fileInput = document.getElementById(`file-upload-${substageId}`);
+    if (fileInput) fileInput.click();
+  };
+
+  const onFileSelected = async (e, phaseId, substageId) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // UI Only implementation for now
+    console.log(`Uploading file ${file.name} to substage ${substageId}`);
+
+    // Simulate optimistic update
+    const newAttachment = {
+      id: Date.now(),
+      name: file.name,
+      type: file.name.split('.').pop(),
+      size: file.size,
+      url: URL.createObjectURL(file), // Temporary local URL
+      uploadedBy: user?.name || 'You',
+      createdAt: new Date().toISOString()
+    };
+
+    setSubstages(prev => ({
+      ...prev,
+      [phaseId]: prev[phaseId].map(s =>
+        s.id === substageId
+          ? { ...s, attachments: [...(s.attachments || []), newAttachment] }
+          : s
+      )
+    }));
+  };
+
+  const handleDeleteAttachment = (phaseId, substageId, attachmentId) => {
+    if (window.confirm('Are you sure you want to remove this attachment?')) {
+      setSubstages(prev => ({
+        ...prev,
+        [phaseId]: prev[phaseId].map(s =>
+          s.id === substageId
+            ? { ...s, attachments: (s.attachments || []).filter(a => a.id !== attachmentId) }
+            : s
+        )
+      }));
+    }
   };
 
   const getStatusClass = (status) => {
@@ -270,130 +691,315 @@ const ProjectDetails = ({ user }) => {
     done: tasks.filter(t => t.status === 'DONE').length
   };
 
-  // Mock Financial Data (Replace with real data from backend later)
-  const mockFinancials = {
-    contractAmount: project.budget || 5000000, // Default 50L if no budget
-    billedAmount: project.actualCost || 1500000, // Default 15L if no cost
-    receivedAmount: 1200000
+  // Group tasks for Asana view
+  const todoTasks = tasks.filter(t => !t.status || t.status === 'TO_DO');
+  const doingTasks = tasks.filter(t => t.status === 'IN_PROGRESS' || t.status === 'IN_REVIEW');
+  const doneTasks = tasks.filter(t => t.status === 'DONE');
+
+  const handleTaskUpdate = async (taskId, updates) => {
+    // 1. Optimistic Update
+    const previousTasks = [...tasks];
+    const updatedTasks = tasks.map(t =>
+      t.id === taskId ? { ...t, ...updates } : t
+    );
+    setTasks(updatedTasks);
+
+    try {
+      // 2. Prepare API Payload
+      const apiPayload = { ...updates };
+
+      // Transform assignee object to assigneeId for backend
+      if (updates.assignee) {
+        apiPayload.assigneeId = updates.assignee.id;
+        delete apiPayload.assignee;
+      } else if (updates.assignee === null) {
+        apiPayload.assigneeId = null;
+      }
+
+      // Transform phase object to phaseId if present (though usually we pass phaseId directly)
+      if (updates.phase) {
+        apiPayload.phaseId = updates.phase.id;
+        delete apiPayload.phase;
+      }
+
+      // 3. API Call
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiPayload),
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+
+    } catch (error) {
+      // 4. Rollback on Error
+      console.error('Task update failed:', error);
+      setTasks(previousTasks);
+      // Show error toast
+      const toast = document.createElement('div');
+      toast.className = 'toast-error';
+      toast.textContent = 'Failed to update task. Changes reverted.';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
   };
 
+  const handleProjectUpdate = async (updates) => {
+    // 1. Optimistic Update
+    const previousProject = { ...project };
+    setProject(prev => ({ ...prev, ...updates }));
+
+    try {
+      // 2. Prepare API Payload
+      // The project update endpoint expects a DTO, but we can send a partial JSON 
+      // if we use the right endpoint or if the backend supports it.
+      // My backend endpoint POST /api/projects/{id}/update expects @ModelAttribute (form data) usually?
+      // Let's check ProjectController. 
+      // It uses @ModelAttribute ProjectUpdateDto. So it expects form-data or query params, NOT JSON body if it's not @RequestBody.
+      // Wait, I checked ProjectController earlier.
+      // public ResponseEntity<?> updateProject(..., @ModelAttribute("projectUpdateDto") ProjectUpdateDto projectUpdateDto, ...)
+      // So I must send FormData.
+
+      const formData = new FormData();
+      Object.keys(updates).forEach(key => {
+        if (updates[key] !== null && updates[key] !== undefined) {
+          formData.append(key, updates[key]);
+        }
+      });
+
+      const response = await fetch(`/api/projects/${id}/update`, {
+        method: 'POST',
+        body: formData, // fetch automatically sets Content-Type to multipart/form-data
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update project');
+      }
+
+    } catch (error) {
+      // 3. Rollback on Error
+      console.error('Project update failed:', error);
+      setProject(previousProject);
+
+      const toast = document.createElement('div');
+      toast.className = 'toast-error';
+      toast.textContent = 'Failed to update project. Changes reverted.';
+      document.body.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+  };
+
+  const handleAddTask = (status) => {
+    const tempId = `temp-${Date.now()}`;
+    const newTask = {
+      id: tempId,
+      name: '',
+      status: status,
+      assignee: null,
+      dueDate: null,
+      priority: null,
+      isTemp: true
+    };
+    setTasks([...tasks, newTask]);
+  };
+
+  const handleCommitTask = async (tempId, taskData) => {
+    // Remove temp task if empty name
+    if (!taskData.name || !taskData.name.trim()) {
+      setTasks(tasks.filter(t => t.id !== tempId));
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${id}/tasks`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          ...taskData,
+          projectId: id,
+          projectStage: project.projectStage // Pass the project's current stage
+        }),
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        const savedTask = responseData.task || responseData;
+        setTasks(prev => prev.map(t => t.id === tempId ? savedTask : t));
+      } else {
+        throw new Error('Failed to create task');
+      }
+    } catch (error) {
+      console.error('Task creation failed:', error);
+      setTasks(prev => prev.filter(t => t.id !== tempId));
+      alert('Failed to create task.');
+    }
+  };
+
+  // --- Drag and Drop Handlers for Board View ---
+  const handleDragStart = (e, { taskId, columnId, index }) => {
+    dragItem.current = { taskId, columnId, index };
+    dragNode.current = e.target;
+    dragNode.current.addEventListener('dragend', handleDragEnd);
+    setDraggingId(taskId);
+    e.dataTransfer.effectAllowed = 'move';
+    setTimeout(() => {
+      if (dragNode.current) dragNode.current.style.opacity = '0.4';
+    }, 0);
+  };
+
+  const handleDragEnter = async (e, targetColumnId) => {
+    e.preventDefault();
+    if (!dragItem.current || dragItem.current.columnId === targetColumnId) return;
+
+    const currentItem = dragItem.current;
+    const task = tasks.find(t => t.id === currentItem.taskId);
+
+    if (!task) return;
+
+    // Optimistic update
+    setTasks(prev => prev.map(t =>
+      t.id === currentItem.taskId ? { ...t, status: targetColumnId } : t
+    ));
+
+    // Update backend
+    try {
+      await fetch(`/api/tasks/${currentItem.taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: targetColumnId }),
+        credentials: 'include'
+      });
+    } catch (error) {
+      console.error('Failed to update task status:', error);
+      // Revert on error
+      fetchProjectDetails(page);
+    }
+
+    dragItem.current = { ...currentItem, columnId: targetColumnId };
+  };
+
+  const handleDragEnd = () => {
+    setDraggingId(null);
+    if (dragNode.current) {
+      dragNode.current.style.opacity = '1';
+      dragNode.current.removeEventListener('dragend', handleDragEnd);
+    }
+    dragItem.current = null;
+    dragNode.current = null;
+  };
+
+  const handleAddTaskToColumn = async (columnId) => {
+    if (!newTaskContent.trim()) {
+      setNewTaskColumn(null);
+      return;
+    }
+
+    try {
+      const response = await fetch(`/api/projects/${id}/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: newTaskContent,
+          status: columnId,
+          projectId: id
+        }),
+        credentials: 'include'
+      });
+
+      if (response.ok) {
+        const responseData = await response.json();
+        const newTask = responseData.task || responseData;
+        setTasks(prev => [newTask, ...prev]);
+      }
+    } catch (error) {
+      console.error('Failed to create task:', error);
+    }
+
+    setNewTaskContent('');
+    setNewTaskColumn(null);
+  };
+
+  const renderAsanaTaskRow = (task, gridColumns) => (
+    <AsanaTaskRow
+      key={task.id}
+      task={task}
+      teamMembers={teamMembers}
+      onUpdate={handleTaskUpdate}
+      onCommit={handleCommitTask}
+      onOpenDetails={() => setSelectedTaskForPanel(task)}
+      gridTemplateColumns={gridColumns}
+    />
+  );
+
+
+
   return (
-    <div className="main-content project-details-page fade-in">
-      {/* Back Navigation */}
-      <div className="project-details-nav">
-        <Link to="/projects" className="back-link-modern">
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <line x1="19" y1="12" x2="5" y2="12"></line>
-            <polyline points="12 19 5 12 12 5"></polyline>
-          </svg>
-          Back to Projects
-        </Link>
-      </div>
-
-      {/* Hero Section */}
-      <div className="project-hero-section">
-        <div className="project-hero-header">
-          <div className="project-hero-title-section">
-            <div style={{ width: '100%' }}>
-              <div className="project-hero-main-row" style={{ alignItems: 'center', gap: '1rem' }}>
-                {project.projectNumber && (
-                  <span className="project-hero-number" style={{
-                    backgroundColor: '#f1f5f9',
-                    padding: '0.35rem 0.75rem',
-                    borderRadius: '8px',
-                    color: '#64748b',
-                    fontWeight: 600,
-                    fontSize: '0.9rem',
-                    fontFamily: 'inherit'
-                  }}>
-                    #{project.projectNumber}
-                  </span>
-                )}
-
-                {project.projectNumber && <span style={{ color: '#cbd5e1', fontSize: '1.25rem', fontWeight: 300 }}>|</span>}
-
-                <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <span className={`project-hero-status-dot ${project.status === 'ACTIVE' ? 'status-dot-green' :
-                      project.status === 'ON_HOLD' ? 'status-dot-grey' :
-                        project.status === 'AT_RISK' ? 'status-dot-red' : 'status-dot-grey'
-                      }`} style={{ width: '12px', height: '12px' }}></span>
-                    <span style={{
-                      fontSize: '0.9rem',
-                      fontWeight: 700,
-                      color: '#1e293b',
-                      textTransform: 'uppercase',
-                      letterSpacing: '0.025em'
-                    }}>
-                      {project.projectStage?.replace(/_/g, ' ') || 'PRELIM'}
-                    </span>
-                  </div>
-
-                  <h1 className="project-hero-title" style={{
-                    margin: 0,
-                    fontSize: '1.75rem',
-                    fontWeight: 800,
-                    color: '#6366f1',
-                    lineHeight: 1.2
-                  }}>
-                    {project.name}
-                  </h1>
-                </div>
-              </div>
-
-              <div className="project-hero-badges">
-                {/* Removed old badges as they are replaced by the new header design */}
-              </div>
+    <div className="project-details-page fade-in">
+      <div className="project-header-modern">
+        <div className="project-header-top">
+          <div className="project-header-left">
+            <div className="project-icon-square">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
+                <line x1="3" y1="9" x2="21" y2="9"></line>
+                <line x1="9" y1="21" x2="9" y2="9"></line>
+              </svg>
             </div>
-            <div className="project-hero-meta">
-              {project.clientName && (
-                <div className="project-hero-meta-item">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                    <circle cx="12" cy="7" r="4"></circle>
-                  </svg>
-                  <span>{project.clientName}</span>
-                </div>
-              )}
-              {project.location && (
-                <div className="project-hero-meta-item">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
-                    <circle cx="12" cy="10" r="3"></circle>
-                  </svg>
-                  <span>{project.location}</span>
-                </div>
-              )}
+            <div className="project-title-wrapper">
+              <h1 className="project-title-modern">{project.name}</h1>
+              <div className="project-status-pill" style={{ cursor: 'pointer', position: 'relative' }} onClick={() => setIsHeaderDropdownOpen(!isHeaderDropdownOpen)}>
+                <span className={`status-dot ${project.status === 'ACTIVE' ? 'active' : project.status === 'ON_HOLD' ? 'on-hold' : 'at-risk'}`}></span>
+                {project.status?.replace(/_/g, ' ') || 'Active'}
+                <ChevronDown size={14} style={{ marginLeft: '6px', opacity: 0.7 }} />
+
+                {isHeaderDropdownOpen && (
+                  <div className="asana-dropdown-menu" style={{ top: '100%', left: 0, marginTop: '8px', width: '160px' }}>
+                    {PROJECT_STATUSES.map(status => (
+                      <div
+                        key={status.value}
+                        className="asana-dropdown-item"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleProjectUpdate({ status: status.value });
+                          setIsHeaderDropdownOpen(false);
+                        }}
+                      >
+                        <span className={`status-dot ${status.value === 'ACTIVE' ? 'active' : status.value === 'ON_HOLD' ? 'on-hold' : 'at-risk'}`}></span>
+                        {status.label}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
-          <div className="project-hero-actions">
-            <Link
-              to={`/projects/${id}/tasks/new`}
-              className="btn-primary-modern"
-              title="Add New Task"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <line x1="12" y1="5" x2="12" y2="19"></line>
-                <line x1="5" y1="12" x2="19" y2="12"></line>
-              </svg>
-              Add Task
-            </Link>
+          <div className="header-actions">
+            <div className="header-avatars">
+              {/* Placeholder for avatars if needed, or just keep actions */}
+            </div>
             {isAdmin && (
               <>
-                <Link to={`/projects/${id}/edit`} className="btn-icon-modern" title="Edit project">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <Link to={`/projects/${id}/edit`} className="btn-customize" title="Edit project">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
                     <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
                   </svg>
                 </Link>
                 <button
                   onClick={handleDeleteProject}
-                  className="btn-icon-modern btn-icon-danger"
+                  className="btn-customize"
+                  style={{ color: '#ef4444', borderColor: '#ef4444' }}
                   disabled={totalTasks > 0}
-                  title={totalTasks > 0 ? `Cannot delete project with ${totalTasks} task${totalTasks > 1 ? 's' : ''}. Delete or reassign tasks first.` : "Delete this project permanently"}
+                  title={totalTasks > 0 ? `Cannot delete project with ${totalTasks} task${totalTasks > 1 ? 's' : ''}` : "Delete project"}
                 >
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                     <polyline points="3 6 5 6 21 6"></polyline>
                     <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
                   </svg>
@@ -403,275 +1009,62 @@ const ProjectDetails = ({ user }) => {
           </div>
         </div>
 
-
-      </div>
-
-      {/* Project Details Modal */}
-      {showDetailsModal && (
-        <div className="modal-overlay" onClick={() => setShowDetailsModal(false)}>
-          <div className="project-details-modal" onClick={(e) => e.stopPropagation()}>
-            <div className="project-details-modal-header">
-              <div className="project-details-modal-header-content">
-                <div className="project-details-modal-icon">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14,2 14,8 20,8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10,9 9,9 8,9"></polyline>
-                  </svg>
-                </div>
-                <div>
-                  <h2 className="project-details-modal-title">Project Details</h2>
-                  <p className="project-details-modal-subtitle">{project.name}</p>
-                </div>
-              </div>
-              <button className="modal-close-button" onClick={() => setShowDetailsModal(false)}>
-                <i className="fas fa-times"></i>
-              </button>
-            </div>
-            <div className="project-details-modal-body">
-              <div className="project-details-info-grid">
-                <div className="project-details-info-section">
-                  <h3 className="project-details-section-title">Basic Information</h3>
-                  <div className="project-details-info-list">
-                    <div className="project-details-info-item">
-                      <span className="project-details-info-label">Status</span>
-                      <span className={`badge badge-project-status ${formatStatus(project.status)}`}>
-                        {project.status?.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="project-details-info-item">
-                      <span className="project-details-info-label">Priority</span>
-                      <span className={`badge badge-priority ${formatPriority(project.priority)}`}>
-                        {project.priority?.replace('_', ' ')}
-                      </span>
-                    </div>
-                    <div className="project-details-info-item">
-                      <span className="project-details-info-label">Stage</span>
-                      <span className={`stage-${project.projectStage?.toLowerCase().replace(/_/g, '-')}`}>
-                        {project.projectStage?.displayName || project.projectStage?.replace(/_/g, ' ')}
-                      </span>
-                    </div>
-                    <div className="project-details-info-item">
-                      <span className="project-details-info-label">Client</span>
-                      <span className="project-details-info-value">{project.clientName || 'N/A'}</span>
-                    </div>
-                    <div className="project-details-info-item">
-                      <span className="project-details-info-label">Location</span>
-                      <span className="project-details-info-value">{project.location || 'N/A'}</span>
-                    </div>
-                    {project.projectCategory && (
-                      <div className="project-details-info-item">
-                        <span className="project-details-info-label">Category</span>
-                        <span className="project-details-info-value">{project.projectCategory.replace('_', ' ')}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                <div className="project-details-info-section">
-                  <h3 className="project-details-section-title">Dates & Timeline</h3>
-                  <div className="project-details-info-list">
-                    <div className="project-details-info-item">
-                      <span className="project-details-info-label">Start Date</span>
-                      <span className="project-details-info-value">
-                        {project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', {
-                          month: 'long',
-                          day: 'numeric',
-                          year: 'numeric'
-                        }) : 'N/A'}
-                      </span>
-                    </div>
-                    {project.estimatedEndDate && (
-                      <div className="project-details-info-item">
-                        <span className="project-details-info-label">Estimated End Date</span>
-                        <span className="project-details-info-value">
-                          {new Date(project.estimatedEndDate).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    )}
-                    {project.createdAt && (
-                      <div className="project-details-info-item">
-                        <span className="project-details-info-label">Created</span>
-                        <span className="project-details-info-value">
-                          {new Date(project.createdAt).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    )}
-                    {project.updatedAt && (
-                      <div className="project-details-info-item">
-                        <span className="project-details-info-label">Last Updated</span>
-                        <span className="project-details-info-value">
-                          {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          })}
-                        </span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-
-                {isAdmin && (project.budget || project.actualCost) && (
-                  <div className="project-details-info-section">
-                    <h3 className="project-details-section-title">Financial Information</h3>
-                    <div className="project-details-info-list">
-                      {project.budget && (
-                        <div className="project-details-info-item">
-                          <span className="project-details-info-label">Budget</span>
-                          <span className="project-details-info-value budget-value">
-                            ₹{project.budget.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      )}
-                      {project.actualCost && (
-                        <div className="project-details-info-item">
-                          <span className="project-details-info-label">Actual Cost</span>
-                          <span className="project-details-info-value cost-value">
-                            ₹{project.actualCost.toLocaleString('en-IN')}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {project.description && (
-                  <div className="project-details-info-section full-width">
-                    <h3 className="project-details-section-title">Description</h3>
-                    <p className="project-details-description">{project.description}</p>
-                  </div>
-                )}
-              </div>
-            </div>
-            <div className="project-details-modal-footer">
-              <button
-                onClick={() => setShowDetailsModal(false)}
-                className="btn-outline-modern"
-              >
-                Close
-              </button>
-              {isAdmin && (
-                <Link
-                  to={`/projects/${id}/edit`}
-                  className="btn-primary-modern"
-                  onClick={() => setShowDetailsModal(false)}
-                >
-                  <i className="fas fa-edit"></i> Edit Project
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Tabs Navigation */}
-      <div className="project-tabs-container">
-        <div className="project-tabs">
+        <div className="project-tabs-modern">
           <button
-            className={`project-tab ${activeTab === 'overview' ? 'active' : ''}`}
+            className={`project-tab-modern ${activeTab === 'overview' ? 'active' : ''}`}
             onClick={() => setActiveTab('overview')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <rect x="3" y="3" width="7" height="7"></rect>
-              <rect x="14" y="3" width="7" height="7"></rect>
-              <rect x="14" y="14" width="7" height="7"></rect>
-              <rect x="3" y="14" width="7" height="7"></rect>
-            </svg>
+            <Layout size={16} />
             Overview
           </button>
-
           <button
-            className={`project-tab ${activeTab === 'contacts' ? 'active' : ''}`}
-            onClick={() => setActiveTab('contacts')}
+            className={`project-tab-modern ${activeTab === 'deliverables' ? 'active' : ''}`}
+            onClick={() => setActiveTab('deliverables')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-              <circle cx="12" cy="7" r="4"></circle>
-            </svg>
-            Client Contacts
+            <ClipboardCheck size={16} />
+            Deliverables
           </button>
-
           <button
-            className={`project-tab ${activeTab === 'team' ? 'active' : ''}`}
-            onClick={() => setActiveTab('team')}
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-              <circle cx="9" cy="7" r="4"></circle>
-              <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-              <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-            </svg>
-            Team
-          </button>
-
-          <button
-            className={`project-tab ${activeTab === 'tasks' ? 'active' : ''}`}
+            className={`project-tab-modern ${activeTab === 'tasks' ? 'active' : ''}`}
             onClick={() => setActiveTab('tasks')}
           >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-              <polyline points="14 2 14 8 20 8"></polyline>
-              <line x1="16" y1="13" x2="8" y2="13"></line>
-              <line x1="16" y1="17" x2="8" y2="17"></line>
-            </svg>
-            Tasks ({totalTasks})
+            <ListTodo size={16} />
+            List
+          </button>
+          <button
+            className={`project-tab-modern ${activeTab === 'board' ? 'active' : ''}`}
+            onClick={() => setActiveTab('board')}
+          >
+            <Kanban size={16} />
+            Board
           </button>
 
-          {(isAdmin || isManager()) && (
-            <button
-              className={`project-tab ${activeTab === 'resources' ? 'active' : ''}`}
-              onClick={() => setActiveTab('resources')}
-            >
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect>
-                <line x1="9" y1="3" x2="9" y2="21"></line>
-                <line x1="3" y1="9" x2="21" y2="9"></line>
-              </svg>
-              Resource Planning
-            </button>
-          )}
-
-          {(isAdmin || isManager()) && (
-            <>
-              <button
-                className={`project-tab ${activeTab === 'invoices' ? 'active' : ''}`}
-                onClick={() => setActiveTab('invoices')}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                  <polyline points="14 2 14 8 20 8"></polyline>
-                  <line x1="16" y1="13" x2="8" y2="13"></line>
-                  <line x1="16" y1="17" x2="8" y2="17"></line>
-                </svg>
-                Invoices
-              </button>
-              <button
-                className={`project-tab ${activeTab === 'financials' ? 'active' : ''}`}
-                onClick={() => setActiveTab('financials')}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                </svg>
-                Financials
-              </button>
-            </>
-          )}
+          <button
+            className={`project-tab-modern ${activeTab === 'drawings' ? 'active' : ''}`}
+            onClick={() => setActiveTab('drawings')}
+          >
+            <File size={16} />
+            Drawings
+          </button>
+          <button
+            className={`project-tab-modern ${activeTab === 'contacts' ? 'active' : ''}`}
+            onClick={() => setActiveTab('contacts')}
+          >
+            <Contact size={16} />
+            Client Contacts
+          </button>
+          <button
+            className={`project-tab-modern ${activeTab === 'team' ? 'active' : ''}`}
+            onClick={() => setActiveTab('team')}
+          >
+            <Users size={16} />
+            Team
+          </button>
         </div>
       </div>
 
       {/* Tab Content */}
-      <div className="project-tab-content" style={{ position: 'relative', minHeight: '200px' }}>
+      <div className="project-content-area">
         {loading && (
           <div style={{
             position: 'absolute',
@@ -693,311 +1086,291 @@ const ProjectDetails = ({ user }) => {
 
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <>
-            <div className="project-overview-grid">
-              <div className="project-overview-card">
-                <div className="project-overview-card-header">
-                  <h3 className="project-overview-card-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-                    </svg>
-                    Project Lifecycle
-                  </h3>
-                </div>
-                <div className="project-overview-card-body">
-                  <ProjectLifecycleChevron currentStage={project.projectStage} horizontal={false} />
-                </div>
+          <div className="project-overview-tab">
+            <div className="overview-main-section">
+              <div className="overview-section-header">
+                <h3>Description</h3>
               </div>
-              <div className="project-overview-card">
-                <div className="project-overview-card-header">
-                  <h3 className="project-overview-card-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                      <polyline points="14,2 14,8 20,8"></polyline>
-                      <line x1="16" y1="13" x2="8" y2="13"></line>
-                      <line x1="16" y1="17" x2="8" y2="17"></line>
-                      <polyline points="10,9 9,9 8,9"></polyline>
-                    </svg>
-                    Project Details
-                  </h3>
-                </div>
-                <div className="project-overview-card-body">
-                  <div className="project-details-overview">
-                    <div className="project-details-overview-section">
-                      <div className="project-details-overview-item">
-                        <span className="project-details-overview-label">Status</span>
-                        <span className={`badge badge-project-status ${formatStatus(project.status)}`}>
-                          {project.status?.replace('_', ' ')}
-                        </span>
-                      </div>
-                      <div className="project-details-overview-item">
-                        <span className="project-details-overview-label">Priority</span>
-                        <span className={`badge badge-priority ${formatPriority(project.priority)}`}>
-                          {project.priority?.replace('_', ' ')}
-                        </span>
-                      </div>
-                      {project.projectCategory && (
-                        <div className="project-details-overview-item">
-                          <span className="project-details-overview-label">Category</span>
-                          <span className="project-details-overview-value">{project.projectCategory.replace('_', ' ')}</span>
-                        </div>
-                      )}
-                    </div>
-                    <div className="project-details-overview-section">
-                      <div className="project-details-overview-item">
-                        <span className="project-details-overview-label">Start Date</span>
-                        <span className="project-details-overview-value">
-                          {project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', {
-                            month: 'long',
-                            day: 'numeric',
-                            year: 'numeric'
-                          }) : 'N/A'}
-                        </span>
-                      </div>
-                      {project.estimatedEndDate && (
-                        <div className="project-details-overview-item">
-                          <span className="project-details-overview-label">Estimated End Date</span>
-                          <span className="project-details-overview-value">
-                            {new Date(project.estimatedEndDate).toLocaleDateString('en-US', {
-                              month: 'long',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </span>
-                        </div>
-                      )}
-                      {project.createdAt && (
-                        <div className="project-details-overview-item">
-                          <span className="project-details-overview-label">Created</span>
-                          <span className="project-details-overview-value">
-                            {new Date(project.createdAt).toLocaleDateString('en-US', {
-                              month: 'long',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </span>
-                        </div>
-                      )}
-                      {project.updatedAt && (
-                        <div className="project-details-overview-item">
-                          <span className="project-details-overview-label">Last Updated</span>
-                          <span className="project-details-overview-value">
-                            {new Date(project.updatedAt).toLocaleDateString('en-US', {
-                              month: 'long',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {isAdmin && (project.budget || project.actualCost) && (
-                      <div className="project-details-overview-section">
-                        {project.budget && (
-                          <div className="project-details-overview-item">
-                            <span className="project-details-overview-label">Budget</span>
-                            <span className="project-details-overview-value budget-value">
-                              ₹{project.budget.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        )}
-                        {project.actualCost && (
-                          <div className="project-details-overview-item">
-                            <span className="project-details-overview-label">Actual Cost</span>
-                            <span className="project-details-overview-value cost-value">
-                              ₹{project.actualCost.toLocaleString('en-IN')}
-                            </span>
-                          </div>
-                        )}
-                      </div>
+              <div className="overview-description">
+
+                {isEditingDescription ? (
+                  <textarea
+                    className="form-control"
+                    value={description}
+                    onChange={(e) => setDescription(e.target.value)}
+                    onBlur={() => {
+                      setIsEditingDescription(false);
+                      if (description !== project.description) {
+                        handleProjectUpdate({ description });
+                      }
+                    }}
+                    autoFocus
+                    rows={4}
+                    style={{ width: '100%', resize: 'vertical' }}
+                  />
+                ) : (
+                  <div
+                    onClick={() => {
+                      setDescription(project.description || '');
+                      setIsEditingDescription(true);
+                    }}
+                    style={{ cursor: 'pointer', minHeight: '2rem' }}
+                    title="Click to edit description"
+                  >
+                    {project.description ? (
+                      <p>{project.description}</p>
+                    ) : (
+                      <p className="text-muted">No description provided. Click to add.</p>
                     )}
-                    {project.description && (
-                      <div className="project-details-overview-section full-width">
-                        <div className="project-details-overview-item">
-                          <span className="project-details-overview-label">Description</span>
-                          <p className="project-details-overview-description">{project.description}</p>
-                        </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="overview-section-header" style={{ marginTop: '2rem' }}>
+                <h3>Project Details</h3>
+              </div>
+              <div className="overview-details-grid">
+                <div className="overview-detail-item">
+                  <span className="detail-label">Project Number</span>
+                  <span className="detail-value">{project.projectNumber || 'N/A'}</span>
+                </div>
+                {project.location && (
+                  <div className="overview-detail-item">
+                    <span className="detail-label">Location</span>
+                    <span className="detail-value">{project.location}</span>
+                  </div>
+                )}
+                {project.chargeType && (
+                  <div className="overview-detail-item">
+                    <span className="detail-label">Charge Type</span>
+                    <span className="detail-value">
+                      {PROJECT_CHARGE_TYPES.find(t => t.value === project.chargeType)?.label || project.chargeType}
+                    </span>
+                  </div>
+                )}
+                <div className="overview-detail-item">
+                  <span className="detail-label">Stage</span>
+                  <div style={{ position: 'relative' }}>
+                    <span
+                      className="badge badge-project-stage"
+                      style={{ backgroundColor: '#e0f2fe', color: '#0369a1', cursor: 'pointer' }}
+                      onClick={() => setShowStageSelector(!showStageSelector)}
+                    >
+                      {PROJECT_STAGES.find(s => s.value === project.projectStage)?.label || project.projectStage}
+                    </span>
+                    {showStageSelector && (
+                      <div className="asana-dropdown-menu" style={{ top: '100%', left: 0 }}>
+                        {PROJECT_STAGES.map(stage => (
+                          <div
+                            key={stage.value}
+                            className="asana-dropdown-item"
+                            onClick={() => {
+                              handleProjectUpdate({ projectStage: stage.value });
+                              setShowStageSelector(false);
+                            }}
+                          >
+                            {stage.label}
+                          </div>
+                        ))}
                       </div>
                     )}
                   </div>
                 </div>
+                <div className="overview-detail-item">
+                  <span className="detail-label">Status</span>
+                  <div style={{ position: 'relative' }}>
+                    <span
+                      className={`badge badge-project-status ${formatStatus(project.status)}`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setShowOverviewStatusSelector(!showOverviewStatusSelector)}
+                    >
+                      {project.status?.replace('_', ' ')}
+                    </span>
+                    {showOverviewStatusSelector && (
+                      <div className="asana-dropdown-menu" style={{ top: '100%', left: 0 }}>
+                        {PROJECT_STATUSES.map(status => (
+                          <div
+                            key={status.value}
+                            className="asana-dropdown-item"
+                            onClick={() => {
+                              handleProjectUpdate({ status: status.value });
+                              setShowOverviewStatusSelector(false);
+                            }}
+                          >
+                            <span className={`badge badge-project-status ${formatStatus(status.value)}`}>
+                              {status.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <div className="overview-detail-item">
+                  <span className="detail-label">Priority</span>
+                  <div style={{ position: 'relative' }}>
+                    <span
+                      className={`badge badge-priority ${formatPriority(project.priority)}`}
+                      style={{ cursor: 'pointer' }}
+                      onClick={() => setShowPrioritySelector(!showPrioritySelector)}
+                    >
+                      {project.priority?.replace('_', ' ')}
+                    </span>
+                    {showPrioritySelector && (
+                      <div className="asana-dropdown-menu" style={{ top: '100%', left: 0 }}>
+                        {PROJECT_PRIORITIES.map(p => (
+                          <div
+                            key={p.value}
+                            className="asana-dropdown-item"
+                            onClick={() => {
+                              handleProjectUpdate({ priority: p.value });
+                              setShowPrioritySelector(false);
+                            }}
+                          >
+                            <span className={`badge badge-priority ${formatPriority(p.value)}`}>
+                              {p.label}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+                {project.projectCategory && (
+                  <div className="overview-detail-item">
+                    <span className="detail-label">Category</span>
+                    <span className="detail-value">{project.projectCategory.replace('_', ' ')}</span>
+                  </div>
+                )}
+                <div className="overview-detail-item">
+                  <span className="detail-label">Start Date</span>
+                  <span className="detail-value">
+                    {project.startDate ? new Date(project.startDate).toLocaleDateString('en-US', {
+                      month: 'long',
+                      day: 'numeric',
+                      year: 'numeric'
+                    }) : 'N/A'}
+                  </span>
+                </div>
+                {project.estimatedEndDate && (
+                  <div className="overview-detail-item">
+                    <span className="detail-label">Estimated End Date</span>
+                    <span className="detail-value">
+                      {new Date(project.estimatedEndDate).toLocaleDateString('en-US', {
+                        month: 'long',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
-          </>
+
+            <div className="overview-sidebar-section">
+              <div className="overview-section-header">
+                <h3>Meta Data</h3>
+              </div>
+              <div className="overview-meta-list">
+                <div className="meta-item">
+                  <span className="meta-label">Created on</span>
+                  <span className="meta-value">
+                    {project.createdAt ? new Date(project.createdAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    }) : 'N/A'}
+                  </span>
+                </div>
+                <div className="meta-item">
+                  <span className="meta-label">Last Updated</span>
+                  <span className="meta-value">
+                    {project.updatedAt ? new Date(project.updatedAt).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric'
+                    }) : 'N/A'}
+                  </span>
+                </div>
+                {isAdmin && (project.budget || project.actualCost) && (
+                  <>
+                    <div className="sidebar-divider"></div>
+                    {project.budget && (
+                      <div className="meta-item">
+                        <span className="meta-label">Budget</span>
+                        <span className="meta-value budget-value">
+                          ₹{project.budget.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
+                    {project.actualCost && (
+                      <div className="meta-item">
+                        <span className="meta-label">Actual Cost</span>
+                        <span className="meta-value cost-value">
+                          ₹{project.actualCost.toLocaleString('en-IN')}
+                        </span>
+                      </div>
+                    )}
+                  </>
+                )}
+              </div>
+            </div>
+          </div>
         )}
 
         {/* Tasks Tab */}
         {activeTab === 'tasks' && (
           <div className="project-tasks-tab">
-            <div className="tab-header-standard" style={{ padding: '1.5rem', paddingBottom: '1rem', borderBottom: '1px solid #e5e7eb' }}>
-              <div className="project-tasks-header-content">
-                <h2 className="tab-header-title">Project Tasks</h2>
-                <Link to={`/projects/${id}/tasks/new`} className="btn-icon-modern" title="Add New Task">
-                  <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <line x1="12" y1="5" x2="12" y2="19"></line>
-                    <line x1="5" y1="12" x2="19" y2="12"></line>
-                  </svg>
-                </Link>
-              </div>
-            </div>
 
-            {/* Task Statistics */}
-            <div className="project-stats-grid" style={{ padding: '1.5rem' }}>
-              <div className="project-stat-card">
-                <div className="stat-icon stat-icon-tasks">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                </div>
-                <div className="stat-content">
-                  <div className="stat-value">{taskStats.total}</div>
-                  <div className="stat-label">Total Tasks</div>
-                </div>
-              </div>
-              <div className="project-stat-card">
-                <div className="stat-icon stat-icon-progress">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <circle cx="12" cy="12" r="10"></circle>
-                    <polyline points="12 6 12 12 16 14"></polyline>
-                  </svg>
-                </div>
-                <div className="stat-content">
-                  <div className="stat-value">{taskStats.inProgress}</div>
-                  <div className="stat-label">In Progress</div>
-                </div>
-              </div>
-              <div className="project-stat-card">
-                <div className="stat-icon stat-icon-review">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <path d="M14 2v6h6"></path>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                    <polyline points="10 9 9 9 8 9"></polyline>
-                  </svg>
-                </div>
-                <div className="stat-content">
-                  <div className="stat-value">{taskStats.inReview}</div>
-                  <div className="stat-label">In Review</div>
-                </div>
-              </div>
-              <div className="project-stat-card">
-                <div className="stat-icon stat-icon-done">
-                  <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"></path>
-                    <polyline points="22 4 12 14.01 9 11.01"></polyline>
-                  </svg>
-                </div>
-                <div className="stat-content">
-                  <div className="stat-value">{taskStats.done}</div>
-                  <div className="stat-label">Completed</div>
-                </div>
-              </div>
-            </div>
 
-            {isTaskListEmpty ? (
-              <div className="project-empty-state">
-                <div className="empty-state-icon">
-                  <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
-                    <polyline points="14 2 14 8 20 8"></polyline>
-                    <line x1="16" y1="13" x2="8" y2="13"></line>
-                    <line x1="16" y1="17" x2="8" y2="17"></line>
-                  </svg>
+            <div className="asana-task-list" style={{ '--grid-columns': gridTemplateColumns }}>
+              <div className="asana-list-header" style={{ gridTemplateColumns }}>
+                <div className="header-cell">
+                  Name
+                  <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'name')} />
                 </div>
-                <h3 className="empty-state-title">No tasks yet</h3>
-                <p className="empty-state-description">This project doesn't have any tasks. Create the first task to get started.</p>
+                <div className="header-cell">
+                  Assignee
+                  <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'assignee')} />
+                </div>
+                <div className="header-cell">
+                  Due date
+                  <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'dueDate')} />
+                </div>
+                <div className="header-cell">
+                  Priority
+                  <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'priority')} />
+                </div>
+                <div className="header-cell">
+                  Status
+                  <div className="resize-handle" onMouseDown={(e) => handleResizeStart(e, 'status')} />
+                </div>
+                <div className="header-cell"></div>
               </div>
-            ) : (
-              <div className="project-tasks-list">
-                {tasks.map(task => (
-                  <Link
-                    key={task.id}
-                    to={`/tasks/${task.id}/details`}
-                    className="project-task-list-item"
-                  >
-                    <div className="project-task-list-main">
-                      <div className="project-task-list-title-section">
-                        <h3 className="project-task-list-title">{task.name}</h3>
-                        <div className="project-task-list-badges">
-                          <span className={`badge badge-status ${getStatusClass(task.status)}`}>
-                            {task.status?.replace(/_/g, ' ')}
-                          </span>
-                          {task.priority && (
-                            <span className={`badge badge-priority ${getPriorityClass(task.priority)}`}>
-                              {task.priority.replace(/_/g, ' ')}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-                      <div className="project-task-list-meta">
-                        {task.assignee && (
-                          <div className="project-task-list-meta-item">
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                              <circle cx="12" cy="7" r="4"></circle>
-                            </svg>
-                            <span>{task.assignee.name || task.assignee.username}</span>
-                          </div>
-                        )}
-                        {task.dueDate && (
-                          <div className={`project-task-list-meta-item ${new Date(task.dueDate) < new Date() ? 'overdue' : ''}`}>
-                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                              <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
-                              <line x1="16" y1="2" x2="16" y2="6"></line>
-                              <line x1="8" y1="2" x2="8" y2="6"></line>
-                              <line x1="3" y1="10" x2="21" y2="10"></line>
-                            </svg>
-                            <span>{new Date(task.dueDate).toLocaleDateString()}</span>
-                            {new Date(task.dueDate) < new Date() && (
-                              <span className="overdue-badge">OVERDUE</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                    <div className="project-task-list-arrow">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="9 18 15 12 9 6"></polyline>
-                      </svg>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-            {showPagination && (
-              <div className="project-pagination">
-                <button
-                  type="button"
-                  className="btn-outline-modern"
-                  onClick={goToPreviousPage}
-                  disabled={!pagination.hasPrevious}
-                >
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="15 18 9 12 15 6"></polyline>
-                  </svg>
-                  Previous
-                </button>
-                <span className="pagination-info">
-                  Page {pagination.currentPage + 1} of {pagination.totalPages}
-                </span>
-                <button
-                  type="button"
-                  className="btn-outline-modern"
-                  onClick={goToNextPage}
-                  disabled={!pagination.hasNext}
-                >
-                  Next
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                    <polyline points="9 18 15 12 9 6"></polyline>
-                  </svg>
-                </button>
-              </div>
-            )}
+
+              <AsanaSection
+                title="To do"
+                tasks={todoTasks}
+                renderRow={(task) => renderAsanaTaskRow(task, gridTemplateColumns)}
+                onAddTask={() => handleAddTask('TO_DO')}
+                gridTemplateColumns={gridTemplateColumns}
+              />
+              <AsanaSection
+                title="Doing"
+                tasks={doingTasks}
+                renderRow={(task) => renderAsanaTaskRow(task, gridTemplateColumns)}
+                onAddTask={() => handleAddTask('IN_PROGRESS')}
+                gridTemplateColumns={gridTemplateColumns}
+              />
+              <AsanaSection
+                title="Done"
+                tasks={doneTasks}
+                defaultExpanded={false}
+                renderRow={(task) => renderAsanaTaskRow(task, gridTemplateColumns)}
+                onAddTask={() => handleAddTask('DONE')}
+                gridTemplateColumns={gridTemplateColumns}
+              />
+            </div>
           </div>
         )}
 
@@ -1005,95 +1378,468 @@ const ProjectDetails = ({ user }) => {
 
         {/* Team Tab */}
         {activeTab === 'team' && (
-          <div className="project-team-tab">
-            <div className="project-team-grid">
-              <div className="project-team-card">
-                <div className="project-team-card-header">
-                  <h3 className="project-team-card-title">
-                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                      <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
-                      <circle cx="9" cy="7" r="4"></circle>
-                      <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
-                      <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
-                    </svg>
-                    Team Roster
-                  </h3>
-                </div>
-                <div className="project-team-card-body">
-                  <TeamRoster tasks={tasks} project={project} />
-                </div>
-              </div>
-            </div>
+          <div className="project-team-tab" style={{ height: '100%' }}>
+            <TeamRoster tasks={tasks} project={project} />
           </div>
         )}
 
         {/* Client Contacts Tab */}
         {activeTab === 'contacts' && (
-          <div className="project-contacts-tab">
-            <div className="project-contacts-grid">
-              <div className="project-contacts-column">
-                <div className="project-team-card">
-                  <div className="project-team-card-header">
-                    <h3 className="project-team-card-title">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
-                        <circle cx="12" cy="7" r="4"></circle>
-                      </svg>
-                      Client Contacts
-                    </h3>
-                  </div>
-                  <div className="project-team-card-body">
-                    <ClientContacts clientId={project.clientId} />
-                  </div>
-                </div>
-              </div>
-              <div className="project-contacts-column">
-                <div className="project-team-card">
-                  <div className="project-team-card-header">
-                    <h3 className="project-team-card-title">
-                      <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                        <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
-                      </svg>
-                      Recent Activity
-                    </h3>
-                  </div>
-                  <div className="project-team-card-body">
-                    <ActivityLog projectId={id} />
-                  </div>
-                </div>
+          <div className="project-contacts-tab" style={{ height: '100%' }}>
+            <ClientContacts
+              clientId={project.clientId}
+              clientName={project.clientName || 'Client'}
+            />
+          </div>
+        )}
+
+        {/* Board Tab */}
+        {activeTab === 'board' && (
+          <div className="project-tasks-tab">
+            <div className="board-view">
+              <div className="board-columns">
+                {[
+                  { id: 'TO_DO', title: 'To Do', status: 'TO_DO' },
+                  { id: 'IN_PROGRESS', title: 'In Progress', status: 'IN_PROGRESS' },
+                  { id: 'IN_REVIEW', title: 'Review', status: 'IN_REVIEW' },
+                  { id: 'DONE', title: 'Done', status: 'DONE' }
+                ].map((column) => {
+                  const columnTasks = tasks.filter(t => (t.status || 'TO_DO') === column.status);
+
+                  return (
+                    <div
+                      key={column.id}
+                      className="board-column"
+                      onDragEnter={(e) => handleDragEnter(e, column.status)}
+                      onDragOver={(e) => e.preventDefault()}
+                    >
+                      <div className="board-column-header">
+                        <h2 className="board-column-title">
+                          {column.title}
+                          <span className="board-column-count">{columnTasks.length}</span>
+                        </h2>
+                        <div className="board-column-actions">
+                          <button onClick={() => setNewTaskColumn(column.id)} className="btn-add-column">
+                            <Plus size={16} />
+                          </button>
+                          <button className="btn-column-menu">
+                            <MoreHorizontal size={16} />
+                          </button>
+                        </div>
+                      </div>
+
+                      <div className="board-column-content">
+                        {columnTasks.map((task, index) => (
+                          <div
+                            key={task.id}
+                            draggable
+                            onDragStart={(e) => handleDragStart(e, { taskId: task.id, columnId: column.status, index })}
+                            onClick={() => setSelectedTask(task)}
+                            className={`board-task-card ${draggingId === task.id ? 'dragging' : ''}`}
+                          >
+                            <div className="task-card-row-1">
+                              <div className="task-check-icon">
+                                <CheckCircle2 size={18} className="text-gray-400" />
+                              </div>
+                              <div className="task-card-name">{task.name}</div>
+                            </div>
+
+                            <div className="task-card-row-2">
+                              <span className={`badge badge-priority ${formatPriority(task.priority)}`}>
+                                {task.priority || 'Medium'}
+                              </span>
+                              <span className={`badge badge-status ${formatStatus(task.status)}`}>
+                                {task.status?.replace(/_/g, ' ') || 'To Do'}
+                              </span>
+                            </div>
+
+                            <div className="task-card-row-3">
+                              {task.assignee && (
+                                <div className="task-assignee-avatar-small" title={task.assignee.name || task.assignee.username}>
+                                  {task.assignee.name ? task.assignee.name.charAt(0).toUpperCase() : 'U'}
+                                </div>
+                              )}
+                              {task.dueDate && (
+                                <div className={`task-due-date-text ${new Date(task.dueDate) < new Date() ? 'overdue' : ''}`}>
+                                  {new Date(task.dueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+
+                        {newTaskColumn === column.id ? (
+                          <div className="new-task-card">
+                            <textarea
+                              autoFocus
+                              className="new-task-input"
+                              placeholder="What needs to be done?"
+                              rows={2}
+                              value={newTaskContent}
+                              onChange={(e) => setNewTaskContent(e.target.value)}
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter' && !e.shiftKey) {
+                                  e.preventDefault();
+                                  handleAddTaskToColumn(column.status);
+                                }
+                                if (e.key === 'Escape') {
+                                  setNewTaskColumn(null);
+                                  setNewTaskContent('');
+                                }
+                              }}
+                            />
+                            <div className="new-task-actions">
+                              <button onClick={() => setNewTaskColumn(null)} className="btn-cancel">Cancel</button>
+                              <button onClick={() => handleAddTaskToColumn(column.status)} className="btn-add">Add</button>
+                            </div>
+                          </div>
+                        ) : (
+                          <button onClick={() => setNewTaskColumn(column.id)} className="btn-add-task">
+                            <Plus size={16} />
+                            <span>Add task</span>
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         )}
 
-        {/* Financials Tab */}
-        {activeTab === 'financials' && (
-          <div className="empty-state-container" style={{ padding: '4rem', textAlign: 'center' }}>
-            <div className="empty-state-icon" style={{ marginBottom: '1.5rem', color: '#94a3b8' }}>
-              <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" />
-              </svg>
+
+        {/* Deliverables Tab - Phase Substages Tracking */}
+        {activeTab === 'deliverables' && (
+          <div style={{ padding: '1rem' }}>
+            {phases.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: '2rem', color: '#64748b' }}>
+                <p>No phases found for this project.</p>
+                <p style={{ fontSize: '0.875rem', marginTop: '0.5rem' }}>
+                  Create phases in the project to track deliverables.
+                </p>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                {phases.map((phase, index) => {
+                  const status = completionStatus[phase.id] || {};
+                  const phaseSubstages = substages[phase.id] || [];
+                  const isExpanded = expandedPhase === phase.id;
+
+                  return (
+                    <div
+                      key={phase.id}
+                      style={{
+                        border: '1px solid #e2e8f0',
+                        borderRadius: '8px',
+                        background: '#fff',
+                        overflow: 'hidden'
+                      }}
+                    >
+                      {/* Phase Header */}
+                      <div
+                        style={{
+                          padding: '0.875rem 1rem',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                          cursor: 'pointer',
+                          background: isExpanded ? '#f8fafc' : '#fff'
+                        }}
+                        onClick={() => togglePhaseExpand(phase.id)}
+                      >
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem' }}>
+                          <svg
+                            width="16" height="16" viewBox="0 0 24 24" fill="none"
+                            stroke="#64748b" strokeWidth="2"
+                            style={{
+                              transform: isExpanded ? 'rotate(90deg)' : 'rotate(0deg)',
+                              transition: 'transform 0.2s ease'
+                            }}
+                          >
+                            <path d="M9 18l6-6-6-6" />
+                          </svg>
+                          <div>
+                            <div style={{ fontWeight: 600, color: '#0f172a', fontSize: '0.9375rem' }}>
+                              {phase.name}
+                            </div>
+                            <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.125rem' }}>
+                              Phase {index + 1}
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Completion Progress */}
+                        {phaseSubstages.length > 0 && (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                            <div style={{
+                              width: '100px',
+                              height: '6px',
+                              background: '#e2e8f0',
+                              borderRadius: '3px',
+                              overflow: 'hidden'
+                            }}>
+                              <div style={{
+                                height: '100%',
+                                width: `${status.percentage || 0}%`,
+                                background: status.allComplete ? '#22c55e' : '#546E7A',
+                                transition: 'width 0.3s ease'
+                              }} />
+                            </div>
+                            <span style={{
+                              fontSize: '0.75rem',
+                              color: status.allComplete ? '#22c55e' : '#64748b',
+                              fontWeight: status.allComplete ? '600' : '400'
+                            }}>
+                              {status.completed || 0}/{status.total || 0}
+                            </span>
+                            {status.allComplete && (
+                              <CheckCircle2 size={16} style={{ color: '#22c55e' }} />
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Substages List (Expanded) */}
+                      {isExpanded && (
+                        <div style={{ borderTop: '1px solid #e2e8f0', padding: '1rem' }}>
+                          {phaseSubstages.length === 0 ? (
+                            <div style={{ textAlign: 'center', padding: '1rem' }}>
+                              <p style={{ color: '#64748b', marginBottom: '0.75rem', fontSize: '0.875rem' }}>
+                                No deliverables defined for this stage.
+                              </p>
+                              <button
+                                onClick={(e) => { e.stopPropagation(); createDefaultSubstages(phase.id); }}
+                                style={{
+                                  padding: '0.5rem 1rem',
+                                  background: '#546E7A',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '0.8125rem',
+                                  fontWeight: '500',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Add Default Deliverables
+                              </button>
+                            </div>
+                          ) : (
+                            <div>
+                              <div style={{
+                                fontSize: '0.6875rem',
+                                fontWeight: '600',
+                                color: '#64748b',
+                                marginBottom: '0.625rem',
+                                textTransform: 'uppercase',
+                                letterSpacing: '0.5px'
+                              }}>
+                                Deliverables ({status.completed || 0}/{status.total || 0} Complete)
+                              </div>
+                              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.375rem' }}>
+                                {phaseSubstages.map(substage => (
+                                  <label
+                                    key={substage.id}
+                                    style={{
+                                      display: 'flex',
+                                      alignItems: 'center',
+                                      gap: '0.75rem',
+                                      padding: '0.625rem 0.75rem',
+                                      background: substage.completed ? '#f0fdf4' : '#f8fafc',
+                                      borderRadius: '6px',
+                                      cursor: 'pointer',
+                                      transition: 'background 0.2s ease'
+                                    }}
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={substage.completed || false}
+                                      onChange={() => toggleSubstageComplete(phase.id, substage.id, substage.completed)}
+                                      style={{
+                                        width: '18px',
+                                        height: '18px',
+                                        accentColor: '#546E7A',
+                                        cursor: 'pointer'
+                                      }}
+                                    />
+                                    <span style={{
+                                      flex: 1,
+                                      fontSize: '0.875rem',
+                                      color: substage.completed ? '#64748b' : '#1e293b',
+                                      textDecoration: substage.completed ? 'line-through' : 'none'
+                                    }}>
+                                      {substage.name}
+                                    </span>
+                                    {substage.completed && substage.completedByName && (
+                                      <span style={{ fontSize: '0.75rem', color: '#94a3b8' }}>
+                                        ✓ {substage.completedByName}
+                                      </span>
+                                    )}
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Drawings Tab */}
+        {activeTab === 'drawings' && (
+          <div className="project-drawings-tab" style={{ padding: '2rem' }}>
+
+            {/* Header & Upload Button */}
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1rem' }}>
+              <h3 style={{ fontSize: '1.25rem', fontWeight: 600, color: '#0f172a', margin: 0 }}>Drawings & Documents</h3>
+              <div>
+                <input
+                  type="file"
+                  id="project-file-upload"
+                  multiple
+                  style={{ display: 'none' }}
+                  onChange={(e) => {
+                    const files = e.target.files;
+                    if (files && files.length > 0) {
+                      handleDrawingsFileUpload(files);
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => document.getElementById('project-file-upload').click()}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px',
+                    background: '#546E7A',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    padding: '8px 16px',
+                    fontSize: '0.875rem',
+                    fontWeight: 500,
+                    cursor: 'pointer'
+                  }}
+                >
+                  <FileUp size={16} />
+                  Upload Files
+                </button>
+              </div>
             </div>
-            <h3 className="empty-state-title" style={{ fontSize: '1.5rem', fontWeight: '600', color: '#1e293b', marginBottom: '0.5rem' }}>Coming Soon</h3>
-            <p className="empty-state-description" style={{ color: '#64748b' }}>The Financials module is currently under development.</p>
+
+            {/* File List */}
+            <div className="drawings-list">
+              <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', marginBottom: '1rem' }}>
+                All Drawings {attachments.length > 0 && <span style={{ color: '#94a3b8', fontWeight: 400 }}>({attachments.length})</span>}
+              </h4>
+
+              {attachments.length === 0 ? (
+                <div style={{ textAlign: 'center', padding: '3rem', color: '#94a3b8', background: '#f8fafc', borderRadius: '8px', border: '1px dashed #e2e8f0' }}>
+                  <div style={{ marginBottom: '1rem', display: 'flex', justifyContent: 'center' }}>
+                    <div style={{ width: '48px', height: '48px', background: '#f1f5f9', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <File size={24} color="#cbd5e1" />
+                    </div>
+                  </div>
+                  <p style={{ fontWeight: 500, color: '#64748b' }}>No drawings uploaded yet</p>
+                  <p style={{ fontSize: '0.875rem' }}>Upload files to see them here</p>
+                </div>
+              ) : (
+                <div style={{ background: '#fff', border: '1px solid #e2e8f0', borderRadius: '8px', overflow: 'hidden' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                    <thead style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                      <tr>
+                        <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Name</th>
+                        <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Uploaded By</th>
+                        <th style={{ textAlign: 'left', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Date</th>
+                        <th style={{ textAlign: 'right', padding: '12px 16px', fontSize: '0.75rem', fontWeight: 600, color: '#64748b', textTransform: 'uppercase' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {attachments.map((file, i) => (
+                        <tr key={file.id} style={{ borderBottom: i < attachments.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                          <td style={{ padding: '12px 16px' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                              <div style={{
+                                width: '32px', height: '32px', borderRadius: '6px', background: '#f1f5f9',
+                                display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#546E7A'
+                              }}>
+                                <File size={16} />
+                              </div>
+                              <div>
+                                <div style={{ fontSize: '0.875rem', fontWeight: 500, color: '#334155' }}>
+                                  {file.originalFilename || file.name}
+                                </div>
+                                <div style={{ fontSize: '0.75rem', color: '#94a3b8' }}>{Math.round(file.size / 1024)} KB</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: '0.875rem', color: '#64748b' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                              {file.uploadedBy && (
+                                <>
+                                  <div style={{ width: '20px', height: '20px', borderRadius: '50%', background: '#e2e8f0', fontSize: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                    {file.uploadedBy.name ? file.uploadedBy.name.charAt(0) : '?'}
+                                  </div>
+                                  {file.uploadedBy.name || 'Unknown'}
+                                </>
+                              )}
+                            </div>
+                          </td>
+                          <td style={{ padding: '12px 16px', fontSize: '0.875rem', color: '#64748b' }}>
+                            {file.createdAt ? new Date(file.createdAt).toLocaleDateString() : '-'}
+                          </td>
+                          <td style={{ padding: '12px 16px', textAlign: 'right' }}>
+                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px' }}>
+                              <button
+                                onClick={() => handleDownloadAttachment(file.id)}
+                                className="btn-icon-small"
+                                title="Download"
+                                style={{ color: '#64748b' }}
+                              >
+                                <Download size={16} />
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
           </div>
         )}
 
         {/* Invoices Tab */}
-        {(isAdmin || isManager()) && activeTab === 'invoices' && (
-          <ProjectInvoicesTab project={project} />
-        )}
-
-        {/* Resource Planning Tab */}
-        {(isAdmin || isManager()) && activeTab === 'resources' && (
-          <div className="project-resources-tab">
-            <ResourcePlanner projectId={id} />
-          </div>
-        )}
 
       </div>
+
+      {/* Task Modal */}
+      {selectedTask && (
+        <TaskModal
+          task={selectedTask}
+          onClose={() => setSelectedTask(null)}
+          onSave={handleTaskUpdate}
+        />
+      )}
+
+      {selectedTaskForPanel && (
+        <TaskDetailPanel
+          task={selectedTaskForPanel}
+          onClose={() => setSelectedTaskForPanel(null)}
+          onUpdate={handleTaskUpdate}
+        />
+      )}
     </div>
+
   );
 };
+
+
 
 export default ProjectDetails;

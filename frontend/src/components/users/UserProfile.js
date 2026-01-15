@@ -288,8 +288,8 @@ const UserProfile = ({ user, onUserUpdate }) => {
                   const incompleteFields = getIncompleteFields(currentUser);
                   if (completion < 100 && incompleteFields.length > 0) {
                     return (
-                      <span style={{ 
-                        fontSize: '12px', 
+                      <span style={{
+                        fontSize: '12px',
                         color: '#6b7280',
                         display: 'flex',
                         alignItems: 'center',
@@ -361,15 +361,15 @@ const UserProfile = ({ user, onUserUpdate }) => {
                   return null;
                 })()}
               </div>
-              <button 
-                onClick={() => setIsEditing(false)} 
-                style={{ 
-                  padding: '6px 16px', 
+              <button
+                onClick={() => setIsEditing(false)}
+                style={{
+                  padding: '6px 16px',
                   fontSize: '14px',
                   fontWeight: '500',
-                  color: '#6b7280',
-                  background: 'transparent',
-                  border: '1px solid #d1d5db',
+                  color: 'white',
+                  background: '#546E7A',
+                  border: 'none',
                   borderRadius: '24px',
                   cursor: 'pointer'
                 }}

@@ -196,7 +196,7 @@ public class PayslipController {
      */
     @GetMapping("/my-payslips")
     public ResponseEntity<?> getMyPayslips(@RequestParam(defaultValue = "0") int page,
-                                          @RequestParam(defaultValue = "10") int size) {
+                                          @RequestParam(defaultValue = "50") int size) {
         Map<String, Object> response = new HashMap<>();
         
         try {
@@ -243,7 +243,7 @@ public class PayslipController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('HR')")
     public ResponseEntity<?> getOrganizationPayslips(@RequestParam Long organizationId,
                                                    @RequestParam(defaultValue = "0") int page,
-                                                   @RequestParam(defaultValue = "10") int size) {
+                                                   @RequestParam(defaultValue = "50") int size) {
         Map<String, Object> response = new HashMap<>();
         
         try {

@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import PageHeader from '../common/PageHeader';
+import { ChevronRight } from 'lucide-react';
+import TaskDetailPanel from '../projects/TaskDetailPanel';
+import { AsanaSection, AsanaTaskRow } from '../projects/AsanaListComponents';
+import '../projects/ProjectDetails.css';
+import './MyApprovals.css';
 
 const MyApprovals = ({ user }) => {
     const [tasks, setTasks] = useState([]);
@@ -14,6 +19,8 @@ const MyApprovals = ({ user }) => {
         hasPrevious: false,
         pageSize: 10
     });
+
+    const [selectedTaskForPanel, setSelectedTaskForPanel] = useState(null);
 
     useEffect(() => {
         if (user) {
@@ -64,18 +71,41 @@ const MyApprovals = ({ user }) => {
         }
     };
 
-    const formatStatus = (status) => {
-        return status?.toLowerCase().replace(/_/g, '-') || 'to-do';
+    const handleTaskUpdate = async (taskId, updates) => {
+        // Optimistic Update
+        setTasks(prev => prev.map(t =>
+            t.id === taskId ? { ...t, ...updates } : t
+        ));
+
+        try {
+            const apiPayload = { ...updates };
+            if (updates.assignee) {
+                apiPayload.assigneeId = updates.assignee.id;
+                delete apiPayload.assignee;
+            } else if (updates.assignee === null) {
+                apiPayload.assigneeId = null;
+            }
+
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'PATCH',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(apiPayload),
+                credentials: 'include'
+            });
+
+            if (!response.ok) {
+                throw new Error('Failed to update task');
+            }
+        } catch (error) {
+            console.error('Task update failed:', error);
+            // Revert changes by refetching
+            fetchApprovalTasks(pagination.currentPage);
+        }
     };
 
-    const formatPriority = (priority) => {
-        return priority?.toLowerCase() || 'medium';
-    };
 
-    const getInitials = (name) => {
-        if (!name) return '?';
-        return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-    };
 
     if (loading) {
         return (
@@ -86,7 +116,7 @@ const MyApprovals = ({ user }) => {
     }
 
     return (
-        <div className="main-content">
+        <div className="main-content approvals-page">
             <PageHeader
                 title="My Approvals"
                 subtitle="Tasks assigned to you for review and approval"
@@ -105,74 +135,34 @@ const MyApprovals = ({ user }) => {
                 </div>
             ) : (
                 <>
-                    <div className="data-table-container">
-                        <table className="data-table">
-                            <thead>
-                                <tr>
-                                    <th>Task</th>
-                                    <th style={{ width: '120px' }}>Priority</th>
-                                    <th style={{ width: '120px' }}>Status</th>
-                                    <th style={{ width: '150px' }}>Assignee</th>
-                                    <th style={{ width: '120px' }}>Due Date</th>
-                                    <th style={{ width: '100px' }}></th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {tasks.map(task => (
-                                    <tr key={task.id}>
-                                        <td>
-                                            <Link
-                                                to={`/tasks/${task.id}/details`}
-                                                className="task-row-title"
-                                                style={{ textDecoration: 'none', color: 'inherit' }}
-                                            >
-                                                {task.name}
-                                            </Link>
-                                            {task.project && (
-                                                <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                                                    {task.project.name}
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <span className={`badge badge-priority ${formatPriority(task.priority)}`}>
-                                                {task.priority}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <span className={`badge badge-status ${formatStatus(task.status)}`}>
-                                                {task.status?.replace(/_/g, ' ')}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            {task.assignee && (
-                                                <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                                    <div className="avatar avatar-sm">
-                                                        {getInitials(task.assignee.name || task.assignee.username)}
-                                                    </div>
-                                                    <span style={{ fontSize: '0.875rem' }}>
-                                                        {task.assignee.name || task.assignee.username}
-                                                    </span>
-                                                </div>
-                                            )}
-                                        </td>
-                                        <td>
-                                            <span className="task-row-date">
-                                                {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'}
-                                            </span>
-                                        </td>
-                                        <td>
-                                            <Link
-                                                to={`/tasks/${task.id}/details`}
-                                                className="btn-small btn-outline"
-                                            >
-                                                Review
-                                            </Link>
-                                        </td>
-                                    </tr>
-                                ))}
-                            </tbody>
-                        </table>
+                    <div className="asana-list-view" style={{ padding: '0 20px' }}>
+                        <div className="asana-list-header" style={{ gridTemplateColumns: 'minmax(400px, 1fr) 150px 150px 120px 120px 80px' }}>
+                            <div className="header-cell">Task name</div>
+                            <div className="header-cell">Assignee</div>
+                            <div className="header-cell">Due date</div>
+                            <div className="header-cell">Priority</div>
+                            <div className="header-cell">Status</div>
+                            <div className="header-cell"></div>
+                        </div>
+
+                        <div className="asana-list-body">
+                            <AsanaSection
+                                title="Approvals"
+                                tasks={tasks}
+                                defaultExpanded={true}
+                                gridTemplateColumns="minmax(400px, 1fr) 150px 150px 120px 120px 80px"
+                                renderRow={(task) => (
+                                    <AsanaTaskRow
+                                        key={task.id}
+                                        task={task}
+                                        teamMembers={[]}
+                                        onUpdate={handleTaskUpdate}
+                                        onOpenDetails={() => setSelectedTaskForPanel(task)}
+                                        gridTemplateColumns="minmax(400px, 1fr) 150px 150px 120px 120px 80px"
+                                    />
+                                )}
+                            />
+                        </div>
                     </div>
 
                     {pagination.totalPages > 1 && (
@@ -202,6 +192,15 @@ const MyApprovals = ({ user }) => {
                         </div>
                     )}
                 </>
+            )}
+
+
+            {selectedTaskForPanel && (
+                <TaskDetailPanel
+                    task={selectedTaskForPanel}
+                    onClose={() => setSelectedTaskForPanel(null)}
+                    onUpdate={handleTaskUpdate}
+                />
             )}
         </div>
     );

@@ -471,7 +471,9 @@ public class TaskService {
                                      Optional<String> newDescriptionOpt,
                                      Optional<Long> newPhaseIdOpt,
                                      Optional<Long> newAssigneeIdOpt, // Use Optional<Optional<Long>> or a flag for unassigning if null means "no change"
-                                     Optional<TaskStatus> newStatusOpt) {
+                                     Optional<TaskStatus> newStatusOpt,
+                                     Optional<TaskPriority> newPriorityOpt,
+                                     Optional<LocalDate> newDueDateOpt) {
 
         Task taskToUpdate = taskRepository.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task with ID " + taskId + " not found."));
@@ -502,11 +504,11 @@ public class TaskService {
 
         // Handling assignee update:
         // If newAssigneeIdOpt is present, it means an update to assignee is intended.
-        // If the inner value (Long) is null, it means unassign.
+        // If the inner value is -1L, it means unassign.
         // If newAssigneeIdOpt is empty, no change to assignee.
         if (newAssigneeIdOpt.isPresent()) {
             Long assigneeId = newAssigneeIdOpt.get();
-            if (assigneeId == null) { // Explicitly unassign
+            if (assigneeId == -1L) { // Explicitly unassign
                 taskToUpdate.setAssignee(null);
             } else {
                 User assignee = userRepository.findById(assigneeId)
@@ -519,6 +521,16 @@ public class TaskService {
 
         if (newStatusOpt.isPresent()) {
             taskToUpdate.setStatus(newStatusOpt.get());
+            updated = true;
+        }
+
+        if (newPriorityOpt.isPresent()) {
+            taskToUpdate.setPriority(newPriorityOpt.get());
+            updated = true;
+        }
+
+        if (newDueDateOpt.isPresent()) {
+            taskToUpdate.setDueDate(newDueDateOpt.get());
             updated = true;
         }
 

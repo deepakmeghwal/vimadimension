@@ -20,7 +20,7 @@ const TaskDetails = ({ user }) => {
       const response = await fetch(`/api/tasks/${id}/details`, {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         setTask(data.task || data);
@@ -37,7 +37,7 @@ const TaskDetails = ({ user }) => {
 
   const getStatusClass = (status) => {
     if (!status) return 'status-to-do';
-    
+
     switch (status.toString().toLowerCase()) {
       case 'done':
         return 'status-done';
@@ -57,7 +57,7 @@ const TaskDetails = ({ user }) => {
 
   const getPriorityClass = (priority) => {
     if (!priority) return 'priority-medium';
-    
+
     switch (priority.toString().toLowerCase()) {
       case 'high':
         return 'priority-high';
@@ -101,7 +101,7 @@ const TaskDetails = ({ user }) => {
 
   const canEditTask = () => {
     if (!user || !task) return false;
-    
+
     // User can edit if they are:
     // 1. Assigned to the task
     // 2. Creator of the task  
@@ -147,9 +147,9 @@ const TaskDetails = ({ user }) => {
 
   // Check if current user is the assigned checker for this task
   const canMarkAsChecked = () => {
-    return task?.checkedBy && 
-           user?.id === task.checkedBy.id && 
-           task.status === 'DONE';
+    return task?.checkedBy &&
+      user?.id === task.checkedBy.id &&
+      task.status === 'DONE';
   };
 
   if (loading) return <div className="main-content">Loading...</div>;
@@ -171,26 +171,26 @@ const TaskDetails = ({ user }) => {
         <div className="page-actions">
           {/* Show button if user is assigned as checker */}
           {task?.checkedBy && user?.id === task.checkedBy.id && (
-            <button 
-              onClick={handleMarkAsChecked} 
+            <button
+              onClick={handleMarkAsChecked}
               className={canMarkAsChecked() ? "btn-primary" : "btn-outline"}
               disabled={isMarkingChecked || !canMarkAsChecked()}
               title={canMarkAsChecked() ? "Mark this task as checked" : "Task must be in DONE status before it can be checked"}
             >
-              {isMarkingChecked ? 'Marking as Checked...' : 
-               canMarkAsChecked() ? 'Mark as Checked' : 
-               'Mark as Checked (Task must be DONE)'}
+              {isMarkingChecked ? 'Marking as Checked...' :
+                canMarkAsChecked() ? 'Mark as Checked' :
+                  'Mark as Checked (Task must be DONE)'}
             </button>
           )}
           {canEditTask() && (
             <>
-              <button 
+              <button
                 onClick={() => navigate(`/tasks/${id}/edit`, { replace: true })}
                 className="btn-secondary"
               >
                 Edit Task
               </button>
-              <button 
+              <button
                 onClick={handleDeleteTask}
                 className="btn-danger"
               >
@@ -350,7 +350,7 @@ const TaskDetails = ({ user }) => {
                   )}
                 </div>
               ))}
-              
+
               <div className="total-time">
                 <strong>
                   Total Time Logged: {

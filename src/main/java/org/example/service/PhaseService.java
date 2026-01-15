@@ -20,6 +20,8 @@ import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
 
+import org.springframework.context.annotation.Lazy;
+
 @Service
 public class PhaseService {
 
@@ -29,6 +31,7 @@ public class PhaseService {
     private final ProjectRepository projectRepository;
     private final UserRepository userRepository;
     private final AuditService auditService;
+    private PhaseSubstageService substageService;
 
     @Autowired
     public PhaseService(PhaseRepository phaseRepository, ProjectRepository projectRepository, UserRepository userRepository, AuditService auditService) {
@@ -36,6 +39,13 @@ public class PhaseService {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.auditService = auditService;
+    }
+
+    // Setter injection with @Lazy to avoid circular dependency
+    @Autowired
+    @Lazy
+    public void setSubstageService(PhaseSubstageService substageService) {
+        this.substageService = substageService;
     }
 
     private User getCurrentAuthenticatedUser() {
@@ -113,7 +123,7 @@ public class PhaseService {
     }
 
     public List<Phase> getPhasesByProjectId(Long projectId) {
-        return phaseRepository.findByProjectId(projectId);
+        return phaseRepository.findByProjectIdWithSubstages(projectId);
     }
 
     public Optional<Phase> getPhaseById(Long phaseId) {
@@ -121,8 +131,8 @@ public class PhaseService {
     }
 
     /**
-     * Create standard Indian architectural phases for a project
-     * Based on COA (Council of Architecture) standards
+     * Create phases for a project based on its lifecycle stages.
+     * Uses the project's lifecycleStages field (defined during project creation).
      */
     @Transactional
     public List<Phase> createStandardPhases(Long projectId) {
@@ -131,30 +141,40 @@ public class PhaseService {
 
         List<Phase> existingPhases = phaseRepository.findByProjectId(projectId);
         if (!existingPhases.isEmpty()) {
-            throw new IllegalStateException("Project already has phases. Cannot create standard phases.");
+            throw new IllegalStateException("Project already has phases. Cannot create phases.");
         }
 
-        org.example.models.enums.PhaseType[] standardPhases = org.example.models.enums.PhaseType.values();
-        List<Phase> createdPhases = new java.util.ArrayList<>();
+        // Use project's lifecycle stages
+        java.util.List<org.example.models.enums.ProjectStage> lifecycleStages = project.getLifecycleStages();
+        if (lifecycleStages == null || lifecycleStages.isEmpty()) {
+            throw new IllegalStateException("No lifecycle stages defined for this project. Please edit the project and select stages.");
+        }
 
+        List<Phase> createdPhases = new java.util.ArrayList<>();
         User currentUser = getCurrentAuthenticatedUser();
 
-        for (org.example.models.enums.PhaseType phaseType : standardPhases) {
+        for (int i = 0; i < lifecycleStages.size(); i++) {
+            org.example.models.enums.ProjectStage stage = lifecycleStages.get(i);
+            
             Phase phase = new Phase();
             phase.setProject(project);
-            phase.setPhaseNumber(String.format("%02d", phaseType.getSequence()));
-            phase.setName(phaseType.getDisplayName());
-            phase.setPhaseType(phaseType);
+            phase.setPhaseNumber(String.format("%02d", i + 1));
+            phase.setName(stage.getDisplayName());
             phase.setStatus(PhaseStatus.ACTIVE);
 
             Phase savedPhase = phaseRepository.save(phase);
             createdPhases.add(savedPhase);
 
+            // Auto-create predefined substages for this phase
+            if (substageService != null) {
+                substageService.createDefaultSubstages(savedPhase);
+            }
+
             auditService.logChange(currentUser, "PHASE", savedPhase.getId(), "CREATE", null, null, 
-                    "Standard phase created: " + phaseType.getDisplayName());
+                    "Phase created from project lifecycle stage: " + stage.getDisplayName());
         }
 
-        logger.info("Created {} standard phases for project {}", createdPhases.size(), projectId);
+        logger.info("Created {} phases from lifecycle stages for project {}", createdPhases.size(), projectId);
         return createdPhases;
     }
 

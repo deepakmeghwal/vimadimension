@@ -14,7 +14,7 @@ const RecordPayment = ({ user }) => {
   });
 
   // Check if user has admin or manager role
-  const canManageInvoices = user?.authorities?.some(auth => 
+  const canManageInvoices = user?.authorities?.some(auth =>
     auth.authority === 'ROLE_ADMIN' || auth.authority === 'ROLE_MANAGER'
   ) || false;
 
@@ -179,12 +179,12 @@ const RecordPayment = ({ user }) => {
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <button 
+          <button
             className="btn btn-outline-secondary mb-2"
-            onClick={() => navigate(`/invoices/${id}/details`)}
+            onClick={() => navigate(-1)}
           >
             <i className="fas fa-arrow-left me-2"></i>
-            Back to Invoice
+            Back
           </button>
           <h2>Record Payment</h2>
         </div>
@@ -193,9 +193,9 @@ const RecordPayment = ({ user }) => {
       {error && (
         <div className="alert alert-danger alert-dismissible fade show" role="alert">
           {error}
-          <button 
-            type="button" 
-            className="btn-close" 
+          <button
+            type="button"
+            className="btn-close"
             onClick={() => setError('')}
           ></button>
         </div>
@@ -266,8 +266,7 @@ const RecordPayment = ({ user }) => {
                   <button
                     type="button"
                     className="btn btn-outline-secondary"
-                    onClick={() => navigate(`/invoices/${id}/details`)}
-                    disabled={submitting}
+                    onClick={() => navigate(-1)}
                   >
                     Cancel
                   </button>
@@ -303,11 +302,11 @@ const RecordPayment = ({ user }) => {
             <div className="card-body">
               <div className="mb-3">
                 <strong>Status:</strong>
-                <span className={`badge ms-2 ${invoice.status === 'DRAFT' ? 'bg-secondary' : 
-                  invoice.status === 'SENT' ? 'bg-primary' : 
-                  invoice.status === 'VIEWED' ? 'bg-info' : 
-                  invoice.status === 'PAID' ? 'bg-success' : 
-                  invoice.status === 'OVERDUE' ? 'bg-danger' : 'bg-dark'}`}>
+                <span className={`badge ms-2 ${invoice.status === 'DRAFT' ? 'bg-secondary' :
+                  invoice.status === 'SENT' ? 'bg-primary' :
+                    invoice.status === 'VIEWED' ? 'bg-info' :
+                      invoice.status === 'PAID' ? 'bg-success' :
+                        invoice.status === 'OVERDUE' ? 'bg-danger' : 'bg-dark'}`}>
                   {invoice.status.replace(/_/g, ' ')}
                 </span>
               </div>
@@ -360,6 +359,7 @@ const RecordPayment = ({ user }) => {
 };
 
 export default RecordPayment;
+
 
 
 

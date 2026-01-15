@@ -49,14 +49,20 @@ public class ProjectService {
     private final TaskRepository taskRepository; // Added TaskRepository
     private final ClientRepository clientRepository;
     private final AuditService auditService;
+    private final PhaseService phaseService;
+    private final org.example.repository.ProjectAttachmentRepository projectAttachmentRepository;
+    private final S3FileStorageService s3FileStorageService;
 
     @Autowired
-    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository, ClientRepository clientRepository, AuditService auditService) {
+    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository, ClientRepository clientRepository, AuditService auditService, PhaseService phaseService, org.example.repository.ProjectAttachmentRepository projectAttachmentRepository, S3FileStorageService s3FileStorageService) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.taskRepository = taskRepository; // Initialize TaskRepository
         this.clientRepository = clientRepository;
         this.auditService = auditService;
+        this.phaseService = phaseService;
+        this.projectAttachmentRepository = projectAttachmentRepository;
+        this.s3FileStorageService = s3FileStorageService;
     }
 
     private User getCurrentAuthenticatedUser() {
@@ -263,7 +269,17 @@ public class ProjectService {
         
         // --- SET NEW CRITICAL FIELDS ---
         project.setBudget(projectCreateDto.getBudget());
+        project.setTotalFee(projectCreateDto.getTotalFee());
+        project.setTargetProfitMargin(projectCreateDto.getTargetProfitMargin());
         project.setPriority(projectCreateDto.getPriority() != null ? projectCreateDto.getPriority() : org.example.models.enums.ProjectPriority.MEDIUM);
+        
+        // Set lifecycle stages
+        if (projectCreateDto.getLifecycleStages() != null && !projectCreateDto.getLifecycleStages().isEmpty()) {
+            project.setLifecycleStages(projectCreateDto.getLifecycleStages());
+        } else {
+            // Default to all stages if none provided
+            project.setLifecycleStages(List.of(org.example.models.enums.ProjectStage.values()));
+        }
         
         logger.info("Creating project '{}' for organization: {}", project.getName(), creator.getOrganization().getName());
 
@@ -281,6 +297,17 @@ public class ProjectService {
                    savedProject.getName(), creator.getOrganization().getName(), creatorUsername);
 
         auditService.logChange(creator, "PROJECT", savedProject.getId(), "CREATE", null, null, "Project created");
+
+        // Auto-create phases from lifecycle stages
+        try {
+            if (savedProject.getLifecycleStages() != null && !savedProject.getLifecycleStages().isEmpty()) {
+                phaseService.createStandardPhases(savedProject.getId());
+                logger.info("Auto-created phases for project '{}'", savedProject.getName());
+            }
+        } catch (Exception e) {
+            logger.warn("Failed to auto-create phases for project '{}': {}", savedProject.getName(), e.getMessage());
+            // Don't fail the project creation if phase creation fails
+        }
 
         return savedProject;
     }
@@ -408,6 +435,30 @@ public class ProjectService {
             if (!Objects.equals(projectToUpdate.getPriority(), projectUpdateDto.getPriority())) {
                 auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "priority", String.valueOf(projectToUpdate.getPriority()), String.valueOf(projectUpdateDto.getPriority()));
                 projectToUpdate.setPriority(projectUpdateDto.getPriority());
+                updated = true;
+            }
+        }
+
+        if (projectUpdateDto.getLifecycleStages() != null) {
+            if (!Objects.equals(projectToUpdate.getLifecycleStages(), projectUpdateDto.getLifecycleStages())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "lifecycleStages", String.valueOf(projectToUpdate.getLifecycleStages()), String.valueOf(projectUpdateDto.getLifecycleStages()));
+                projectToUpdate.setLifecycleStages(projectUpdateDto.getLifecycleStages());
+                updated = true;
+            }
+        }
+
+        if (projectUpdateDto.getTotalFee() != null) {
+            if (!Objects.equals(projectToUpdate.getTotalFee(), projectUpdateDto.getTotalFee())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "totalFee", String.valueOf(projectToUpdate.getTotalFee()), String.valueOf(projectUpdateDto.getTotalFee()));
+                projectToUpdate.setTotalFee(projectUpdateDto.getTotalFee());
+                updated = true;
+            }
+        }
+
+        if (projectUpdateDto.getTargetProfitMargin() != null) {
+            if (!Objects.equals(projectToUpdate.getTargetProfitMargin(), projectUpdateDto.getTargetProfitMargin())) {
+                auditService.logChange(currentUser, "PROJECT", projectId, "UPDATE", "targetProfitMargin", String.valueOf(projectToUpdate.getTargetProfitMargin()), String.valueOf(projectUpdateDto.getTargetProfitMargin()));
+                projectToUpdate.setTargetProfitMargin(projectUpdateDto.getTargetProfitMargin());
                 updated = true;
             }
         }
@@ -686,5 +737,100 @@ public class ProjectService {
         }
         
         return new ArrayList<>(project.getAccessibleByUsers());
+    }
+
+    @Transactional(readOnly = true)
+    public List<org.example.models.ProjectAttachment> getAttachments(Long projectId) {
+        Project project = projectRepository.findById(projectId)
+             .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+        
+        User currentUser = getCurrentAuthenticatedUser();
+        if (!project.getOrganization().equals(currentUser.getOrganization())) {
+             throw new org.springframework.security.access.AccessDeniedException("Access denied");
+        }
+
+        return projectAttachmentRepository.findByProjectIdOrderByCreatedAtDesc(projectId);
+    }
+
+    @Transactional
+    public org.example.models.ProjectAttachment uploadAttachment(Long projectId, org.springframework.web.multipart.MultipartFile file, User uploader) {
+        Project project = projectRepository.findById(projectId)
+                .orElseThrow(() -> new IllegalArgumentException("Project not found"));
+        
+        // Security Check: Uploader must be in same org
+        if (!project.getOrganization().equals(uploader.getOrganization())) {
+             throw new org.springframework.security.access.AccessDeniedException("User cannot upload to project in another organization");
+        }
+
+        try {
+            String directory = "projects/" + projectId + "/attachments";
+            String originalFilename = file.getOriginalFilename();
+            String baseName = "file";
+            if (originalFilename != null) {
+                if (originalFilename.contains(".")) {
+                    baseName = originalFilename.substring(0, originalFilename.lastIndexOf("."));
+                } else {
+                    baseName = originalFilename;
+                }
+            }
+
+            // storeFile adds UUID and extension
+            String storedUrl = s3FileStorageService.storeFile(file, directory, baseName);
+            
+            // Extract S3 key from the returned URL (format: /api/files/{key})
+            String s3Key = storedUrl.replace("/api/files/", "");
+            
+            org.example.models.ProjectAttachment attachment = org.example.models.ProjectAttachment.builder()
+                    .name(file.getOriginalFilename())
+                    .originalFilename(file.getOriginalFilename())
+                    .fileUrl(s3Key) // Store the S3 key
+                    .contentType(file.getContentType())
+                    .size(file.getSize())
+                    .uploadedBy(uploader)
+                    .project(project)
+                    .build();
+            
+            return projectAttachmentRepository.save(attachment);
+        } catch (Exception e) {
+            throw new RuntimeException("Failed to store file", e);
+        }
+    }
+
+    @Transactional
+    public void deleteAttachment(Long projectId, Long attachmentId) {
+        org.example.models.ProjectAttachment attachment = projectAttachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
+        
+        if (!attachment.getProject().getId().equals(projectId)) {
+             throw new IllegalArgumentException("Attachment does not belong to this project");
+        }
+
+        User currentUser = getCurrentAuthenticatedUser(); 
+        if (!attachment.getProject().getOrganization().equals(currentUser.getOrganization())) {
+             throw new org.springframework.security.access.AccessDeniedException("Access denied");
+        }
+
+        // Delete from S3
+        s3FileStorageService.deleteFile(attachment.getFileUrl());
+        
+        // Delete from DB
+        projectAttachmentRepository.delete(attachment);
+    }
+
+    public String generatePresignedDownloadUrl(Long projectId, Long attachmentId) {
+         org.example.models.ProjectAttachment attachment = projectAttachmentRepository.findById(attachmentId)
+                .orElseThrow(() -> new IllegalArgumentException("Attachment not found"));
+         
+         if (!attachment.getProject().getId().equals(projectId)) {
+             throw new IllegalArgumentException("Attachment does not belong to this project");
+        }
+         
+         // Verify user access (current user)
+         User currentUser = getCurrentAuthenticatedUser(); 
+         if (!attachment.getProject().getOrganization().equals(currentUser.getOrganization())) {
+              throw new org.springframework.security.access.AccessDeniedException("Access denied");
+         }
+
+         return s3FileStorageService.generatePresignedDownloadUrl("/api/files/" + attachment.getFileUrl());
     }
 }

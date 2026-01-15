@@ -9,7 +9,7 @@ const UsersList = ({ isPeopleContext = false }) => {
   const [authorized, setAuthorized] = useState(false);
   const [checkingAuth, setCheckingAuth] = useState(true);
   const [togglingStatus, setTogglingStatus] = useState(false);
-  const [viewMode, setViewMode] = useState('list'); // 'list' or 'grid'
+
   const [showUserModal, setShowUserModal] = useState(false);
   const [selectedUserId, setSelectedUserId] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
@@ -184,14 +184,14 @@ const UsersList = ({ isPeopleContext = false }) => {
   const basePath = isPeopleContext ? '/people/directory' : '/admin/users';
 
   return (
-    <div className="main-content">
-      <div className="page-header">
-        <div className="page-header-top">
+    <div className="main-content" style={{ maxWidth: '100%' }}>
+      <div className="page-header" style={{ width: '100%' }}>
+        <div className="page-header-top" style={{ width: '100%' }}>
           <div className="page-header-title-section">
             <h1 className="page-title">{isPeopleContext ? 'People Directory' : 'All Users'}</h1>
             <p className="page-subtitle">Manage your organization's users and roles</p>
           </div>
-          <div className="page-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="page-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginLeft: 'auto' }}>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <input
                 type="text"
@@ -237,58 +237,12 @@ const UsersList = ({ isPeopleContext = false }) => {
               </svg>
             </div>
 
-            {/* View Mode Toggles */}
-            <div className="view-toggles" style={{ display: 'inline-flex', background: '#f1f5f9', borderRadius: '6px', padding: '2px' }}>
-              <button
-                onClick={() => setViewMode('list')}
-                style={{
-                  background: viewMode === 'list' ? 'white' : 'transparent',
-                  border: 'none',
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  boxShadow: viewMode === 'list' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-                title="List View"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <line x1="8" y1="6" x2="21" y2="6"></line>
-                  <line x1="8" y1="12" x2="21" y2="12"></line>
-                  <line x1="8" y1="18" x2="21" y2="18"></line>
-                  <line x1="3" y1="6" x2="3.01" y2="6"></line>
-                  <line x1="3" y1="12" x2="3.01" y2="12"></line>
-                  <line x1="3" y1="18" x2="3.01" y2="18"></line>
-                </svg>
-              </button>
-              <button
-                onClick={() => setViewMode('grid')}
-                style={{
-                  background: viewMode === 'grid' ? 'white' : 'transparent',
-                  border: 'none',
-                  padding: '0.5rem',
-                  borderRadius: '4px',
-                  cursor: 'pointer',
-                  boxShadow: viewMode === 'grid' ? '0 1px 3px rgba(0,0,0,0.1)' : 'none',
-                  display: 'flex',
-                  alignItems: 'center'
-                }}
-                title="Grid View"
-              >
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <rect x="3" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="3" width="7" height="7"></rect>
-                  <rect x="14" y="14" width="7" height="7"></rect>
-                  <rect x="3" y="14" width="7" height="7"></rect>
-                </svg>
-              </button>
-            </div>
+
 
             <button
               onClick={() => navigate(isPeopleContext ? '/people/invitations' : '/admin/invitations')}
               className="btn-primary"
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#546E7A', border: 'none' }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
@@ -330,7 +284,7 @@ const UsersList = ({ isPeopleContext = false }) => {
                   <button
                     className="btn-primary"
                     onClick={() => navigate(isPeopleContext ? '/people/invitations' : '/admin/invitations')}
-                    style={{ marginTop: '0.75rem' }}
+                    style={{ marginTop: '0.75rem', backgroundColor: '#546E7A', border: 'none' }}
                   >
                     Invite People
                   </button>
@@ -338,126 +292,84 @@ const UsersList = ({ isPeopleContext = false }) => {
               </div>
             ) : (
               <>
-                {viewMode === 'list' ? (
-                  <table className="data-table">
-                    <thead>
-                      <tr>
-                        <th>Name</th>
-                        <th>Username</th>
-                        <th>Email</th>
-                        <th>Role</th>
-                        <th>Status</th>
-                        <th className="text-right">Actions</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {users.map(user => (
-                        <tr key={user.id} onClick={() => handleUserClick(user.id)} style={{ cursor: 'pointer' }}>
-                          <td>
-                            <div className="font-weight-medium text-dark">
-                              {user.name || user.username}
-                            </div>
-                          </td>
-                          <td>{user.username}</td>
-                          <td>{user.email}</td>
-                          <td>
-                            <span className={`badge ${(Array.isArray(user.roles) && user.roles.some(r => (typeof r === 'string' ? r : r.name || r.authority) === 'ROLE_ADMIN')) || (Array.isArray(user.roles) && user.roles.includes('ROLE_ADMIN')) ? 'badge-priority high' : 'badge-priority low'}`}>
-                              {Array.isArray(user.roles) ? user.roles.map(r => {
-                                const roleName = typeof r === 'string' ? r : (r.name || r.authority || '');
-                                return roleName.replace('ROLE_', '');
-                              }).join(', ') : 'No role'}
-                            </span>
-                          </td>
-                          <td>
-                            <span className={`badge ${user.enabled ? 'badge-status completed' : 'badge-status blocked'}`}>
-                              {user.enabled ? 'Active' : 'Inactive'}
-                            </span>
-                          </td>
-                          <td className="text-right" onClick={(e) => e.stopPropagation()}>
-                            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(`${basePath}/${user.id}/edit`);
-                                }}
-                                className="btn-icon-modern"
-                                title="Edit"
-                              >
-                                <i className="fas fa-pencil-alt"></i>
-                              </button>
-                              <button
-                                onClick={(e) => handleToggleUserStatus(user.id, user.enabled, e)}
-                                className={`btn-icon-modern ${user.enabled ? 'text-danger' : 'text-success'}`}
-                                title={user.enabled ? 'Deactivate' : 'Activate'}
-                                disabled={togglingStatus}
-                              >
-                                <i className={`fas ${user.enabled ? 'fa-ban' : 'fa-check-circle'}`}></i>
-                              </button>
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  navigate(isPeopleContext ? `/people/roles` : `/admin/users/${user.id}/roles`);
-                                }}
-                                className="btn-icon-modern"
-                                title="Manage Roles"
-                              >
-                                <i className="fas fa-user-shield"></i>
-                              </button>
-                            </div>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                ) : (
-                  <div className="users-grid" style={{ padding: '1rem' }}>
+
+                <table className="data-table">
+                  <thead>
+                    <tr>
+                      <th>Name</th>
+                      <th>Username</th>
+                      <th>Email</th>
+                      <th>Role</th>
+                      <th>Status</th>
+                      <th className="text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
                     {users.map(user => (
-                      <div key={user.id} className="user-card" onClick={() => handleUserClick(user.id)} style={{ cursor: 'pointer' }}>
-                        <div className="user-header">
-                          <h3>{user.name || user.username}</h3>
+                      <tr key={user.id} onClick={() => handleUserClick(user.id)} style={{ cursor: 'pointer' }}>
+                        <td>
+                          <div className="font-weight-medium text-dark">
+                            {user.name || user.username}
+                          </div>
+                        </td>
+                        <td>{user.username}</td>
+                        <td>{user.email}</td>
+                        <td>
                           <span className={`badge ${(Array.isArray(user.roles) && user.roles.some(r => (typeof r === 'string' ? r : r.name || r.authority) === 'ROLE_ADMIN')) || (Array.isArray(user.roles) && user.roles.includes('ROLE_ADMIN')) ? 'badge-priority high' : 'badge-priority low'}`}>
                             {Array.isArray(user.roles) ? user.roles.map(r => {
                               const roleName = typeof r === 'string' ? r : (r.name || r.authority || '');
                               return roleName.replace('ROLE_', '');
                             }).join(', ') : 'No role'}
                           </span>
-                        </div>
-
-                        <div className="user-details">
-                          <p><strong>Username:</strong> {user.username}</p>
-                          {user.email && <p><strong>Email:</strong> {user.email}</p>}
-                          {user.designation && <p><strong>Designation:</strong> {user.designation}</p>}
-                          <p><strong>Status:</strong>
-                            <span className={`badge ${user.enabled ? 'badge-status completed' : 'badge-status blocked'}`} style={{ marginLeft: '0.5rem' }}>
-                              {user.enabled ? 'Active' : 'Inactive'}
-                            </span>
-                          </p>
-                        </div>
-
-                        <div className="user-actions" style={{ marginTop: '0.75rem', display: 'flex', gap: '0.5rem' }} onClick={(e) => e.stopPropagation()}>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              navigate(`${basePath}/${user.id}/edit`);
-                            }}
-                            className="btn-outline"
-                            style={{ flex: 1, fontSize: '0.875rem', padding: '0.5rem 1rem' }}
-                          >
-                            Edit
-                          </button>
-                          <button
-                            onClick={(e) => handleToggleUserStatus(user.id, user.enabled, e)}
-                            className="btn-outline"
-                            style={{ flex: 1, fontSize: '0.875rem', padding: '0.5rem 1rem' }}
-                            disabled={togglingStatus}
-                          >
-                            {togglingStatus ? '...' : user.enabled ? 'Deactivate' : 'Activate'}
-                          </button>
-                        </div>
-                      </div>
+                        </td>
+                        <td>
+                          <span className="badge-status" style={{
+                            backgroundColor: user.enabled ? '#dcfce7' : '#fee2e2',
+                            color: user.enabled ? '#166534' : '#991b1b',
+                            padding: '0.25rem 0.75rem',
+                            borderRadius: '9999px',
+                            display: 'inline-block'
+                          }}>
+                            {user.enabled ? 'Active' : 'Inactive'}
+                          </span>
+                        </td>
+                        <td className="text-right" onClick={(e) => e.stopPropagation()}>
+                          <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '0.5rem' }}>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(`${basePath}/${user.id}/edit`);
+                              }}
+                              className="btn-icon-modern"
+                              title="Edit User Details"
+                            >
+                              <i className="fas fa-pencil-alt"></i>
+                            </button>
+                            <button
+                              onClick={(e) => handleToggleUserStatus(user.id, user.enabled, e)}
+                              className={`btn-icon-modern ${user.enabled ? 'text-danger' : 'text-success'}`}
+                              title={user.enabled ? 'Deactivate User Access' : 'Activate User Access'}
+                              disabled={togglingStatus}
+                            >
+                              <i className={`fas ${user.enabled ? 'fa-ban' : 'fa-check-circle'}`}></i>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                navigate(isPeopleContext ? `/people/roles` : `/admin/users/${user.id}/roles`);
+                              }}
+                              className="btn-icon-modern"
+                              title="Manage User Roles & Permissions"
+                            >
+                              <i className="fas fa-user-shield"></i>
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
                     ))}
-                  </div>
-                )}
+                  </tbody>
+                </table>
+
 
                 {pagination.totalPages > 1 && (
                   <div className="pagination-controls" style={{ padding: '1rem', borderTop: '1px solid #e5e7eb', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '1rem' }}>

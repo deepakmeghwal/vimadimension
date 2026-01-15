@@ -11,6 +11,7 @@ const CheckIcon = () => (
 const LandingPage = () => {
   const navigate = useNavigate();
   const [visibleSections, setVisibleSections] = useState(new Set());
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const observerRef = useRef(null);
 
   useEffect(() => {
@@ -78,14 +79,61 @@ const LandingPage = () => {
       {/* Navigation Bar */}
       <nav className="landing-nav">
         <div className="landing-nav-container">
-          <div className="landing-logo">
-            <h2>KOMOREBI</h2>
+          <div className="landing-logo" style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+            <img src="/images/logo_final.svg" alt="ArchiEase Logo" style={{ height: '32px', width: 'auto' }} />
+            <h2>ARCHIEASE</h2>
           </div>
-          <div className="landing-nav-links">
+
+          {/* Desktop Nav */}
+          <div className="landing-nav-links desktop-nav">
+            <div className="features-dropdown">
+              <button className="nav-link-btn">Features</button>
+              <div className="features-dropdown-menu">
+                <span className="dropdown-item">Projects</span>
+                <span className="dropdown-item">Tasks</span>
+                <span className="dropdown-item">Timesheets</span>
+                <span className="dropdown-item">Invoicing</span>
+                <span className="dropdown-item">Team</span>
+                <span className="dropdown-item">Clients</span>
+                <span className="dropdown-item">Payroll</span>
+                <span className="dropdown-item">Reports</span>
+              </div>
+            </div>
             <button onClick={() => navigate('/pricing')} className="nav-link-btn">Pricing</button>
             <button onClick={() => navigate('/login')} className="nav-link-btn">Login</button>
-            <button onClick={() => navigate('/register')} className="nav-btn-primary">Sign Up</button>
+            <button onClick={() => window.open('https://calendly.com/kejriwal9576/30min', '_blank')} className="nav-btn-primary">Book a Demo</button>
           </div>
+
+          {/* Mobile Hamburger Button */}
+          <button
+            className={`mobile-menu-btn ${mobileMenuOpen ? 'open' : ''}`}
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            aria-label="Toggle menu"
+          >
+            <span></span>
+            <span></span>
+            <span></span>
+          </button>
+        </div>
+
+        {/* Mobile Menu */}
+        <div className={`mobile-menu ${mobileMenuOpen ? 'open' : ''}`}>
+          <div className="mobile-menu-section">
+            <span className="mobile-menu-label">Features</span>
+            <div className="mobile-features-grid">
+              <span className="mobile-feature-item">Projects</span>
+              <span className="mobile-feature-item">Tasks</span>
+              <span className="mobile-feature-item">Timesheets</span>
+              <span className="mobile-feature-item">Invoicing</span>
+              <span className="mobile-feature-item">Team</span>
+              <span className="mobile-feature-item">Clients</span>
+              <span className="mobile-feature-item">Payroll</span>
+              <span className="mobile-feature-item">Reports</span>
+            </div>
+          </div>
+          <button onClick={() => { navigate('/pricing'); setMobileMenuOpen(false); }} className="mobile-nav-link">Pricing</button>
+          <button onClick={() => { navigate('/login'); setMobileMenuOpen(false); }} className="mobile-nav-link">Login</button>
+          <button onClick={() => { window.open('https://calendly.com/kejriwal9576/30min', '_blank'); setMobileMenuOpen(false); }} className="mobile-nav-btn-primary">Book a Demo</button>
         </div>
       </nav>
 
@@ -97,14 +145,11 @@ const LandingPage = () => {
               Your Business Operating System <br />Reimagined.<br />
             </h1>
             <p className="hero-subtitle">
-              Komorebi Essentials brings your entire organization together. Manage projects, track tasks, handle payroll, and connect your team—all in one unified platform.
+              ArchiEase brings your entire organization together. Manage projects, track tasks, handle payroll, and connect your team—all in one unified platform.
             </p>
             <div className="hero-actions">
-              <button onClick={() => navigate('/register')} className="btn-hero-primary">
-                Get Started
-              </button>
-              <button onClick={() => navigate('/login')} className="btn-hero-secondary">
-                Sign In
+              <button onClick={() => window.open('https://calendly.com/kejriwal9576/30min', '_blank')} className="btn-hero-primary">
+                Book a Demo
               </button>
             </div>
           </div>
@@ -115,7 +160,7 @@ const LandingPage = () => {
       </section>
 
       {/* Hero Section with Features */}
-      <section className="hero-section">
+      <section className="hero-section" id="features-section">
         <div className="features-container">
           <div className="section-title-wrapper">
             <h2
@@ -150,68 +195,6 @@ const LandingPage = () => {
         </div>
       </section>
 
-      {/* Pricing Preview Section */}
-      <section
-        className={`pricing-preview-section ${visibleSections.has('pricing') ? 'visible' : ''}`}
-        data-section="pricing"
-      >
-        <div className="pricing-preview-container">
-          <h2 className="section-title" style={{ fontSize: '2.5rem', marginBottom: '20px', color: '#2d3748' }}>Simple, Transparent Pricing</h2>
-          <p className="section-subtitle" style={{ fontSize: '1.2rem', color: '#718096', marginBottom: '50px' }}>
-            Start with a 15-day free trial. Upgrade as you grow. No hidden fees.
-          </p>
-
-          <div className="pricing-preview-grid">
-            {/* Solo Plan */}
-            <div className="pricing-preview-card">
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>Solo</h3>
-              <div className="price" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '5px', color: '#4f46e5' }}>₹99<span style={{ fontSize: '1rem', fontWeight: 'normal', color: '#718096' }}>/user/mo</span></div>
-              <p style={{ color: '#718096', marginBottom: '10px' }}>Perfect for freelancers just starting out.</p>
-              <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>+ 18% GST</p>
-              <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left', marginBottom: '25px', width: '100%' }}>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> 1 User</li>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> 3 Active Projects</li>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> Basic Task Boards</li>
-              </ul>
-              <button onClick={() => navigate('/register')} className="btn-outline" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '2px solid #4f46e5', color: '#4f46e5', background: 'transparent', fontWeight: '600', cursor: 'pointer', marginTop: 'auto' }}>Start 15-Day Free Trial</button>
-            </div>
-
-            {/* Studio Plan */}
-            <div className="pricing-preview-card popular">
-              <div style={{ background: '#4f46e5', color: 'white', padding: '5px 15px', borderRadius: '20px', display: 'inline-block', marginBottom: '15px', fontSize: '0.8rem', fontWeight: 'bold' }}>MOST POPULAR</div>
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>Studio</h3>
-              <div className="price" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '5px', color: '#2d3748' }}>₹499<span style={{ fontSize: '1rem', fontWeight: 'normal', color: '#718096' }}>/user/mo</span></div>
-              <p style={{ color: '#718096', marginBottom: '10px' }}>For growing teams needing financial insights.</p>
-              <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>+ 18% GST</p>
-              <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left', marginBottom: '25px', width: '100%' }}>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> Unlimited Projects</li>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> Financial Dashboard</li>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> Team Collaboration</li>
-              </ul>
-              <button onClick={() => navigate('/register')} className="btn-primary" style={{ width: '100%', padding: '12px', borderRadius: '6px', border: 'none', background: '#4f46e5', color: 'white', fontWeight: '600', cursor: 'pointer', marginTop: 'auto' }}>Start 15-Day Free Trial</button>
-            </div>
-
-            {/* Firm Plan */}
-            <div className="pricing-preview-card">
-              <h3 style={{ fontSize: '1.5rem', marginBottom: '10px' }}>Firm</h3>
-              <div className="price" style={{ fontSize: '2rem', fontWeight: 'bold', marginBottom: '5px', color: '#2d3748' }}>₹399<span style={{ fontSize: '1rem', fontWeight: 'normal', color: '#718096' }}>/user/mo</span></div>
-              <p style={{ color: '#718096', marginBottom: '10px' }}>Volume pricing for established teams (5+ users).</p>
-              <p style={{ fontSize: '0.875rem', color: '#64748b', marginBottom: '20px' }}>+ 18% GST</p>
-              <ul style={{ listStyle: 'none', padding: 0, textAlign: 'left', marginBottom: '25px', width: '100%' }}>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> Volume Discount</li>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> Advanced Permissions</li>
-                <li style={{ marginBottom: '10px', display: 'flex', alignItems: 'center' }}><CheckIcon /> Priority Support</li>
-              </ul>
-              <button onClick={() => navigate('/register')} className="btn-outline" style={{ width: '100%', padding: '10px', borderRadius: '6px', border: '2px solid #4f46e5', color: '#4f46e5', background: 'transparent', fontWeight: '600', cursor: 'pointer', marginTop: 'auto' }}>Contact Sales</button>
-            </div>
-          </div>
-
-          <div style={{ marginTop: '40px' }}>
-            <button onClick={() => navigate('/pricing')} style={{ background: 'transparent', border: 'none', color: '#4f46e5', fontWeight: '600', fontSize: '1.1rem', cursor: 'pointer', textDecoration: 'underline' }}>View Full Pricing Details →</button>
-          </div>
-        </div>
-      </section>
-
       {/* Footer & CTA Wrapper */}
       <div
         className={`footer-cta-wrapper ${visibleSections.has('footer-cta') ? 'visible' : ''}`}
@@ -223,14 +206,11 @@ const LandingPage = () => {
             <div className="cta-content">
               <h2 className="cta-title">Ready to Streamline Your Workflow?</h2>
               <p className="cta-subtitle">
-                Join thousands of teams who have transformed their project management with Komorebi.
+                Join thousands of teams who have transformed their project management with ArchiEase.
               </p>
               <div className="cta-actions">
-                <button onClick={() => navigate('/register')} className="btn-cta-primary">
-                  Get Started for Free
-                </button>
-                <button onClick={() => navigate('/demo')} className="btn-cta-secondary">
-                  Schedule Demo
+                <button onClick={() => window.open('https://calendly.com/kejriwal9576/30min', '_blank')} className="btn-cta-primary">
+                  Book a Demo
                 </button>
               </div>
             </div>
@@ -242,57 +222,36 @@ const LandingPage = () => {
           <div className="footer-main">
             <div className="footer-grid">
               <div className="footer-brand-col">
-                <div className="footer-brand">KOMOREBI</div>
+                <div className="footer-brand">ARCHIEASE</div>
                 <p className="footer-description">
                   Empowering teams to build the future with intuitive project management tools.
                 </p>
               </div>
 
               <div className="footer-col">
-                <h4 className="footer-heading">Product</h4>
-                <ul className="footer-links">
-                  <li><button className="footer-link">Features</button></li>
-                  <li><button className="footer-link">Pricing</button></li>
-                  <li><button className="footer-link">Integrations</button></li>
-                  <li><button className="footer-link">Changelog</button></li>
-                </ul>
-              </div>
-
-              <div className="footer-col">
-                <h4 className="footer-heading">Company</h4>
-                <ul className="footer-links">
-                  <li><button className="footer-link">About Us</button></li>
-                  <li><button className="footer-link">Careers</button></li>
-                  <li><button className="footer-link">Blog</button></li>
-                  <li><button className="footer-link">Contact</button></li>
-                </ul>
-              </div>
-
-              <div className="footer-col">
                 <h4 className="footer-heading">Contact</h4>
                 <div className="footer-contact-item">
                   <span className="footer-contact-icon">📧</span>
-                  <a href="mailto:hello@komorebi.com" className="footer-contact-link">hello@komorebi.com</a>
+                  <a href="mailto:support@archiease.in" className="footer-contact-link">support@archiease.in</a>
                 </div>
                 <div className="footer-contact-item">
                   <span className="footer-contact-icon">📱</span>
-                  <a href="tel:+15551234567" className="footer-contact-link">+1 (555) 123-4567</a>
+                  <a href="tel:+918409011633" className="footer-contact-link">+91 84090 11633</a>
                 </div>
                 <div className="footer-contact-item">
                   <span className="footer-contact-icon">📍</span>
-                  <span className="footer-contact-link">San Francisco, CA</span>
+                  <span className="footer-contact-link">C-156, Vasant Vihar, Indore, Madhya Pradesh 452010, India</span>
                 </div>
               </div>
             </div>
 
             <div className="footer-bottom">
               <div className="footer-copyright">
-                © {new Date().getFullYear()} Komorebi Inc. All rights reserved.
+                © {new Date().getFullYear()} ArchiEase Inc. All rights reserved.
               </div>
               <div className="footer-legal">
-                <button className="footer-legal-link">Privacy Policy</button>
-                <button className="footer-legal-link">Terms of Service</button>
-                <button className="footer-legal-link">Cookie Settings</button>
+                <button className="footer-legal-link" onClick={() => navigate('/privacy-policy')}>Privacy Policy</button>
+                <button className="footer-legal-link" onClick={() => navigate('/terms')}>Terms of Service</button>
               </div>
             </div>
           </div>

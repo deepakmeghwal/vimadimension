@@ -120,14 +120,14 @@ const ClientsList = ({ user }) => {
   }
 
   return (
-    <div className="main-content">
-      <div className="page-header">
-        <div className="page-header-top">
+    <div className="main-content" style={{ maxWidth: '100%' }}>
+      <div className="page-header" style={{ width: '100%' }}>
+        <div className="page-header-top" style={{ width: '100%' }}>
           <div className="page-header-title-section">
             <h1 className="page-title">All Clients</h1>
             <p className="page-subtitle">Manage your client organizations and contacts</p>
           </div>
-          <div className="page-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap' }}>
+          <div className="page-header-actions" style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', marginLeft: 'auto' }}>
             <div style={{ position: 'relative', display: 'inline-block' }}>
               <input
                 type="text"
@@ -175,7 +175,7 @@ const ClientsList = ({ user }) => {
             <button
               className="btn-primary"
               onClick={() => setIsCreateModalOpen(true)}
-              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem' }}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '0.5rem', backgroundColor: '#546E7A', border: 'none' }}
             >
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                 <line x1="12" y1="5" x2="12" y2="19"></line>
@@ -215,7 +215,7 @@ const ClientsList = ({ user }) => {
                   <button
                     className="btn-primary"
                     onClick={() => setIsCreateModalOpen(true)}
-                    style={{ marginTop: '0.75rem' }}
+                    style={{ marginTop: '0.75rem', backgroundColor: '#546E7A', border: 'none' }}
                   >
                     Create Client
                   </button>

@@ -28,9 +28,11 @@ export class DatabaseStack extends cdk.Stack {
             allowMajorVersionUpgrade: false,
             autoMinorVersionUpgrade: true,
             backupRetention: cdk.Duration.days(1),
-            deleteAutomatedBackups: true,
-            removalPolicy: cdk.RemovalPolicy.DESTROY, // For dev/test, use SNAPSHOT or RETAIN for prod
-            databaseName: 'vimadimension',
+            deleteAutomatedBackups: false,  // Keep backups for recovery
+            deletionProtection: true,  // Prevent accidental deletion
+            removalPolicy: cdk.RemovalPolicy.RETAIN,  // Never delete the database
+            // ⚠️ WARNING: Do NOT change databaseName - it causes database replacement and DATA LOSS!
+            databaseName: 'archiease',
             publiclyAccessible: false,
         });
 

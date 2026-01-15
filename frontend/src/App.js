@@ -6,12 +6,12 @@ import Login from './components/common/Login';
 import LandingPage from './components/common/LandingPage';
 import ProjectsList from './components/projects/ProjectsList';
 import ProjectDetails from './components/projects/ProjectDetails';
+
 import ResourcePlannerWrapper from './components/projects/ResourcePlannerWrapper';
 import CreateProject from './components/projects/CreateProject';
 import EditProject from './components/projects/EditProject';
 import CreatePhase from './components/phases/CreatePhase';
 import EditPhase from './components/phases/EditPhase';
-import UserProfile from './components/users/UserProfile';
 import TaskDetails from './components/tasks/TaskDetails';
 import TaskForm from './components/tasks/TaskForm';
 import TaskEditForm from './components/tasks/TaskEditForm';
@@ -36,8 +36,13 @@ import RoleDetails from './components/admin/RoleDetails';
 import UserRoleManagement from './components/admin/UserRoleManagement';
 import OrganizationSettings from './components/admin/OrganizationSettings';
 import ClientsList from './components/admin/ClientsList';
-import FinancialHealthDashboard from './components/finance/FinancialHealthDashboard';
+import ResourcePlanningDashboard from './components/finance/ResourcePlanningDashboard';
+import GenerateInvoices from './components/finance/GenerateInvoices';
+import FinancialDashboard from './components/finance/FinancialDashboard';
 import PricingPage from './components/pricing/PricingPage';
+import PrivacyPolicy from './components/common/PrivacyPolicy';
+import TermsOfService from './components/common/TermsOfService';
+
 
 // Auth components
 import VerifyEmail from './components/auth/VerifyEmail';
@@ -153,14 +158,14 @@ const App = () => {
           <Route
             path="/login"
             element={
-              user ? <Navigate to="/profile" replace /> : <Login onLogin={handleLogin} />
+              user ? <Navigate to="/projects" replace /> : <Login onLogin={handleLogin} />
             }
           />
 
           <Route
-            path="/register"
+            path="/onboard/k7x9m2p"
             element={
-              user ? <Navigate to="/profile" replace /> : <OrganizationRegister />
+              user ? <Navigate to="/projects" replace /> : <OrganizationRegister />
             }
           />
 
@@ -174,7 +179,7 @@ const App = () => {
           <Route
             path="/forgot-password"
             element={
-              user ? <Navigate to="/profile" replace /> : <ForgotPassword />
+              user ? <Navigate to="/projects" replace /> : <ForgotPassword />
             }
           />
 
@@ -188,7 +193,7 @@ const App = () => {
           <Route
             path="/join"
             element={
-              user ? <Navigate to="/profile" replace /> : <JoinOrganization />
+              user ? <Navigate to="/projects" replace /> : <JoinOrganization />
             }
           />
 
@@ -202,10 +207,18 @@ const App = () => {
             element={<PricingPage />}
           />
 
+          <Route
+            path="/privacy-policy"
+            element={<PrivacyPolicy />}
+          />
+
+          <Route
+            path="/terms"
+            element={<TermsOfService />}
+          />
           {/* Protected routes wrapped in Layout */}
           {user ? (
-            <Route element={<Layout user={user} onLogout={handleLogout} />}>
-              <Route path="/profile" element={<UserProfile user={user} onUserUpdate={checkAuthStatus} />} />
+            <Route element={<Layout user={user} onLogout={handleLogout} onUserUpdate={checkAuthStatus} />}>
               <Route path="/my-tasks" element={<MyTasks user={user} />} />
               <Route path="/tasks" element={<MyTasks user={user} />} />
               <Route path="/my-approvals" element={<MyApprovals user={user} />} />
@@ -257,7 +270,11 @@ const App = () => {
               <Route path="/invoices/:id/payment" element={<RecordPayment user={user} />} />
 
               {/* Financial Health Dashboard */}
-              <Route path="/finance/health" element={<FinancialHealthDashboard user={user} />} />
+              <Route path="/finance/resource-planning" element={<ResourcePlanningDashboard user={user} />} />
+              <Route path="/finance/resource-planning/:projectId" element={<ResourcePlanningDashboard user={user} />} />
+              <Route path="/finance/generate-invoices" element={<GenerateInvoices user={user} />} />
+              <Route path="/finance/generate-invoices/:projectId" element={<GenerateInvoices user={user} />} />
+              <Route path="/finance/dashboard" element={<FinancialDashboard />} />
             </Route>
           ) : (
             <Route path="*" element={<Navigate to="/login" replace />} />

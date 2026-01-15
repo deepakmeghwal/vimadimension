@@ -139,18 +139,23 @@ public class OrganizationRegistrationController {
         }
 
         try {
-            // Always return success to prevent email enumeration
-            authService.resendVerificationEmail(email);
+            boolean result = authService.resendVerificationEmail(email);
             
-            response.put("success", true);
-            response.put("message", "If an unverified account exists with this email, a new verification link has been sent.");
-            return ResponseEntity.ok(response);
+            if (result) {
+                response.put("success", true);
+                response.put("message", "Verification email sent successfully.");
+                return ResponseEntity.ok(response);
+            } else {
+                response.put("success", false);
+                response.put("message", "Failed to send verification email: User not found, already verified, or invalid organization state.");
+                return ResponseEntity.badRequest().body(response);
+            }
 
         } catch (Exception e) {
             logger.error("Resend verification failed: {}", e.getMessage(), e);
-            response.put("success", true); // Still return success to prevent enumeration
-            response.put("message", "If an unverified account exists with this email, a new verification link has been sent.");
-            return ResponseEntity.ok(response);
+            response.put("success", false);
+            response.put("message", "Internal Server Error: " + e.getMessage());
+            return ResponseEntity.internalServerError().body(response);
         }
     }
 }

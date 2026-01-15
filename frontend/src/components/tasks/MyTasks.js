@@ -1,6 +1,11 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { CheckCircle2, ChevronRight } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
+import TaskDetailPanel from '../projects/TaskDetailPanel';
+import { AsanaSection, AsanaTaskRow, formatStatus, formatPriority } from '../projects/AsanaListComponents';
+import '../projects/ProjectDetails.css';
+import './MyTasks.css';
 
 const MyTasks = ({ user }) => {
   const location = useLocation();
@@ -20,7 +25,7 @@ const MyTasks = ({ user }) => {
 
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [viewMode, setViewMode] = useState('board'); // 'list' or 'board'
+  const [viewMode, setViewMode] = useState('list'); // 'list' or 'board'
   const [showStandaloneForm, setShowStandaloneForm] = useState(false);
   const [showFilterModal, setShowFilterModal] = useState(false);
   const [filters, setFilters] = useState({
@@ -28,6 +33,8 @@ const MyTasks = ({ user }) => {
     status: [],
     priority: []
   });
+
+  const [selectedTaskForPanel, setSelectedTaskForPanel] = useState(null);
 
   // Fetch tasks with filters via API call
   const fetchTasks = async (page = 0, currentFilters = null) => {
@@ -42,11 +49,11 @@ const MyTasks = ({ user }) => {
         page: page.toString(),
         size: pagination.pageSize.toString()
       });
-      
+
       // If on /my-tasks route, use the backend endpoint that filters by current user
       // Otherwise, use the general tasks endpoint with assignee filters if provided
       let apiEndpoint = '/api/tasks';
-      
+
       if (isMyTasks) {
         // Use the backend endpoint that automatically filters by authenticated user
         apiEndpoint = '/api/tasks/assigned-to-me';
@@ -54,7 +61,7 @@ const MyTasks = ({ user }) => {
         // If assignees are selected, filter by the first assignee (backend supports single assigneeId)
         params.append('assigneeId', activeFilters.assigneeIds[0].toString());
       }
-      
+
       // Apply status and priority filters to the API call
       if (activeFilters.status && activeFilters.status.length > 0) {
         activeFilters.status.forEach(s => params.append('status', s));
@@ -103,13 +110,13 @@ const MyTasks = ({ user }) => {
   // Refetch tasks when navigating to this route from another route
   useEffect(() => {
     const isTasksRoute = location.pathname === '/my-tasks' || location.pathname === '/tasks';
-    
+
     // Refetch if we're on a tasks route and the pathname changed
     // This includes switching between /my-tasks and /tasks
     if (user && isTasksRoute && prevPathnameRef.current !== location.pathname) {
       fetchTasks(0);
     }
-    
+
     // Update the ref for the next render
     prevPathnameRef.current = location.pathname;
   }, [location.pathname, user, isMyTasks]);
@@ -122,6 +129,40 @@ const MyTasks = ({ user }) => {
   const handlePageChange = (newPage) => {
     if (newPage >= 0 && newPage < pagination.totalPages) {
       fetchTasks(newPage);
+    }
+  };
+
+  const handleTaskUpdate = async (taskId, updates) => {
+    // Optimistic Update
+    setAllTasks(prev => prev.map(t =>
+      t.id === taskId ? { ...t, ...updates } : t
+    ));
+
+    try {
+      const apiPayload = { ...updates };
+      if (updates.assignee) {
+        apiPayload.assigneeId = updates.assignee.id;
+        delete apiPayload.assignee;
+      } else if (updates.assignee === null) {
+        apiPayload.assigneeId = null;
+      }
+
+      const response = await fetch(`/api/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(apiPayload),
+        credentials: 'include'
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to update task');
+      }
+    } catch (error) {
+      console.error('Task update failed:', error);
+      // Revert changes by refetching
+      fetchTasks(pagination.currentPage);
     }
   };
 
@@ -149,18 +190,7 @@ const MyTasks = ({ user }) => {
     }
   };
 
-  const formatStatus = (status) => {
-    return status?.toLowerCase().replace(/_/g, '-') || 'to-do';
-  };
 
-  const formatPriority = (priority) => {
-    return priority?.toLowerCase() || 'medium';
-  };
-
-  const getInitials = (name) => {
-    if (!name) return '?';
-    return name.split(' ').map(n => n[0]).join('').toUpperCase().substring(0, 2);
-  };
 
   const hasActiveFilters = () => {
     return filters.assigneeIds.length > 0 || filters.status.length > 0 || filters.priority.length > 0;
@@ -184,77 +214,41 @@ const MyTasks = ({ user }) => {
     fetchTasks(0, newFilters);
   };
 
-  const renderListView = (tasks) => (
-    <div className="data-table-container">
-      <table className="data-table">
-        <thead>
-          <tr>
-            <th>Task</th>
-            <th style={{ width: '120px' }}>Priority</th>
-            <th style={{ width: '120px' }}>Status</th>
-            <th style={{ width: '150px' }}>Assignee</th>
-            <th style={{ width: '120px' }}>Due Date</th>
-            <th style={{ width: '100px' }}></th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.map(task => (
-            <tr key={task.id}>
-              <td>
-                <Link
-                  to={`/tasks/${task.id}/details`}
-                  className="task-row-title"
-                  style={{ textDecoration: 'none', color: 'inherit' }}
-                >
-                  {task.name}
-                </Link>
-                {task.project && (
-                  <div style={{ fontSize: '0.75rem', color: '#64748b', marginTop: '0.25rem' }}>
-                    {task.project.name}
-                  </div>
-                )}
-              </td>
-              <td>
-                <span className={`badge badge-priority ${formatPriority(task.priority)}`}>
-                  {task.priority}
-                </span>
-              </td>
-              <td>
-                <span className={`badge badge-status ${formatStatus(task.status)}`}>
-                  {task.status?.replace(/_/g, ' ')}
-                </span>
-              </td>
-              <td>
-                {task.assignee && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                    <div className="avatar avatar-sm">
-                      {getInitials(task.assignee.name || task.assignee.username)}
-                    </div>
-                    <span style={{ fontSize: '0.875rem' }}>
-                      {task.assignee.name || task.assignee.username}
-                    </span>
-                  </div>
-                )}
-              </td>
-              <td>
-                <span className="task-row-date">
-                  {task.dueDate ? new Date(task.dueDate).toLocaleDateString() : '-'}
-                </span>
-              </td>
-              <td>
-                <Link
-                  to={`/tasks/${task.id}/details`}
-                  className="btn-small btn-outline"
-                >
-                  View
-                </Link>
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
+  const renderListView = (tasks) => {
+    const gridTemplateColumns = 'minmax(400px, 1fr) 150px 150px 120px 120px 80px';
+
+    return (
+      <div className="asana-list-view" style={{ padding: '0 20px' }}>
+        <div className="asana-list-header" style={{ gridTemplateColumns }}>
+          <div className="header-cell">Task name</div>
+          <div className="header-cell">Assignee</div>
+          <div className="header-cell">Due date</div>
+          <div className="header-cell">Priority</div>
+          <div className="header-cell">Status</div>
+          <div className="header-cell"></div>
+        </div>
+
+        <div className="asana-list-body">
+          <AsanaSection
+            title="Tasks"
+            tasks={tasks}
+            defaultExpanded={true}
+            gridTemplateColumns={gridTemplateColumns}
+            renderRow={(task) => (
+              <AsanaTaskRow
+                key={task.id}
+                task={task}
+                teamMembers={[]} // We might need to fetch all users for assignee selector to work fully
+                onUpdate={handleTaskUpdate}
+                onOpenDetails={() => setSelectedTaskForPanel(task)}
+                gridTemplateColumns={gridTemplateColumns}
+              />
+            )}
+          />
+        </div>
+      </div>
+    );
+  };
 
   const handleDragStart = (e, taskId) => {
     e.dataTransfer.setData('taskId', taskId.toString());
@@ -291,9 +285,9 @@ const MyTasks = ({ user }) => {
     }
 
     const oldStatus = taskToUpdate.status;
-    
+
     // Optimistically update UI
-    setAllTasks(prev => prev.map(task => 
+    setAllTasks(prev => prev.map(task =>
       task.id.toString() === taskId ? { ...task, status: newStatus } : task
     ));
 
@@ -309,7 +303,7 @@ const MyTasks = ({ user }) => {
 
       if (!response.ok) {
         // Rollback on error
-        setAllTasks(prev => prev.map(task => 
+        setAllTasks(prev => prev.map(task =>
           task.id.toString() === taskId ? { ...task, status: oldStatus } : task
         ));
         const errorData = await response.json();
@@ -317,7 +311,7 @@ const MyTasks = ({ user }) => {
       }
     } catch (error) {
       console.error('Error updating task status:', error);
-      setAllTasks(prev => prev.map(task => 
+      setAllTasks(prev => prev.map(task =>
         task.id.toString() === taskId ? { ...task, status: oldStatus } : task
       ));
       setError('Failed to update task status');
@@ -354,32 +348,57 @@ const MyTasks = ({ user }) => {
             </div>
             <div className="kanban-column-cards">
               {tasksByStatus[status].map(task => (
-                <Link
+                <div
                   key={task.id}
-                  to={`/tasks/${task.id}/details`}
-                  className="kanban-card"
-                  style={{ textDecoration: 'none' }}
+                  className="board-task-card"
                   draggable
                   onDragStart={(e) => handleDragStart(e, task.id)}
                   onDragEnd={handleDragEnd}
                 >
-                  <div className="kanban-card-title">{task.name}</div>
-                  <div className="kanban-card-meta">
-                    <span className={`badge badge-priority ${formatPriority(task.priority)}`}>
-                      {task.priority}
-                    </span>
-                    {task.assignee && (
-                      <div className="avatar avatar-sm">
-                        {getInitials(task.assignee.name || task.assignee.username)}
+                  <div
+                    className="board-task-card-content"
+                    onClick={() => setSelectedTaskForPanel(task)}
+                  >
+                    <div className="task-card-row-1">
+                      <div className="task-check-icon">
+                        <CheckCircle2 size={18} className="text-gray-400" />
                       </div>
-                    )}
-                    {task.dueDate && (
-                      <span style={{ fontSize: '0.75rem', color: '#64748b' }}>
-                        {new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                      <div className="task-card-name">{task.name}</div>
+                    </div>
+
+                    <div className="task-card-row-2">
+                      <span className={`badge badge-priority ${formatPriority(task.priority)}`}>
+                        {task.priority || 'Medium'}
                       </span>
-                    )}
+                      <span className={`badge badge-status ${formatStatus(task.status)}`}>
+                        {task.status?.replace(/_/g, ' ') || 'To Do'}
+                      </span>
+                    </div>
+
+                    <div className="task-card-row-3">
+                      {task.assignee && (
+                        <div className="task-assignee-avatar-small" title={task.assignee.name || task.assignee.username}>
+                          {task.assignee.name ? task.assignee.name.charAt(0).toUpperCase() : 'U'}
+                        </div>
+                      )}
+                      {task.dueDate && (
+                        <div className={`task-due-date-text ${new Date(task.dueDate) < new Date() ? 'overdue' : ''}`}>
+                          {new Date(task.dueDate).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                        </div>
+                      )}
+                    </div>
                   </div>
-                </Link>
+                  <button
+                    className="btn-task-details-slider board-card-details-btn"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSelectedTaskForPanel(task);
+                    }}
+                  >
+                    <ChevronRight size={14} />
+                    Details
+                  </button>
+                </div>
               ))}
             </div>
           </div>
@@ -428,18 +447,18 @@ const MyTasks = ({ user }) => {
 
   if (loading && allTasks.length === 0) {
     return (
-      <div className="main-content">
+      <div className="main-content my-tasks-page">
         <LoadingSpinner message="Loading your tasks..." size="large" />
       </div>
     );
   }
 
   return (
-    <div className="main-content">
+    <div className="main-content my-tasks-page">
       <div className="projects-header-compact">
         <div className="projects-header-left">
           <h1 className="projects-title-compact">
-            {isMyTasks ? 'My Tasks' : 'Tasks'} 
+            {isMyTasks ? 'My Tasks' : 'Tasks'}
             <span className="projects-count">({currentTasks.length})</span>
           </h1>
         </div>
@@ -519,6 +538,14 @@ const MyTasks = ({ user }) => {
           {renderPaginationControls()}
         </>
       )}
+
+      {selectedTaskForPanel && (
+        <TaskDetailPanel
+          task={selectedTaskForPanel}
+          onClose={() => setSelectedTaskForPanel(null)}
+          onUpdate={handleTaskUpdate}
+        />
+      )}
     </div>
   );
 };
@@ -586,7 +613,7 @@ const TaskFilterModal = ({ filters, onApply, onClose, onClear, isMyTasks = false
       const response = await fetch('/api/tasks/users', {
         credentials: 'include'
       });
-      
+
       if (response.ok) {
         const data = await response.json();
         if (data.success && data.users) {
@@ -596,11 +623,11 @@ const TaskFilterModal = ({ filters, onApply, onClose, onClear, isMyTasks = false
             const username = (user.username || '').toLowerCase();
             const name = (user.name || '').toLowerCase();
             const email = (user.email || '').toLowerCase();
-            
-            return userId.includes(queryLower) || 
-                   username.includes(queryLower) || 
-                   name.includes(queryLower) ||
-                   email.includes(queryLower);
+
+            return userId.includes(queryLower) ||
+              username.includes(queryLower) ||
+              name.includes(queryLower) ||
+              email.includes(queryLower);
           });
           setSearchResults(filtered);
           setShowResults(true);
@@ -747,7 +774,7 @@ const TaskFilterModal = ({ filters, onApply, onClose, onClear, isMyTasks = false
                       </div>
                     )}
                   </div>
-                  
+
                   {showResults && searchResults.length > 0 && (
                     <div className="user-search-results">
                       {searchResults.map(user => (

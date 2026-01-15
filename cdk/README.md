@@ -1,6 +1,6 @@
-# VimaDimension CDK Deployment Guide
+# ArchiEase CDK Deployment Guide
 
-This guide covers deploying the VimaDimension application to AWS using CDK.
+This guide covers deploying the ArchiEase application to AWS using CDK.
 
 ## Architecture Overview
 
@@ -9,8 +9,7 @@ This guide covers deploying the VimaDimension application to AWS using CDK.
 | **SesStack** | AWS SES for email sending with SMTP credentials |
 | **NetworkStack** | VPC, subnets, and security groups |
 | **DatabaseStack** | RDS MySQL database |
-| **LoadBalancerStack** | Application Load Balancer |
-| **BackendStack** | EC2 Auto Scaling Group running Docker containers |
+| **BackendStack** | EC2 instance with Elastic IP running Docker containers |
 | **FrontendStack** | S3 bucket + CloudFront distribution for React app |
 
 ## Prerequisites
@@ -83,10 +82,10 @@ cd ..
 aws ecr get-login-password --region us-east-1 | docker login --username AWS --password-stdin YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com
 
 # Build the Docker image for Linux AMD64 (even on Apple Silicon Macs)
-docker build --platform linux/amd64 -t vimadimension-backend .
+docker build --platform linux/amd64 -t archiease-backend .
 
 # Tag for ECR
-docker tag vimadimension-backend:latest YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/cdk-hnb659fds-container-assets-YOUR_ACCOUNT_ID-us-east-1:latest
+docker tag archiease-backend:latest YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/cdk-hnb659fds-container-assets-YOUR_ACCOUNT_ID-us-east-1:latest
 
 # Push to ECR
 docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/cdk-hnb659fds-container-assets-YOUR_ACCOUNT_ID-us-east-1:latest
@@ -147,7 +146,6 @@ Or deploy stacks individually (in dependency order):
 npx cdk deploy SesStack
 npx cdk deploy NetworkStack
 npx cdk deploy DatabaseStack
-npx cdk deploy LoadBalancerStack
 npx cdk deploy BackendStack
 npx cdk deploy FrontendStack
 ```
@@ -169,13 +167,13 @@ echo "Deploying to Account: $ACCOUNT_ID in Region: $REGION"
 
 # Build and push Docker image
 echo "Building Docker image for Linux AMD64..."
-docker build --platform linux/amd64 -t vimadimension-backend .
+docker build --platform linux/amd64 -t archiease-backend .
 
 echo "Logging into ECR..."
 aws ecr get-login-password --region $REGION | docker login --username AWS --password-stdin $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com
 
 echo "Tagging and pushing image..."
-docker tag vimadimension-backend:latest $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/cdk-hnb659fds-container-assets-$ACCOUNT_ID-$REGION:latest
+docker tag archiease-backend:latest $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/cdk-hnb659fds-container-assets-$ACCOUNT_ID-$REGION:latest
 docker push $ACCOUNT_ID.dkr.ecr.$REGION.amazonaws.com/cdk-hnb659fds-container-assets-$ACCOUNT_ID-$REGION:latest
 
 # Build frontend

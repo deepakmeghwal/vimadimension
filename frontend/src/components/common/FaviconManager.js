@@ -35,7 +35,7 @@ const FaviconManager = ({ user }) => {
                 link.href = canvas.toDataURL();
             } else {
                 // Reset to default (firm logo) if no user
-                link.href = '/images/firm-logo.jpg';
+                link.href = '/images/logo_final_black_tab.svg';
             }
         };
 

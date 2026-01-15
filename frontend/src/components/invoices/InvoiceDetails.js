@@ -12,7 +12,7 @@ const InvoiceDetails = ({ user }) => {
   const [isSendingEmail, setIsSendingEmail] = useState(false);
 
   // Check if user has admin or manager role
-  const canManageInvoices = user?.authorities?.some(auth => 
+  const canManageInvoices = user?.authorities?.some(auth =>
     auth.authority === 'ROLE_ADMIN' || auth.authority === 'ROLE_MANAGER'
   ) || false;
 
@@ -246,8 +246,8 @@ const InvoiceDetails = ({ user }) => {
         <div className="alert alert-danger">
           <h4>Error</h4>
           <p>{error}</p>
-          <button className="btn btn-primary" onClick={() => navigate('/invoices')}>
-            Back to Invoices
+          <button className="btn btn-primary" onClick={() => navigate(-1)}>
+            Back
           </button>
         </div>
       </div>
@@ -260,8 +260,8 @@ const InvoiceDetails = ({ user }) => {
         <div className="alert alert-warning">
           <h4>Invoice Not Found</h4>
           <p>The requested invoice could not be found.</p>
-          <button className="btn btn-primary" onClick={() => navigate('/invoices')}>
-            Back to Invoices
+          <button className="btn btn-primary" onClick={() => navigate(-1)}>
+            Back
           </button>
         </div>
       </div>
@@ -273,12 +273,12 @@ const InvoiceDetails = ({ user }) => {
       {/* Header */}
       <div className="d-flex justify-content-between align-items-center mb-4">
         <div>
-          <button 
+          <button
             className="btn btn-outline-secondary mb-2"
-            onClick={() => navigate('/invoices')}
+            onClick={() => navigate(-1)}
           >
             <i className="fas fa-arrow-left me-2"></i>
-            Back to Invoices
+            Back
           </button>
           <h2>Invoice Details</h2>
         </div>
@@ -312,9 +312,9 @@ const InvoiceDetails = ({ user }) => {
       {error && (
         <div className="alert alert-danger alert-dismissible fade show" role="alert">
           {error}
-          <button 
-            type="button" 
-            className="btn-close" 
+          <button
+            type="button"
+            className="btn-close"
             onClick={() => setError('')}
           ></button>
         </div>
@@ -323,9 +323,9 @@ const InvoiceDetails = ({ user }) => {
       {message && (
         <div className={`alert alert-${message.type === 'success' ? 'success' : 'danger'} alert-dismissible fade show`} role="alert">
           {message.text}
-          <button 
-            type="button" 
-            className="btn-close" 
+          <button
+            type="button"
+            className="btn-close"
             onClick={() => setMessage(null)}
           ></button>
         </div>
@@ -338,9 +338,9 @@ const InvoiceDetails = ({ user }) => {
             <div className="modal-content">
               <div className="modal-header">
                 <h5 className="modal-title">Send Invoice Email</h5>
-                <button 
-                  type="button" 
-                  className="btn-close" 
+                <button
+                  type="button"
+                  className="btn-close"
                   onClick={() => setShowEmailConfirm(false)}
                   disabled={isSendingEmail}
                 ></button>
@@ -354,17 +354,17 @@ const InvoiceDetails = ({ user }) => {
                 )}
               </div>
               <div className="modal-footer">
-                <button 
-                  type="button" 
-                  className="btn btn-secondary" 
+                <button
+                  type="button"
+                  className="btn btn-secondary"
                   onClick={handleSkipEmail}
                   disabled={isSendingEmail}
                 >
                   Skip Email
                 </button>
-                <button 
-                  type="button" 
-                  className="btn btn-primary" 
+                <button
+                  type="button"
+                  className="btn btn-primary"
                   onClick={handleSendEmail}
                   disabled={isSendingEmail || !invoice?.clientEmail}
                 >
@@ -565,7 +565,7 @@ const InvoiceDetails = ({ user }) => {
                       {invoice.status === 'DRAFT' && (
                         <>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item"
                               onClick={() => handleStatusUpdate('SENT')}
                             >
@@ -575,7 +575,7 @@ const InvoiceDetails = ({ user }) => {
                           </li>
                           <li><hr className="dropdown-divider" /></li>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item text-danger"
                               onClick={() => handleStatusUpdate('CANCELLED')}
                             >
@@ -590,7 +590,7 @@ const InvoiceDetails = ({ user }) => {
                       {invoice.status === 'SENT' && (
                         <>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item"
                               onClick={() => handleStatusUpdate('VIEWED')}
                             >
@@ -599,7 +599,7 @@ const InvoiceDetails = ({ user }) => {
                             </button>
                           </li>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item text-warning"
                               onClick={() => handleStatusUpdate('OVERDUE')}
                             >
@@ -609,7 +609,7 @@ const InvoiceDetails = ({ user }) => {
                           </li>
                           <li><hr className="dropdown-divider" /></li>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item text-danger"
                               onClick={() => handleStatusUpdate('CANCELLED')}
                             >
@@ -624,7 +624,7 @@ const InvoiceDetails = ({ user }) => {
                       {invoice.status === 'VIEWED' && (
                         <>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item text-warning"
                               onClick={() => handleStatusUpdate('OVERDUE')}
                             >
@@ -634,7 +634,7 @@ const InvoiceDetails = ({ user }) => {
                           </li>
                           <li><hr className="dropdown-divider" /></li>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item text-danger"
                               onClick={() => handleStatusUpdate('CANCELLED')}
                             >
@@ -649,7 +649,7 @@ const InvoiceDetails = ({ user }) => {
                       {invoice.status === 'OVERDUE' && (
                         <>
                           <li>
-                            <button 
+                            <button
                               className="dropdown-item text-danger"
                               onClick={() => handleStatusUpdate('CANCELLED')}
                             >
@@ -665,7 +665,7 @@ const InvoiceDetails = ({ user }) => {
 
                 {/* Record Payment Button (for SENT, VIEWED, OVERDUE) */}
                 {(invoice.status === 'SENT' || invoice.status === 'VIEWED' || invoice.status === 'OVERDUE') && (
-                  <button 
+                  <button
                     className="btn btn-success"
                     onClick={() => navigate(`/invoices/${id}/payment`)}
                   >

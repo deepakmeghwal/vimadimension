@@ -1,27 +1,151 @@
-/* Main container for Projects List */
-.main-content {
-    /* Note: main-content is used globally, so we might need a specific class for projects list or ensure this doesn't break other pages */
-    /* Ideally, ProjectsList.js should have a specific wrapper class like .projects-list-page */
-    scroll-snap-type: y mandatory;
+/* Basic layout for the projects list view */
+.project-list-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
 }
 
-/* We'll target the specific structure in ProjectsList.js */
-
-
-
-
-.fade-in {
-    animation: fadeIn 0.5s ease-in-out;
+/* Override main-content max-width for full width layout */
+.projects-list-page.main-content {
+  max-width: 100%;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
+.project-list-row {
+  background: #ffffff;
+  border: 1px solid #e0e0e0;
+  border-radius: 12px;
+  box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+  transition: box-shadow 0.2s ease, transform 0.2s ease;
+}
 
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+.project-list-row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(15, 23, 42, 0.08);
+}
+
+.project-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  cursor: pointer;
+}
+
+.project-name-section {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-weight: 600;
+  color: #0f172a;
+}
+
+.project-progress-section {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  min-width: 200px;
+  justify-content: flex-end;
+}
+
+.project-progress-bar {
+  flex: 1;
+  height: 6px;
+  border-radius: 999px;
+  background: #e2e8f0;
+  overflow: hidden;
+}
+
+.project-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4ade80 0%, #38bdf8 100%);
+}
+
+.project-progress-text {
+  font-size: 0.875rem;
+  color: #334155;
+  width: 36px;
+  text-align: right;
+}
+
+.project-expanded-content {
+  padding: 0 1.25rem 1.25rem 1.25rem;
+  border-top: 1px solid #f1f5f9;
+}
+
+.project-tasks-table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+.project-tasks-table th {
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: #64748b;
+  padding: 0.75rem 0.5rem;
+  border-bottom: 1px solid #e2e8f0;
+}
+
+.project-tasks-table td {
+  padding: 0.75rem 0.5rem;
+  font-size: 0.9rem;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.project-task-empty-state {
+  padding: 1.5rem;
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.95rem;
+}
+
+.project-task-add-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+
+.project-task-add-row input {
+  flex: 1;
+  padding: 0.6rem 0.75rem;
+  border-radius: 8px;
+  border: 1px solid #e2e8f0;
+  font-size: 0.9rem;
+}
+
+.project-task-add-row button {
+  padding: 0.6rem 1.2rem;
+  border: none;
+  border-radius: 999px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.25);
+}
+
+.project-task-add-row button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.project-toast {
+  position: fixed;
+  bottom: 24px;
+  right: 24px;
+  padding: 0.75rem 1rem;
+  border-radius: 999px;
+  color: #fff;
+  font-weight: 600;
+  box-shadow: 0 8px 20px rgba(15, 23, 42, 0.15);
+}
+
+.project-toast.success {
+  background: #22c55e;
+}
+
+.project-toast.error {
+  background: #ef4444;
 }

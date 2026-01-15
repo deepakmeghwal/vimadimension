@@ -179,8 +179,8 @@ const UserDetailsModal = ({ isOpen, onClose, userId, isPeopleContext = false }) 
       borderRadius: '9999px',
       fontSize: '0.875rem',
       fontWeight: '600',
-      backgroundColor: '#e0e7ff',
-      color: '#3730a3'
+      backgroundColor: '#f1f5f9',
+      color: '#475569'
     },
     statusBadge: {
       display: 'inline-block',
@@ -190,7 +190,7 @@ const UserDetailsModal = ({ isOpen, onClose, userId, isPeopleContext = false }) 
       fontWeight: '600'
     },
     salaryCard: {
-      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+      background: 'linear-gradient(135deg, #546E7A 0%, #455A64 100%)',
       borderRadius: '12px',
       padding: '1.5rem',
       color: 'white',
@@ -246,7 +246,7 @@ const UserDetailsModal = ({ isOpen, onClose, userId, isPeopleContext = false }) 
               }}
               style={{
                 padding: '0.625rem 1.25rem',
-                background: '#6366f1',
+                background: '#546E7A',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -259,12 +259,12 @@ const UserDetailsModal = ({ isOpen, onClose, userId, isPeopleContext = false }) 
                 gap: '0.5rem'
               }}
               onMouseEnter={(e) => {
-                e.target.style.backgroundColor = '#4f46e5';
+                e.target.style.backgroundColor = '#455A64';
                 e.target.style.transform = 'translateY(-1px)';
-                e.target.style.boxShadow = '0 4px 6px rgba(99, 102, 241, 0.3)';
+                e.target.style.boxShadow = '0 4px 6px rgba(84, 110, 122, 0.3)';
               }}
               onMouseLeave={(e) => {
-                e.target.style.backgroundColor = '#6366f1';
+                e.target.style.backgroundColor = '#546E7A';
                 e.target.style.transform = 'none';
                 e.target.style.boxShadow = 'none';
               }}
@@ -356,8 +356,8 @@ const UserDetailsModal = ({ isOpen, onClose, userId, isPeopleContext = false }) 
                     <div>
                       <span style={{
                         ...modalStyles.statusBadge,
-                        backgroundColor: user.enabled ? '#d4edda' : '#f8d7da',
-                        color: user.enabled ? '#155724' : '#721c24'
+                        backgroundColor: user.enabled ? '#dcfce7' : '#fee2e2',
+                        color: user.enabled ? '#166534' : '#991b1b'
                       }}>
                         {user.enabled ? 'Active' : 'Inactive'}
                       </span>

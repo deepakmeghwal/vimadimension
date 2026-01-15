@@ -141,10 +141,10 @@ const EditUser = ({ isPeopleContext = false }) => {
         <h1 className="page-title">Edit Person</h1>
         <div className="page-actions">
           <button
-            onClick={() => navigate(backPath)}
+            onClick={() => navigate(-1)}
             className="btn-outline"
           >
-            Back to Directory
+            Back
           </button>
         </div>
       </div>
@@ -321,6 +321,7 @@ const EditUser = ({ isPeopleContext = false }) => {
             <button
               type="submit"
               className="btn-primary"
+              style={{ backgroundColor: '#546E7A', border: 'none' }}
               disabled={loading}
             >
               {loading ? 'Updating...' : 'Update Person'}
@@ -328,7 +329,7 @@ const EditUser = ({ isPeopleContext = false }) => {
             <button
               type="button"
               className="btn-outline"
-              onClick={() => navigate(backPath)}
+              onClick={() => navigate(-1)}
               disabled={loading}
             >
               Cancel

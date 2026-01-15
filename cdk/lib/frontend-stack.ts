@@ -3,6 +3,7 @@ import * as s3 from 'aws-cdk-lib/aws-s3';
 import * as cloudfront from 'aws-cdk-lib/aws-cloudfront';
 import * as origins from 'aws-cdk-lib/aws-cloudfront-origins';
 import * as s3deploy from 'aws-cdk-lib/aws-s3-deployment';
+import * as acm from 'aws-cdk-lib/aws-certificatemanager';
 import { Construct } from 'constructs';
 import * as path from 'path';
 
@@ -55,7 +56,7 @@ function handler(event) {
 
         // Cache policy for static assets (JS, CSS with hashed names - cache for 1 year)
         const staticAssetsCachePolicy = new cloudfront.CachePolicy(this, 'StaticAssetsCachePolicy', {
-            cachePolicyName: 'VimaDimension-StaticAssets',
+            cachePolicyName: 'ArchiEase-StaticAssets',
             comment: 'Cache static assets with content hashes for 1 year',
             defaultTtl: cdk.Duration.days(365),
             maxTtl: cdk.Duration.days(365),
@@ -66,7 +67,7 @@ function handler(event) {
 
         // Cache policy for HTML and other dynamic content (no caching or very short TTL)
         const htmlCachePolicy = new cloudfront.CachePolicy(this, 'HtmlCachePolicy', {
-            cachePolicyName: 'VimaDimension-Html',
+            cachePolicyName: 'ArchiEase-Html',
             comment: 'Minimal caching for HTML files',
             defaultTtl: cdk.Duration.seconds(0),
             maxTtl: cdk.Duration.seconds(1),
@@ -76,8 +77,16 @@ function handler(event) {
         });
 
 
+        // SSL Certificate for custom domain (must be in us-east-1 for CloudFront)
+        const certificate = acm.Certificate.fromCertificateArn(
+            this, 'Certificate',
+            'arn:aws:acm:us-east-1:288833449200:certificate/2991fb7e-8cf5-45a7-bce2-5bb78db1e71f'
+        );
+
         // CloudFront Distribution
         this.distribution = new cloudfront.Distribution(this, 'Distribution', {
+            domainNames: ['archiease.com', 'www.archiease.com'],
+            certificate: certificate,
             defaultBehavior: {
                 origin: s3Origin,
                 viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,
@@ -117,7 +126,7 @@ function handler(event) {
                 },
                 '/api/*': {
                     origin: new origins.HttpOrigin(props.backendDnsName, {
-                        httpPort: 80,
+                        httpPort: 8080,
                         protocolPolicy: cloudfront.OriginProtocolPolicy.HTTP_ONLY,
                     }),
                     viewerProtocolPolicy: cloudfront.ViewerProtocolPolicy.REDIRECT_TO_HTTPS,

@@ -188,5 +188,50 @@ public class ResourceAssignmentController {
             return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch availability"));
         }
     }
-}
 
+    /**
+     * Get project-level burn rate and budget status (Financial Resource Planning)
+     */
+    @GetMapping("/burn-rate")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getProjectBurnRate(@PathVariable Long projectId, @PathVariable Long phaseId) {
+        try {
+            org.example.dto.BurnRateDto burnRate = resourceAssignmentService.calculateProjectBurnRate(projectId);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "burnRate", burnRate
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error calculating burn rate: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to calculate burn rate"));
+        }
+    }
+
+    /**
+     * Get user utilization for a specific week (checks for >40hr/week overload)
+     */
+    @GetMapping("/users/{userId}/utilization")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<?> getUserUtilization(
+            @PathVariable Long userId,
+            @RequestParam(required = false) String weekStart) {
+        try {
+            LocalDate startDate = weekStart != null ? 
+                    LocalDate.parse(weekStart) : 
+                    LocalDate.now().with(java.time.DayOfWeek.MONDAY);
+            
+            org.example.dto.UtilizationDto utilization = resourceAssignmentService.checkUserUtilization(userId, startDate);
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "utilization", utilization
+            ));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            logger.error("Error checking utilization: {}", e.getMessage(), e);
+            return ResponseEntity.status(500).body(Map.of("error", "Failed to check utilization"));
+        }
+    }
+}

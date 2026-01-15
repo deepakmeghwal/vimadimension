@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useNavigate, useSearchParams } from 'react-router-dom';
+import { useNavigate, useSearchParams, useLocation } from 'react-router-dom';
 import { PROJECT_STAGES, getStageFeePercentage } from '../../constants/projectEnums';
 
 const CreateInvoice = ({ user }) => {
@@ -27,7 +27,7 @@ const CreateInvoice = ({ user }) => {
       }
     ]
   });
-  
+
   const [projects, setProjects] = useState([]);
   const [templates, setTemplates] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -35,28 +35,63 @@ const CreateInvoice = ({ user }) => {
   const [error, setError] = useState('');
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const location = useLocation();
 
   // Check if user has admin or manager role
-  const canManageInvoices = user?.authorities?.some(auth => 
+  const canManageInvoices = user?.authorities?.some(auth =>
     auth.authority === 'ROLE_ADMIN' || auth.authority === 'ROLE_MANAGER'
   ) || false;
 
   useEffect(() => {
     if (canManageInvoices) {
+      // If project data passed via state, use it and skip fetching all projects initially (or fetch in background)
+      // But we still need the list for the dropdown
       fetchProjects();
       fetchTemplates();
-      
-      // Pre-select project if provided in URL params
+
+      // Pre-select project if provided in URL params or state
       const projectId = searchParams.get('projectId');
+      const phaseId = searchParams.get('phaseId');
+
+      // Check for passed state
+      if (location.state?.project) {
+        const passedProject = location.state.project;
+        setProjects([passedProject]); // Optimization: Set only this project initially or add to list
+        setSelectedProject(passedProject);
+
+        setFormData(prev => ({
+          ...prev,
+          projectId: passedProject.id.toString(),
+          clientName: passedProject.clientName || prev.clientName,
+          clientAddress: passedProject.clientBillingAddress || prev.clientAddress
+        }));
+
+        // If we have the project, we can fetch contacts immediately
+        fetchClientContacts(passedProject);
+      }
+
       if (projectId) {
-        setFormData(prev => ({ ...prev, projectId }));
+        setFormData(prev => ({
+          ...prev,
+          projectId,
+          // If phaseId is present, pre-select stage and set to standard mode
+          selectedStage: phaseId || prev.selectedStage,
+          invoiceMode: phaseId ? 'standard' : prev.invoiceMode
+        }));
       }
     }
-  }, [canManageInvoices, searchParams]);
+  }, [canManageInvoices, searchParams, location.state]);
 
   useEffect(() => {
     // Auto-populate client info when project is selected
+    // Only run if selectedProject is NOT already set (to avoid overwriting if we passed it via state)
+    // Or if the selected ID changed
     if (formData.projectId && projects.length > 0) {
+      // If we already have the correct project selected (e.g. from state), don't search again
+      if (selectedProject && selectedProject.id.toString() === formData.projectId) {
+        return;
+      }
+
       const project = projects.find(p => p.id.toString() === formData.projectId);
       if (project) {
         setSelectedProject(project);
@@ -70,9 +105,13 @@ const CreateInvoice = ({ user }) => {
         // Then fetch client contacts to get email and phone
         fetchClientContacts(project);
       } else {
-        setSelectedProject(null);
+        // If we passed project via state, it might not be in the 'projects' list yet if that fetch is slow
+        // So don't nullify selectedProject if it matches the ID
+        if (!selectedProject || selectedProject.id.toString() !== formData.projectId) {
+          setSelectedProject(null);
+        }
       }
-    } else {
+    } else if (!formData.projectId) {
       setSelectedProject(null);
     }
   }, [formData.projectId, projects]);
@@ -97,7 +136,7 @@ const CreateInvoice = ({ user }) => {
         issueDate: today.toISOString().split('T')[0],
         dueDate: dueDate.toISOString().split('T')[0],
         items: [{
-          description: `${stageLabel} - ${feePercentage}% of Project Budget (₹${projectBudget.toLocaleString('en-IN')})`,
+          description: `${stageLabel} Fee - ${selectedProject.name}`,
           itemType: 'FIXED_PRICE',
           quantity: '1',
           unitPrice: calculatedAmount.toFixed(2),
@@ -109,7 +148,7 @@ const CreateInvoice = ({ user }) => {
       const today = new Date();
       const dueDate = new Date(today);
       dueDate.setDate(today.getDate() + 15);
-      
+
       setFormData(prev => ({
         ...prev,
         issueDate: today.toISOString().split('T')[0],
@@ -122,7 +161,7 @@ const CreateInvoice = ({ user }) => {
     try {
       // Get client ID from project (if available in the project object)
       const clientId = project.clientId;
-      
+
       if (clientId) {
         // Fetch client contacts
         const contactsResponse = await fetch(`/api/clients/${clientId}/contacts`, {
@@ -319,21 +358,21 @@ const CreateInvoice = ({ user }) => {
     <div className="container mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h2>Create New Invoice</h2>
-        <button 
+        <button
           className="btn btn-secondary"
-          onClick={() => navigate('/invoices')}
+          onClick={() => navigate(-1)}
         >
           <i className="fas fa-arrow-left me-2"></i>
-          Back to Invoices
+          Back
         </button>
       </div>
 
       {error && (
         <div className="alert alert-danger alert-dismissible fade show" role="alert">
           {error}
-          <button 
-            type="button" 
-            className="btn-close" 
+          <button
+            type="button"
+            className="btn-close"
             onClick={() => setError('')}
           ></button>
         </div>
@@ -499,7 +538,7 @@ const CreateInvoice = ({ user }) => {
                         </button>
                       )}
                     </div>
-                    
+
                     <div className="row">
                       <div className="col-md-6">
                         <div className="mb-3">
@@ -531,7 +570,7 @@ const CreateInvoice = ({ user }) => {
                         </div>
                       </div>
                     </div>
-                    
+
                     <div className="row">
                       <div className="col-md-3">
                         <div className="mb-3">
@@ -598,7 +637,7 @@ const CreateInvoice = ({ user }) => {
                     placeholder="Any additional notes for the client..."
                   ></textarea>
                 </div>
-                
+
                 <div className="mb-3">
                   <label htmlFor="termsAndConditions" className="form-label">Terms and Conditions</label>
                   <textarea
@@ -641,16 +680,16 @@ const CreateInvoice = ({ user }) => {
                   <span>Subtotal:</span>
                   <span>₹{totals.subtotal}</span>
                 </div>
-                
+
                 {parseFloat(formData.taxRate) > 0 && (
                   <div className="d-flex justify-content-between mb-2">
                     <span>Tax ({formData.taxRate}%):</span>
                     <span>₹{totals.taxAmount}</span>
                   </div>
                 )}
-                
+
                 <hr />
-                
+
                 <div className="d-flex justify-content-between mb-3">
                   <strong>Total:</strong>
                   <strong>₹{totals.total}</strong>
@@ -674,11 +713,11 @@ const CreateInvoice = ({ user }) => {
                       </>
                     )}
                   </button>
-                  
+
                   <button
                     type="button"
                     className="btn btn-outline-secondary"
-                    onClick={() => navigate('/invoices')}
+                    onClick={() => navigate(-1)}
                   >
                     Cancel
                   </button>

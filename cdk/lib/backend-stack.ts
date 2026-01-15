@@ -1,62 +1,36 @@
 import * as cdk from 'aws-cdk-lib';
 import * as ec2 from 'aws-cdk-lib/aws-ec2';
 import * as iam from 'aws-cdk-lib/aws-iam';
-import * as autoscaling from 'aws-cdk-lib/aws-autoscaling';
-import * as elbv2 from 'aws-cdk-lib/aws-elasticloadbalancingv2';
-import * as ecr_assets from 'aws-cdk-lib/aws-ecr-assets';
-import * as ecr from 'aws-cdk-lib/aws-ecr';
 import * as s3 from 'aws-cdk-lib/aws-s3';
 import { Construct } from 'constructs';
 import * as secretsmanager from 'aws-cdk-lib/aws-secretsmanager';
-import * as path from 'path';
 
 interface BackendStackProps extends cdk.StackProps {
     vpc: ec2.Vpc;
     dbSecurityGroup: ec2.SecurityGroup;
-    webSecurityGroup: ec2.SecurityGroup; // Temporary prop to keep export alive
     secret: secretsmanager.ISecret;
-    albListener: elbv2.ApplicationListener;
-    sesSecret: secretsmanager.ISecret;  // SES SMTP credentials
-    senderEmail: string;                 // Email address to send from
+    sesSecret: secretsmanager.ISecret;
+    senderEmail: string;
 }
 
 export class BackendStack extends cdk.Stack {
-    public readonly asg: autoscaling.AutoScalingGroup;
+    public readonly instance: ec2.Instance;
     public readonly uploadsBucket: s3.Bucket;
+    public readonly publicDnsName: string;
 
     constructor(scope: Construct, id: string, props: BackendStackProps) {
         super(scope, id, props);
 
-        // Keep reference to WebSG to prevent "Export in use" error during migration
-        new cdk.CfnOutput(this, 'WebSgReference', {
-            value: props.webSecurityGroup.securityGroupId,
-            description: 'Temporary reference to keep WebSG export alive',
-        });
-
         // ==================== S3 BUCKET FOR FILE UPLOADS ====================
-        // 
-        // Scalable file storage structure:
-        //   profile-images/{orgId}/user_{userId}_{uuid}.{ext}
-        //   documents/{orgId}/{category}/{userId}_{uuid}.{ext}
-        //   project-files/{orgId}/project_{projectId}/{userId}_{uuid}.{ext}
-        //
-        // Benefits:
-        //   - Organized by organization for easy management
-        //   - Scalable (can add new file types easily)
-        //   - Files never deleted (lifecycle moves to Infrequent Access after 90 days)
-        //   - Clear structure for auditing and compliance
-        //
+        // IMPORTANT: Update this value after each new CloudFront deployment
+        const CLOUDFRONT_DOMAIN = 'd3esaqi72ck9uv.cloudfront.net';
+
         this.uploadsBucket = new s3.Bucket(this, 'UploadsBucket', {
-            bucketName: `komorebi-uploads-${this.account}-${this.region}`,
-            // Block all public access - files served through backend API or CloudFront
+            bucketName: `archiease-uploads-${this.account}-${this.region}`,
             blockPublicAccess: s3.BlockPublicAccess.BLOCK_ALL,
-            // Encryption at rest
             encryption: s3.BucketEncryption.S3_MANAGED,
-            // Enable versioning for data protection
             versioned: false,
-            // Auto-delete objects when bucket is deleted (for dev/test - remove for production)
             removalPolicy: cdk.RemovalPolicy.RETAIN,
-            // CORS configuration for direct uploads (if needed in future)
             cors: [
                 {
                     allowedMethods: [
@@ -64,86 +38,67 @@ export class BackendStack extends cdk.Stack {
                         s3.HttpMethods.PUT,
                         s3.HttpMethods.POST,
                     ],
-                    allowedOrigins: ['https://d2y5qb737p8vzn.cloudfront.net', 'http://localhost:3000'],
+                    allowedOrigins: [`https://${CLOUDFRONT_DOMAIN}`, 'http://localhost:3000'],
                     allowedHeaders: ['*'],
                     maxAge: 3000,
                 },
             ],
-            // Lifecycle rules for cost optimization
             lifecycleRules: [
                 {
-                    // Move all files to Infrequent Access storage class after 90 days
-                    // This reduces storage costs by ~50% while keeping files accessible
-                    // Files are NEVER deleted (as per requirements)
                     transitions: [
                         {
                             storageClass: s3.StorageClass.INFREQUENT_ACCESS,
                             transitionAfter: cdk.Duration.days(90),
                         },
                     ],
-                    // Clean up incomplete multipart uploads after 7 days (saves costs)
                     abortIncompleteMultipartUploadAfter: cdk.Duration.days(7),
                 },
             ],
         });
 
-        // Output the bucket name for reference
         new cdk.CfnOutput(this, 'UploadsBucketName', {
             value: this.uploadsBucket.bucketName,
             description: 'S3 bucket for file uploads',
             exportName: 'UploadsBucketName',
         });
 
-        // IAM Role
+        // ==================== IAM ROLE ====================
         const role = new iam.Role(this, 'BackendInstanceRole', {
             assumedBy: new iam.ServicePrincipal('ec2.amazonaws.com'),
             managedPolicies: [
                 iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonSSMManagedInstanceCore'),
-                iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite'), // To read DB credentials
-                iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'), // To pull Docker image
+                iam.ManagedPolicy.fromAwsManagedPolicyName('SecretsManagerReadWrite'),
+                iam.ManagedPolicy.fromAwsManagedPolicyName('AmazonEC2ContainerRegistryReadOnly'),
             ],
         });
 
-        // Grant S3 permissions for file uploads
         this.uploadsBucket.grantReadWrite(role);
-
-        // Also grant delete permissions for removing old profile images
         this.uploadsBucket.grantDelete(role);
 
-        // Grant SES send permissions to the backend
         role.addToPolicy(new iam.PolicyStatement({
             effect: iam.Effect.ALLOW,
-            actions: [
-                'ses:SendEmail',
-                'ses:SendRawEmail',
-            ],
+            actions: ['ses:SendEmail', 'ses:SendRawEmail'],
             resources: ['*'],
         }));
 
-        // Grant access to SES credentials secret
         props.sesSecret.grantRead(role);
 
-        // Docker Image Asset
-        // This will build the Dockerfile in the root directory and push it to ECR
-        // Docker Image URI
-        const imageUri = `288833449200.dkr.ecr.us-east-1.amazonaws.com/cdk-hnb659fds-container-assets-288833449200-us-east-1:v20251129-task-proxy-fix`;
+        // ==================== DOCKER IMAGE ====================
+        // Dynamic ECR URI based on current account and region
+        const imageUri = `${this.account}.dkr.ecr.${this.region}.amazonaws.com/cdk-hnb659fds-container-assets-${this.account}-${this.region}:v20260114-lazy-fix`;
 
-        // Grant read access to the instance role
-        // No longer needed as imageUri is hardcoded and not pulled from a repository object
-
-        // AMI (Amazon Linux 2023)
+        // ==================== AMI ====================
         const ami = new ec2.AmazonLinuxImage({
             generation: ec2.AmazonLinuxGeneration.AMAZON_LINUX_2023,
             cpuType: ec2.AmazonLinuxCpuType.X86_64,
         });
 
-        // User Data
+        // ==================== USER DATA ====================
         const userData = ec2.UserData.forLinux();
         userData.addCommands(
             'yum update -y',
-            'echo "Forcing replacement: $(date)"',
-            `echo "Deployment timestamp: ${new Date().toISOString()} - FORCE DEPLOY 8"`,
-            'yum install -y docker jq aws-cli', // Install Docker, jq, and aws-cli
+            `echo "Deployment timestamp: ${new Date().toISOString()} - LAZY FIX"`,
+            'yum install -y docker jq aws-cli',
             'service docker start',
             'usermod -a -G docker ec2-user',
 
@@ -167,9 +122,7 @@ export class BackendStack extends cdk.Stack {
             `MAIL_FROM="${props.senderEmail}"`,
 
             // Convert AWS Secret Access Key to SMTP Password
-            // AWS SES SMTP password derivation algorithm (official AWS method)
-            // Reference: https://docs.aws.amazon.com/ses/latest/dg/smtp-credentials.html
-            `MAIL_PASSWORD=$(python3 << 'PYEOF'
+            `MAIL_PASSWORD=$(python3 <<'PYEOF'
 import hmac
 import hashlib
 import base64
@@ -205,7 +158,6 @@ def calculate_key(secret_access_key, region):
     signature_and_version = bytes([VERSION]) + signature
     return base64.b64encode(signature_and_version).decode('utf-8')
 
-# Get the secret key from environment
 secret_key = os.environ.get('SES_SECRET_KEY', '')
 region = '${this.region}'
 
@@ -230,14 +182,9 @@ PYEOF
             '  echo "ERROR: Failed to generate SMTP password. Check logs above."',
             '  exit 1',
             'fi',
-            'echo "SMTP password generated successfully (length: ${#MAIL_PASSWORD})"',
-            'if [ -z "$MAIL_PASSWORD" ]; then',
-            '  echo "ERROR: Failed to generate SMTP password. Check logs above."',
-            '  exit 1',
-            'fi',
             'echo "SMTP password generated successfully"',
 
-            // Run Container with email and S3 configuration
+            // Run Container
             `docker run -d --restart always -p 8080:8080 \\
                 -m 1536m \\
                 -e JAVA_OPTS="-Xmx1024m -Xms512m" \\
@@ -247,68 +194,84 @@ PYEOF
                 -e SPRING_DATASOURCE_PASSWORD="\${DB_PASS}" \\
                 -e SERVER_PORT=8080 \\
                 -e SPRING_JPA_HIBERNATE_DDL_AUTO=validate \\
-                -e APP_CORS_ALLOWED_ORIGINS="https://d2y5qb737p8vzn.cloudfront.net" \\
+                -e APP_CORS_ALLOWED_ORIGINS="https://${CLOUDFRONT_DOMAIN}" \\
                 -e MAIL_HOST="\${MAIL_HOST}" \\
                 -e MAIL_PORT="\${MAIL_PORT}" \\
                 -e MAIL_USERNAME="\${SES_ACCESS_KEY}" \\
                 -e MAIL_PASSWORD="\${MAIL_PASSWORD}" \\
                 -e MAIL_FROM="\${MAIL_FROM}" \\
-                -e APP_FRONTEND_URL="https://d2y5qb737p8vzn.cloudfront.net" \\
-                -e APP_NAME="Komorebi" \\
+                -e APP_FRONTEND_URL="https://${CLOUDFRONT_DOMAIN}" \\
+                -e APP_NAME="ArchiEase" \\
                 -e AWS_S3_BUCKET="${this.uploadsBucket.bucketName}" \\
                 -e AWS_REGION="${this.region}" \\
                 -e APP_STORAGE_TYPE="s3" \\
                 ${imageUri}`
         );
 
-        // Create Security Group for ASG (Internal to this stack to avoid cycles)
-        const asgSg = new ec2.SecurityGroup(this, 'AsgSG', {
+        // ==================== SECURITY GROUP ====================
+        const instanceSg = new ec2.SecurityGroup(this, 'InstanceSG', {
             vpc: props.vpc,
-            description: 'Security Group for Backend ASG',
+            description: 'Security Group for Backend EC2 Instance',
             allowAllOutbound: true,
         });
-        asgSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow SSH');
 
-        // Auto Scaling Group
-        this.asg = new autoscaling.AutoScalingGroup(this, 'BackendASG', {
+        // Allow SSH for debugging (via SSM is preferred, but keeping for flexibility)
+        instanceSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(22), 'Allow SSH');
+
+        // Allow HTTP on port 8080 from CloudFront (CloudFront IPs are dynamic, so allowing all)
+        instanceSg.addIngressRule(ec2.Peer.anyIpv4(), ec2.Port.tcp(8080), 'Allow HTTP from CloudFront');
+
+        // ==================== KEY PAIR (Optional, for debugging) ====================
+        // const keyPair = new ec2.KeyPair(this, 'BackendKeyPair', {
+        //     name: 'backend-key-pair',
+        // });
+
+        // ==================== EC2 INSTANCE ====================
+        this.instance = new ec2.Instance(this, 'BackendInstance', {
             vpc: props.vpc,
             vpcSubnets: {
-                subnetType: ec2.SubnetType.PUBLIC, // Using Public subnet to save NAT Gateway costs
+                subnetType: ec2.SubnetType.PUBLIC,
             },
-            instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.SMALL), // Upgraded to SMALL for Docker overhead
+            instanceType: ec2.InstanceType.of(ec2.InstanceClass.T3, ec2.InstanceSize.SMALL),
             machineImage: ami,
-            securityGroup: asgSg,
+            securityGroup: instanceSg,
             role: role,
             userData: userData,
-            minCapacity: 1,
-            maxCapacity: 2,
-            desiredCapacity: 1,
-            updatePolicy: autoscaling.UpdatePolicy.rollingUpdate({
-                minInstancesInService: 0, // Allow downtime for faster deployment in this dev/test setup
-                maxBatchSize: 1,
-            }),
+            // keyName: keyPair.keyName, // Optional
         });
 
-        // Attach ASG to ALB Listener
-        props.albListener.addTargets('BackendTargets', {
-            port: 8080,
-            targets: [this.asg],
-            healthCheck: {
-                path: '/actuator/health',
-                interval: cdk.Duration.seconds(30),
-                healthyThresholdCount: 2,
-                unhealthyThresholdCount: 5,
-            },
+        // ==================== ELASTIC IP ====================
+        const eip = new ec2.CfnEIP(this, 'BackendEIP', {
+            domain: 'vpc',
         });
 
-        // Allow ASG to access Database
-        new ec2.CfnSecurityGroupIngress(this, 'AllowAsgToDb', {
+        new ec2.CfnEIPAssociation(this, 'EIPAssociation', {
+            allocationId: eip.attrAllocationId,
+            instanceId: this.instance.instanceId,
+        });
+
+        // Export the EC2 public DNS name for CloudFront (CloudFront requires hostname, not IP)
+        this.publicDnsName = this.instance.instancePublicDnsName;
+
+        new cdk.CfnOutput(this, 'BackendPublicDnsName', {
+            value: this.publicDnsName,
+            description: 'Public DNS name of the backend instance',
+            exportName: 'BackendPublicDnsName',
+        });
+
+        new cdk.CfnOutput(this, 'BackendInstanceId', {
+            value: this.instance.instanceId,
+            description: 'Instance ID of the backend EC2',
+        });
+
+        // ==================== DATABASE ACCESS ====================
+        new ec2.CfnSecurityGroupIngress(this, 'AllowInstanceToDb', {
             groupId: props.dbSecurityGroup.securityGroupId,
             ipProtocol: 'tcp',
             fromPort: 3306,
             toPort: 3306,
-            sourceSecurityGroupId: asgSg.securityGroupId,
-            description: 'Allow MySQL from ASG',
+            sourceSecurityGroupId: instanceSg.securityGroupId,
+            description: 'Allow MySQL from Backend Instance',
         });
     }
 }

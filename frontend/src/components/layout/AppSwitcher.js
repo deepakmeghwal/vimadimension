@@ -26,10 +26,19 @@ const AppSwitcher = ({ user }) => {
             comingSoon: true
         },
         {
+            id: 'finance',
+            name: 'Finance',
+            icon: '💰',
+            path: '/finance/dashboard',
+            description: 'Financial health and invoices',
+            color: '#10b981',
+            requiresManager: true
+        },
+        {
             id: 'admin',
             name: 'Admin',
             icon: '⚙️',
-            path: '/admin/dashboard',
+            path: '/admin/organization',
             description: 'System administration',
             color: '#64748b',
             adminOnly: true
@@ -40,6 +49,7 @@ const AppSwitcher = ({ user }) => {
     const getCurrentApp = () => {
         const path = location.pathname;
         if (path.startsWith('/admin')) return 'admin';
+        if (path.startsWith('/finance')) return 'finance';
         if (path.startsWith('/people')) return 'people';
         return 'projects'; // Default
     };
@@ -49,7 +59,13 @@ const AppSwitcher = ({ user }) => {
 
     // Filter apps based on user role
     const isAdmin = user?.authorities?.some(a => a.authority === 'ROLE_ADMIN');
-    const availableApps = apps.filter(app => !app.adminOnly || isAdmin);
+    const isManager = user?.authorities?.some(a => a.authority === 'ROLE_MANAGER');
+
+    const availableApps = apps.filter(app => {
+        if (app.adminOnly && !isAdmin) return false;
+        if (app.requiresManager && !isAdmin && !isManager) return false;
+        return true;
+    });
 
     // Close dropdown when clicking outside
     useEffect(() => {

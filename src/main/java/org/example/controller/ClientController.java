@@ -37,7 +37,7 @@ public class ClientController {
     public ResponseEntity<?> searchClientsPaginated(
             @RequestParam(value = "query", required = false) String query,
             @RequestParam(value = "page", defaultValue = "0") int page,
-            @RequestParam(value = "size", defaultValue = "20") int size) {
+            @RequestParam(value = "size", defaultValue = "50") int size) {
         User currentUser = getCurrentUser();
         org.springframework.data.domain.Page<Client> clients = clientService.searchClientsPaginated(currentUser.getOrganization().getId(), query, page, size);
         return ResponseEntity.ok(clients);

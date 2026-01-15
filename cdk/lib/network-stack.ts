@@ -11,7 +11,7 @@ export class NetworkStack extends cdk.Stack {
     super(scope, id, props);
 
     // VPC
-    this.vpc = new ec2.Vpc(this, 'VimaDimensionVpc', {
+    this.vpc = new ec2.Vpc(this, 'VimaDimensionVpc', {  // Keep original ID to maintain cross-stack references
       maxAzs: 2,
       natGateways: 0, // Saving costs as per plan, using Public subnets for EC2
       subnetConfiguration: [

@@ -286,12 +286,7 @@ const ResourcePlanner = ({ projectId, isFullView = false }) => {
     if (phases.length === 0) {
         return (
             <div className="resource-planner-section">
-                <div className="resource-planner-header">
-                    <div>
-                        <h3 className="resource-planner-title">Resource Planner</h3>
-                        <p className="resource-planner-subtitle">Assign team members to phases with billing rates and planned hours</p>
-                    </div>
-                </div>
+
                 {error && (
                     <div className="modern-alert error" style={{ marginBottom: '1rem' }}>
                         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
@@ -320,7 +315,7 @@ const ResourcePlanner = ({ projectId, isFullView = false }) => {
                         </svg>
                     </div>
                     <h3>No Phases Found</h3>
-                    <p>This project doesn't have any phases yet. Quick setup standard Indian architectural phases or create custom ones.</p>
+                    <p>This project doesn't have any phases yet. Create phases from the project's lifecycle stages.</p>
                     <div style={{ marginTop: '1.5rem', display: 'flex', flexDirection: 'column', gap: '1rem', alignItems: 'center' }}>
                         <button
                             onClick={handleCreateStandardPhases}
@@ -340,7 +335,7 @@ const ResourcePlanner = ({ projectId, isFullView = false }) => {
                                     <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
                                         <polyline points="20 6 9 17 4 12"></polyline>
                                     </svg>
-                                    Quick Setup: Create Standard Phases
+                                    Create Project Phases
                                 </>
                             )}
                         </button>
@@ -358,7 +353,7 @@ const ResourcePlanner = ({ projectId, isFullView = false }) => {
                         </Link>
                     </div>
                     <div style={{ marginTop: '1.5rem', padding: '1rem', backgroundColor: '#f1f5f9', borderRadius: '8px', fontSize: '0.875rem', color: '#475569' }}>
-                        <strong>Standard Phases Include:</strong> Feasibility Study, Site Analysis, Concept Design, Preliminary Design, Design Development, Working Drawings (GFC), Statutory Approvals, Tender Documentation, Construction Documentation, Site Supervision, Completion & Handover, As-Built Drawings
+                        <strong>Note:</strong> Phases will be created based on the lifecycle stages selected when this project was created.
                     </div>
                 </div>
             </div>
@@ -369,12 +364,7 @@ const ResourcePlanner = ({ projectId, isFullView = false }) => {
     if (users.length === 0) {
         return (
             <div className="resource-planner-section">
-                <div className="resource-planner-header">
-                    <div>
-                        <h3 className="resource-planner-title">Resource Planner</h3>
-                        <p className="resource-planner-subtitle">Assign team members to phases with billing rates and planned hours</p>
-                    </div>
-                </div>
+
                 <div className="empty-state-modern">
                     <p>No team members found. Please add team members to the project first.</p>
                 </div>
@@ -388,24 +378,7 @@ const ResourcePlanner = ({ projectId, isFullView = false }) => {
 
     return (
         <div className="resource-planner-section">
-            <div className="resource-planner-header">
-                <div>
-                    <h3 className="resource-planner-title">Resource Planner</h3>
-                    <p className="resource-planner-subtitle">Assign team members to phases with billing rates and planned hours</p>
-                </div>
-                {!isFullView && (
-                    <button
-                        className="btn-outline-modern"
-                        onClick={() => navigate(`/projects/${projectId}/resource-planner`)}
-                        style={{ marginLeft: 'auto' }}
-                    >
-                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ marginRight: '0.5rem' }}>
-                            <path d="M15 3h6v6M9 21H3v-6M21 3l-7 7M3 21l7-7" />
-                        </svg>
-                        Full View
-                    </button>
-                )}
-            </div>
+
 
             {success && (
                 <div className="modern-alert success" style={{ marginBottom: '1rem' }}>

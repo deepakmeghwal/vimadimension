@@ -103,8 +103,8 @@ const CreateUser = ({ isPeopleContext = false }) => {
       <div className="page-header">
         <h1 className="page-title">Create New Person</h1>
         <div className="page-actions">
-          <button 
-            onClick={() => navigate(backPath)} 
+          <button
+            onClick={() => navigate(-1)}
             className="btn-outline"
           >
             {backLabel}
@@ -253,17 +253,17 @@ const CreateUser = ({ isPeopleContext = false }) => {
           </div>
 
           <div className="project-actions">
-            <button 
-              type="submit" 
+            <button
+              type="submit"
               className="btn-primary"
               disabled={loading}
             >
               {loading ? 'Creating...' : 'Create Person'}
             </button>
-            <button 
-              type="button" 
+            <button
+              type="button"
               className="btn-outline"
-              onClick={() => navigate(backPath)}
+              onClick={() => navigate(-1)}
               disabled={loading}
             >
               Cancel

@@ -1,6 +1,6 @@
 # Backend API Documentation
 
-Complete reference for all backend REST API endpoints in the Vimadimension application.
+Complete reference for all backend REST API endpoints in the ArchiEase application.
 
 ## Table of Contents
 
@@ -1335,6 +1335,7 @@ Standard error response format:
 ---
 
 **Last Updated:** 2024
+
 
 
 

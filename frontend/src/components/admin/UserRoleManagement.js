@@ -108,11 +108,11 @@ const UserRoleManagement = ({ user }) => {
                 <div style={{ padding: '2rem' }}>
                     <div className="error-message">{error || 'User not found'}</div>
                     <button
-                        onClick={() => navigate('/admin/users')}
+                        onClick={() => navigate(-1)}
                         className="btn-secondary"
                         style={{ marginTop: '1rem' }}
                     >
-                        ← Back to Users
+                        ← Back
                     </button>
                 </div>
             </div>
@@ -128,7 +128,8 @@ const UserRoleManagement = ({ user }) => {
                 actions={
                     <div style={{ display: 'flex', gap: '0.75rem' }}>
                         <button
-                            onClick={() => navigate('/admin/users')}
+                            type="button"
+                            onClick={() => navigate(-1)}
                             className="btn-secondary"
                         >
                             Cancel

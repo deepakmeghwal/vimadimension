@@ -1,4 +1,4 @@
-# Multi-stage Dockerfile for VimaDimension Spring Boot Application (Backend Only)
+# Multi-stage Dockerfile for ArchiEase Spring Boot Application (Backend Only)
 # Frontend is deployed separately to S3 + CloudFront
 
 # Stage 1: Build Backend (No frontend embedding)

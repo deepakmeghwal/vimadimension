@@ -190,9 +190,9 @@ const OrganizationSettings = () => {
                 method: 'DELETE',
                 credentials: 'include'
             });
-            
+
             const data = await response.json();
-            
+
             if (data.success) {
                 setSuccessMessage('Logo deleted successfully.');
                 setOrganization(prev => ({ ...prev, logoUrl: null }));
@@ -300,7 +300,7 @@ const OrganizationSettings = () => {
             right: '-10%',
             width: '400px',
             height: '400px',
-            background: 'radial-gradient(circle, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0) 70%)',
+            background: 'radial-gradient(circle, rgba(84, 110, 122, 0.15) 0%, rgba(84, 110, 122, 0) 70%)',
             borderRadius: '50%',
             zIndex: 1,
         },
@@ -394,9 +394,9 @@ const OrganizationSettings = () => {
             border: 'none',
         },
         primaryButton: {
-            background: '#2563eb',
+            background: '#546E7A',
             color: 'white',
-            boxShadow: '0 4px 6px -1px rgba(37, 99, 235, 0.2)',
+            boxShadow: '0 4px 6px -1px rgba(84, 110, 122, 0.2)',
         },
         secondaryButton: {
             background: 'white',
@@ -465,12 +465,12 @@ const OrganizationSettings = () => {
                                     boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06)'
                                 }}
                             >
-                                <img 
-                                    src={organization.logoUrl} 
-                                    alt="Organization Logo" 
-                                    style={{ 
-                                        width: '100%', 
-                                        height: '100%', 
+                                <img
+                                    src={organization.logoUrl}
+                                    alt="Organization Logo"
+                                    style={{
+                                        width: '100%',
+                                        height: '100%',
                                         objectFit: 'contain',
                                         borderRadius: '8px'
                                     }}
@@ -478,14 +478,14 @@ const OrganizationSettings = () => {
                                 />
                             </div>
                         ) : (
-                            <div 
+                            <div
                                 style={{
                                     display: 'flex',
                                     width: '80px',
                                     height: '80px',
                                     borderRadius: '12px',
                                     backgroundColor: 'white',
-                                    color: '#2563eb',
+                                    color: '#546E7A',
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     fontSize: '32px',
@@ -533,7 +533,7 @@ const OrganizationSettings = () => {
             <div style={styles.card}>
                 <div style={styles.cardHeader}>
                     <div style={styles.cardTitle}>
-                        <div style={{ ...styles.iconWrapper, background: '#eff6ff', color: '#2563eb' }}>
+                        <div style={{ ...styles.iconWrapper, background: '#eff6ff', color: '#546E7A' }}>
                             <BuildingIcon />
                         </div>
                         General Information
@@ -542,8 +542,8 @@ const OrganizationSettings = () => {
                         <button
                             onClick={() => setIsEditing(true)}
                             style={{ ...styles.button, ...styles.primaryButton }}
-                            onMouseOver={(e) => e.currentTarget.style.background = '#1d4ed8'}
-                            onMouseOut={(e) => e.currentTarget.style.background = '#2563eb'}
+                            onMouseOver={(e) => e.currentTarget.style.background = '#455A64'}
+                            onMouseOut={(e) => e.currentTarget.style.background = '#546E7A'}
                         >
                             <EditIcon />
                             Edit Details
@@ -592,7 +592,7 @@ const OrganizationSettings = () => {
                                 <div style={styles.value}>
                                     <span style={{ color: '#94a3b8' }}><GlobeIcon /></span>
                                     {organization.website ? (
-                                        <a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ color: '#2563eb', textDecoration: 'none' }}>
+                                        <a href={organization.website} target="_blank" rel="noopener noreferrer" style={{ color: '#546E7A', textDecoration: 'none' }}>
                                             {organization.website}
                                         </a>
                                     ) : (
@@ -712,15 +712,15 @@ const OrganizationSettings = () => {
                                     <div>
                                         {organization.logoUrl && (
                                             <div style={{ marginBottom: '1rem', position: 'relative', display: 'inline-block' }}>
-                                                <img 
-                                                    src={organization.logoUrl} 
-                                                    alt="Current Logo" 
-                                                    style={{ 
-                                                        maxHeight: '100px', 
+                                                <img
+                                                    src={organization.logoUrl}
+                                                    alt="Current Logo"
+                                                    style={{
+                                                        maxHeight: '100px',
                                                         maxWidth: '200px',
                                                         borderRadius: '8px',
                                                         border: '1px solid #e2e8f0'
-                                                    }} 
+                                                    }}
                                                 />
                                                 <button
                                                     type="button"
@@ -748,7 +748,7 @@ const OrganizationSettings = () => {
                                                 </button>
                                             </div>
                                         )}
-                                        <div style={{ 
+                                        <div style={{
                                             border: '2px dashed #e2e8f0',
                                             borderRadius: '8px',
                                             padding: '1.5rem',
@@ -757,9 +757,9 @@ const OrganizationSettings = () => {
                                             backgroundColor: logoUploading ? '#f8fafc' : '#ffffff',
                                             transition: 'all 0.2s'
                                         }}
-                                        onClick={() => !logoUploading && document.getElementById('logo-upload-input')?.click()}
-                                        onMouseOver={(e) => !logoUploading && (e.currentTarget.style.borderColor = '#2563eb')}
-                                        onMouseOut={(e) => !logoUploading && (e.currentTarget.style.borderColor = '#e2e8f0')}
+                                            onClick={() => !logoUploading && document.getElementById('logo-upload-input')?.click()}
+                                            onMouseOver={(e) => !logoUploading && (e.currentTarget.style.borderColor = '#546E7A')}
+                                            onMouseOut={(e) => !logoUploading && (e.currentTarget.style.borderColor = '#e2e8f0')}
                                         >
                                             <input
                                                 id="logo-upload-input"
@@ -782,7 +782,7 @@ const OrganizationSettings = () => {
                                                             <div style={{
                                                                 width: `${logoUploadProgress}%`,
                                                                 height: '100%',
-                                                                backgroundColor: '#2563eb',
+                                                                backgroundColor: '#546E7A',
                                                                 transition: 'width 0.3s'
                                                             }}></div>
                                                         </div>
@@ -794,9 +794,9 @@ const OrganizationSettings = () => {
                                             ) : (
                                                 <div>
                                                     <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="#64748b" strokeWidth="2" style={{ margin: '0 auto 0.5rem' }}>
-                                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
-                                                        <polyline points="17 8 12 3 7 8"/>
-                                                        <line x1="12" y1="3" x2="12" y2="15"/>
+                                                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                                                        <polyline points="17 8 12 3 7 8" />
+                                                        <line x1="12" y1="3" x2="12" y2="15" />
                                                     </svg>
                                                     <div style={{ color: '#64748b', fontSize: '0.875rem' }}>
                                                         Click to upload logo
@@ -1073,8 +1073,8 @@ const OrganizationSettings = () => {
                             <button
                                 type="submit"
                                 style={{ ...styles.button, ...styles.primaryButton }}
-                                onMouseOver={(e) => e.currentTarget.style.background = '#1d4ed8'}
-                                onMouseOut={(e) => e.currentTarget.style.background = '#2563eb'}
+                                onMouseOver={(e) => e.currentTarget.style.background = '#455A64'}
+                                onMouseOut={(e) => e.currentTarget.style.background = '#546E7A'}
                             >
                                 <SaveIcon />
                                 Save Changes

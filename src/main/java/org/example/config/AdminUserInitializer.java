@@ -37,10 +37,10 @@ public class AdminUserInitializer implements CommandLineRunner {
         logger.info("Checking for default admin user...");
 
         // Check for "admin" user
-        createAdminUserIfNotFound("admin", "admin", "admin@vimadimension.com", "System Administrator");
+        createAdminUserIfNotFound("admin", "admin", "admin@archiease.in", "System Administrator");
         
         // Check for "kejriwal9576" user
-        createAdminUserIfNotFound("kejriwal9576", "admin", "kejriwal9576@vimadimension.com", "Saurav Kejriwal");
+        createAdminUserIfNotFound("kejriwal9576", "admin", "kejriwal9576@archiease.in", "Saurav Kejriwal");
     }
 
     private void createAdminUserIfNotFound(String username, String password, String email, String fullName) {
