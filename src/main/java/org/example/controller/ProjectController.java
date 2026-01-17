@@ -204,7 +204,7 @@ public class ProjectController {
                                                 @RequestParam(defaultValue = "0") int page,
                                                 @RequestParam(defaultValue = "50") int size,
                                                 Authentication authentication) {
-        Optional<Project> projectOptional = projectService.findById(projectId);
+        Optional<Project> projectOptional = projectService.findByIdWithClient(projectId);
         if (projectOptional.isEmpty()) {
             logger.warn("Attempted to view details for non-existent project ID: {}", projectId);
             return ResponseEntity.notFound().build();
@@ -269,7 +269,8 @@ public class ProjectController {
     @GetMapping("/{id}/edit")
     @PreAuthorize("isAuthenticated()")
     public ResponseEntity<?> showUpdateProjectForm(@PathVariable("id") Long projectId) {
-        Optional<Project> projectOptional = projectService.findById(projectId);
+        // Use the new method to fetch project with client eagerly
+        Optional<Project> projectOptional = projectService.findByIdWithClient(projectId);
         if (projectOptional.isEmpty()) {
             logger.warn("Attempted to edit non-existent project ID: {}", projectId);
             return ResponseEntity.notFound().build();

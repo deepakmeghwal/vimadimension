@@ -37,7 +37,7 @@ import LoadingSpinner from '../common/LoadingSpinner';
 import ProjectDetailsSkeleton from './ProjectDetailsSkeleton';
 import TaskDetailPanel from './TaskDetailPanel';
 import { AsanaSection, AsanaTaskRow, formatStatus, formatPriority, PriorityIcon } from './AsanaListComponents';
-import { PROJECT_STAGES, PROJECT_STATUSES, PROJECT_PRIORITIES, PROJECT_CHARGE_TYPES } from '../../constants/projectEnums';
+import { PROJECT_STAGES, PROJECT_STATUSES, PROJECT_PRIORITIES, PROJECT_CHARGE_TYPES, DRAWING_TYPES } from '../../constants/projectEnums';
 import './ProjectDetails.css';
 
 const PAGE_SIZE = 12;
@@ -159,6 +159,113 @@ const TaskModal = ({ task, onClose, onSave }) => {
   );
 };
 
+const DocumentUploadModal = ({ files, onClose, onUpload, projectStage }) => {
+  const [selectedStage, setSelectedStage] = useState(projectStage || '');
+  const [selectedType, setSelectedType] = useState('WORKING'); // Default to Working Drawing
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+
+  // If we have multiple files, we apply the same metadata to all of them for now
+  // Enhancment: Allow per-file metadata if needed
+
+  const handleUpload = async () => {
+    setIsUploading(true);
+    setUploadProgress(0);
+
+    // Convert files object to array if needed
+    const fileList = Array.from(files);
+    const total = fileList.length;
+    let completed = 0;
+
+    for (const file of fileList) {
+      await onUpload(file, selectedStage, selectedType);
+      completed++;
+      setUploadProgress(Math.round((completed / total) * 100));
+    }
+
+    setIsUploading(false);
+    onClose();
+  };
+
+  return (
+    <div className="task-modal-overlay">
+      <div className="task-modal" style={{ maxWidth: '500px', height: 'auto', maxHeight: '90vh' }}>
+        <div className="task-modal-header">
+          <h3>Upload Drawings</h3>
+          <button className="btn-icon-modal" onClick={onClose} disabled={isUploading}><X size={20} /></button>
+        </div>
+
+        <div className="task-modal-body" style={{ padding: '20px' }}>
+          <div className="overview-details-grid" style={{ gridTemplateColumns: '1fr', gap: '20px' }}>
+
+            <div className="info-box" style={{ background: '#f8fafc', padding: '12px', borderRadius: '6px', marginBottom: '10px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '4px' }}>
+                <FileUp size={16} className="text-primary" />
+                <span style={{ fontWeight: 600 }}>{files.length} file(s) selected</span>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: '#64748b' }}>
+                {Array.from(files).map(f => f.name).join(', ')}
+              </div>
+            </div>
+
+            <div className="form-group">
+              <label className="task-field-label" style={{ display: 'block', marginBottom: '8px' }}>Project Stage</label>
+              <select
+                className="form-control"
+                value={selectedStage}
+                onChange={(e) => setSelectedStage(e.target.value)}
+                style={{ width: '100%', padding: '8px' }}
+                disabled={isUploading}
+              >
+                <option value="">Select Stage</option>
+                {PROJECT_STAGES.map(stage => (
+                  <option key={stage.value} value={stage.value}>{stage.label}</option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-group">
+              <label className="task-field-label" style={{ display: 'block', marginBottom: '8px' }}>Drawing Type</label>
+              <select
+                className="form-control"
+                value={selectedType}
+                onChange={(e) => setSelectedType(e.target.value)}
+                style={{ width: '100%', padding: '8px' }}
+                disabled={isUploading}
+              >
+                <option value="">Select Drawing Type</option>
+                {DRAWING_TYPES.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </select>
+            </div>
+
+            {isUploading && (
+              <div style={{ marginTop: '20px' }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '4px', fontSize: '0.85rem' }}>
+                  <span>Uploading...</span>
+                  <span>{uploadProgress}%</span>
+                </div>
+                <div style={{ width: '100%', height: '6px', background: '#e2e8f0', borderRadius: '3px', overflow: 'hidden' }}>
+                  <div style={{ width: `${uploadProgress}%`, height: '100%', background: '#3b82f6', transition: 'width 0.3s ease' }}></div>
+                </div>
+              </div>
+            )}
+
+          </div>
+        </div>
+
+        <div className="task-modal-footer" style={{ justifyContent: 'flex-end', gap: '10px' }}>
+          <button className="btn-secondary" onClick={onClose} disabled={isUploading}>Cancel</button>
+          <button className="btn-primary" onClick={handleUpload} disabled={isUploading || !selectedStage || !selectedType}>
+            {isUploading ? 'Uploading...' : 'Upload Files'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 const ProjectDetails = ({ user }) => {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -201,6 +308,9 @@ const ProjectDetails = ({ user }) => {
 
   // Drawings Tab State
   const [attachments, setAttachments] = useState([]);
+  const [showUploadModal, setShowUploadModal] = useState(false);
+  const [selectedUploadFiles, setSelectedUploadFiles] = useState(null);
+  const fileInputRef = useRef(null);
 
   // Column Resizing State
   const [columnWidths, setColumnWidths] = useState({
@@ -380,32 +490,45 @@ const ProjectDetails = ({ user }) => {
     }
   }, [activeTab, id]);
 
-  const handleDrawingsFileUpload = async (files) => {
-    if (!files || files.length === 0) return;
+  // Trigger file input click
+  const triggerDrawingsInput = () => {
+    fileInputRef.current?.click();
+  };
 
-    // Upload each file
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i];
-      const formData = new FormData();
-      formData.append('file', file);
-
-      try {
-        const response = await fetch(`/api/projects/${id}/attachments`, {
-          method: 'POST',
-          credentials: 'include',
-          body: formData
-        });
-
-        if (!response.ok) {
-          console.error("Upload failed for " + file.name);
-          alert("Upload failed for " + file.name);
-        }
-      } catch (err) {
-        console.error("Upload error", err);
-      }
+  const handleDrawingsFileLocalSelect = (e) => {
+    if (e.target.files && e.target.files.length > 0) {
+      setSelectedUploadFiles(e.target.files);
+      setShowUploadModal(true);
     }
-    // Refresh list
-    fetchAttachments();
+  };
+
+  const performDrawingsUpload = async (file, stage, drawingType) => {
+    const formData = new FormData();
+    formData.append('file', file);
+    if (stage) formData.append('stage', stage);
+    if (drawingType) formData.append('drawingType', drawingType);
+
+    try {
+      const response = await fetch(`/api/projects/${id}/attachments`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!response.ok) {
+        console.error("Upload failed for " + file.name);
+        // We could bubble error up, but for now console logs are fine as modal handles loading state
+      }
+    } catch (err) {
+      console.error("Upload error", err);
+    }
+  };
+
+  const onModalUploadComplete = () => {
+    setShowUploadModal(false);
+    setSelectedUploadFiles(null);
+    if (fileInputRef.current) fileInputRef.current.value = ""; // Reset input
+    fetchAttachments(); // Refresh list
   };
 
   const handleDownloadAttachment = async (attachmentId) => {
@@ -1039,6 +1162,7 @@ const ProjectDetails = ({ user }) => {
             Board
           </button>
 
+          {/*
           <button
             className={`project-tab-modern ${activeTab === 'drawings' ? 'active' : ''}`}
             onClick={() => setActiveTab('drawings')}
@@ -1046,6 +1170,7 @@ const ProjectDetails = ({ user }) => {
             <File size={16} />
             Drawings
           </button>
+*/}
           <button
             className={`project-tab-modern ${activeTab === 'contacts' ? 'active' : ''}`}
             onClick={() => setActiveTab('contacts')}
@@ -1702,16 +1827,12 @@ const ProjectDetails = ({ user }) => {
                   type="file"
                   id="project-file-upload"
                   multiple
+                  ref={fileInputRef} // ADDED REF
                   style={{ display: 'none' }}
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (files && files.length > 0) {
-                      handleDrawingsFileUpload(files);
-                    }
-                  }}
+                  onChange={handleDrawingsFileLocalSelect} // CHANGED HANDLER
                 />
                 <button
-                  onClick={() => document.getElementById('project-file-upload').click()}
+                  onClick={triggerDrawingsInput} // CHANGED HANDLER
                   style={{
                     display: 'flex',
                     alignItems: 'center',
@@ -1733,7 +1854,10 @@ const ProjectDetails = ({ user }) => {
             </div>
 
             {/* File List */}
+            {/* Same list code as before */}
             <div className="drawings-list">
+              {/* ... */}
+
               <h4 style={{ fontSize: '1rem', fontWeight: 600, color: '#334155', marginBottom: '1rem' }}>
                 All Drawings {attachments.length > 0 && <span style={{ color: '#94a3b8', fontWeight: 400 }}>({attachments.length})</span>}
               </h4>
@@ -1833,6 +1957,19 @@ const ProjectDetails = ({ user }) => {
           task={selectedTaskForPanel}
           onClose={() => setSelectedTaskForPanel(null)}
           onUpdate={handleTaskUpdate}
+        />
+      )}
+
+      {showUploadModal && selectedUploadFiles && (
+        <DocumentUploadModal
+          files={selectedUploadFiles}
+          onClose={() => {
+            setShowUploadModal(false);
+            setSelectedUploadFiles(null);
+            if (fileInputRef.current) fileInputRef.current.value = "";
+          }}
+          onUpload={performDrawingsUpload}
+          projectStage={project.projectStage}
         />
       )}
     </div>

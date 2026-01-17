@@ -51,10 +51,10 @@ public class ProjectService {
     private final AuditService auditService;
     private final PhaseService phaseService;
     private final org.example.repository.ProjectAttachmentRepository projectAttachmentRepository;
-    private final S3FileStorageService s3FileStorageService;
+    private final FileStorageService fileStorageService;
 
     @Autowired
-    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository, ClientRepository clientRepository, AuditService auditService, PhaseService phaseService, org.example.repository.ProjectAttachmentRepository projectAttachmentRepository, S3FileStorageService s3FileStorageService) {
+    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository, ClientRepository clientRepository, AuditService auditService, PhaseService phaseService, org.example.repository.ProjectAttachmentRepository projectAttachmentRepository, FileStorageService fileStorageService) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.taskRepository = taskRepository; // Initialize TaskRepository
@@ -62,7 +62,7 @@ public class ProjectService {
         this.auditService = auditService;
         this.phaseService = phaseService;
         this.projectAttachmentRepository = projectAttachmentRepository;
-        this.s3FileStorageService = s3FileStorageService;
+        this.fileStorageService = fileStorageService;
     }
 
     private User getCurrentAuthenticatedUser() {
@@ -141,6 +141,10 @@ public class ProjectService {
 
     public Optional<Project> findById(Long projectId) { // Renamed for consistency
         return projectRepository.findById(projectId);
+    }
+    
+    public Optional<Project> findByIdWithClient(Long projectId) {
+        return projectRepository.findByIdWithClient(projectId);
     }
 
     // Removed unsafe findByName and findByNameContaining methods
@@ -753,7 +757,7 @@ public class ProjectService {
     }
 
     @Transactional
-    public org.example.models.ProjectAttachment uploadAttachment(Long projectId, org.springframework.web.multipart.MultipartFile file, User uploader) {
+    public org.example.models.ProjectAttachment uploadAttachment(Long projectId, org.springframework.web.multipart.MultipartFile file, User uploader, org.example.models.enums.ProjectStage stage, org.example.models.enums.DrawingType drawingType) {
         Project project = projectRepository.findById(projectId)
                 .orElseThrow(() -> new IllegalArgumentException("Project not found"));
         
@@ -775,7 +779,7 @@ public class ProjectService {
             }
 
             // storeFile adds UUID and extension
-            String storedUrl = s3FileStorageService.storeFile(file, directory, baseName);
+            String storedUrl = fileStorageService.storeFile(file, directory, baseName);
             
             // Extract S3 key from the returned URL (format: /api/files/{key})
             String s3Key = storedUrl.replace("/api/files/", "");
@@ -788,6 +792,8 @@ public class ProjectService {
                     .size(file.getSize())
                     .uploadedBy(uploader)
                     .project(project)
+                    .stage(stage)
+                    .drawingType(drawingType)
                     .build();
             
             return projectAttachmentRepository.save(attachment);
@@ -810,8 +816,8 @@ public class ProjectService {
              throw new org.springframework.security.access.AccessDeniedException("Access denied");
         }
 
-        // Delete from S3
-        s3FileStorageService.deleteFile(attachment.getFileUrl());
+        // Delete from storage
+        fileStorageService.deleteFile(attachment.getFileUrl());
         
         // Delete from DB
         projectAttachmentRepository.delete(attachment);
@@ -831,6 +837,6 @@ public class ProjectService {
               throw new org.springframework.security.access.AccessDeniedException("Access denied");
          }
 
-         return s3FileStorageService.generatePresignedDownloadUrl("/api/files/" + attachment.getFileUrl());
+         return fileStorageService.generatePresignedDownloadUrl("/api/files/" + attachment.getFileUrl());
     }
 }

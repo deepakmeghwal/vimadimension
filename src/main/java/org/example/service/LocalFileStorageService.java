@@ -206,6 +206,27 @@ public class LocalFileStorageService implements FileStorageService {
             ));
         }
     }
+    @Override
+    public PresignedUrlResponse generatePresignedUploadUrl(String directory, String filename, String contentType) {
+        // For local storage, we don't have presigned URLs, but we can return the direct upload endpoint
+        // This is a simplified approach for development
+        String extension = "";
+        if (contentType.equals("image/jpeg")) extension = ".jpg";
+        else if (contentType.equals("image/png")) extension = ".png";
+        
+        String uniqueFilename = filename + "_" + UUID.randomUUID().toString().substring(0, 8) + extension;
+        String relativePath = directory + "/" + uniqueFilename;
+        
+        // Mock response
+        return new PresignedUrlResponse(baseUrl + "/upload", baseUrl + "/" + relativePath, "POST"); 
+    }
+
+    @Override
+    public String generatePresignedDownloadUrl(String fileUrl) {
+        // For local storage, the fileUrl (e.g., /api/files/...) is already a direct link
+        // We just return it as is
+        return fileUrl; 
+    }
 }
 
 

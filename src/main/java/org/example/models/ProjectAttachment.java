@@ -32,6 +32,12 @@ public class ProjectAttachment {
 
     private Long size;
 
+    @Enumerated(EnumType.STRING)
+    private org.example.models.enums.ProjectStage stage;
+
+    @Enumerated(EnumType.STRING)
+    private org.example.models.enums.DrawingType drawingType;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "uploaded_by_id")
     private User uploadedBy;

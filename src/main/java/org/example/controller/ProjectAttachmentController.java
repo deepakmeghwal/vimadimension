@@ -36,12 +36,14 @@ public class ProjectAttachmentController {
     public ResponseEntity<ProjectAttachment> uploadAttachment(
             @PathVariable Long projectId,
             @RequestParam("file") MultipartFile file,
+            @RequestParam(value = "stage", required = false) org.example.models.enums.ProjectStage stage,
+            @RequestParam(value = "drawingType", required = false) org.example.models.enums.DrawingType drawingType,
             @AuthenticationPrincipal UserDetails userDetails) throws IOException {
         
         User user = userService.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
-        return ResponseEntity.ok(projectService.uploadAttachment(projectId, file, user));
+        return ResponseEntity.ok(projectService.uploadAttachment(projectId, file, user, stage, drawingType));
     }
 
     @DeleteMapping("/{attachmentId}")

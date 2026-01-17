@@ -24,6 +24,11 @@ public interface ProjectRepository extends JpaRepository<Project, Long> {
     Optional<Project> findByOrganization_IdAndName(Long organizationId, String name);
     List<Project> findByOrganization_IdAndNameContainingIgnoreCase(Long organizationId, String nameFragment);
     
+    // Eagerly fetch client to avoid LazyInitializationException
+    @Query("SELECT p FROM Project p LEFT JOIN FETCH p.client WHERE p.id = :id")
+    Optional<Project> findByIdWithClient(@Param("id") Long id);
+
+    
     // Organization-based queries - using correct JPA property path
     long countByOrganization_Id(Long organizationId);
     long countByOrganization_IdAndStatusNot(Long organizationId, ProjectStatus status);

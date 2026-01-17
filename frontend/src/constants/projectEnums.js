@@ -42,3 +42,20 @@ export const TASK_PRIORITIES = [
     { value: 'HIGH', label: 'High', cssClass: 'priority-high' },
     { value: 'URGENT', label: 'Urgent', cssClass: 'priority-urgent' }
 ];
+export const DRAWING_TYPES = [
+    { value: 'SITE_PLAN', label: 'Site Plan' },
+    { value: 'FLOOR_PLAN', label: 'Floor Plan' },
+    { value: 'ELEVATION', label: 'Elevation' },
+    { value: 'SECTION', label: 'Section' },
+    { value: 'STRUCTURAL', label: 'Structural Drawing' },
+    { value: 'ELECTRICAL', label: 'Electrical Drawing' },
+    { value: 'PLUMBING', label: 'Plumbing Drawing' },
+    { value: 'HVAC', label: 'HVAC Drawing' },
+    { value: 'FIRE_FIGHTING', label: 'Fire Fighting Drawing' },
+    { value: 'LANDSCAPE', label: 'Landscape Drawing' },
+    { value: 'INTERIOR', label: 'Interior Design' },
+    { value: 'WORKING', label: 'Working Drawing' },
+    { value: 'SUBMISSION', label: 'Submission Drawing' },
+    { value: 'PRESENTATION', label: 'Presentation Drawing' },
+    { value: 'OTHER', label: 'Other' }
+];
