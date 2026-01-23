@@ -7,8 +7,10 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import java.time.LocalDateTime;
 
-@Entity
-@Table(name = "project_attachments")
+// DISABLED: Temporarily disabling entity to avoid schema validation
+// TODO: Create project_attachments table in production DB before re-enabling
+// @Entity
+// @Table(name = "project_attachments")
 @Data
 @Builder
 @NoArgsConstructor

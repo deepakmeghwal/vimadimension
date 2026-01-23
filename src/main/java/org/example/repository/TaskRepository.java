@@ -32,6 +32,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     // Find tasks by project ID with eager loading of all related entities
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t FROM Task t " +
         "LEFT JOIN FETCH t.project p " +
+        "LEFT JOIN FETCH p.client " +
         "LEFT JOIN FETCH t.assignee " +
         "LEFT JOIN FETCH t.reporter " +
         "LEFT JOIN FETCH t.checkedBy " +
@@ -54,6 +55,7 @@ public interface TaskRepository extends JpaRepository<Task, Long> {
     // Uses LEFT JOIN FETCH for eager loading to prevent LazyInitializationException
     @org.springframework.data.jpa.repository.Query("SELECT DISTINCT t FROM Task t " +
         "LEFT JOIN FETCH t.project p " +
+        "LEFT JOIN FETCH p.client " +
         "LEFT JOIN FETCH t.assignee " +
         "LEFT JOIN FETCH t.reporter " +
         "LEFT JOIN FETCH t.checkedBy " +

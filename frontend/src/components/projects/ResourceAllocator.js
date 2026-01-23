@@ -268,10 +268,8 @@ const ResourceAllocator = ({ projectId }) => {
             <div className="resource-allocator">
                 <div className="empty-state">
                     <h3>No Phases Found</h3>
-                    <p>Create project phases first to allocate resources.</p>
-                    <Link to={`/projects/${projectId}/phases/new`} className="btn-primary">
-                        Create Phase
-                    </Link>
+                    <p>This project doesn't have any phases yet. Phases are created automatically based on the project's lifecycle stages.</p>
+                    <p>To add phases, edit the project and select the appropriate lifecycle stages.</p>
                 </div>
             </div>
         );

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Mail } from 'lucide-react';
+import { SkeletonLoader } from '../common/SkeletonLoader';
 
 const TeamRoster = ({ tasks, project }) => {
     const [teamMembers, setTeamMembers] = useState([]);
@@ -72,10 +73,22 @@ const TeamRoster = ({ tasks, project }) => {
                 </div>
 
                 {loading ? (
-                    <div className="loading-state">
-                        <div className="loading-spinner"></div>
-                        <p>Loading team members...</p>
-                    </div>
+                    <>
+                        {[1, 2, 3, 4].map(i => (
+                            <div key={i} className="asana-task-row skeleton-row" style={gridStyle}>
+                                <div className="asana-task-name-cell">
+                                    <SkeletonLoader type="circle" width="24px" height="24px" style={{ marginRight: '0.75rem' }} />
+                                    <SkeletonLoader type="text" width="120px" height="1rem" />
+                                </div>
+                                <div className="asana-task-date">
+                                    <SkeletonLoader type="text" width="100px" height="1rem" />
+                                </div>
+                                <div className="asana-task-date">
+                                    <SkeletonLoader type="text" width="150px" height="1rem" />
+                                </div>
+                            </div>
+                        ))}
+                    </>
                 ) : teamMembers.length === 0 ? (
                     <div className="loading-state">
                         <p style={{ color: '#64748b' }}>No team members assigned to this project.</p>

@@ -377,3 +377,63 @@
         transform: translateY(0) scale(1);
     }
 }
+
+/* Mobile Responsiveness for My Tasks */
+@media (max-width: 768px) {
+    .my-tasks-page {
+        padding: 0 1rem;
+    }
+
+    /* Used in MyTasks for header */
+    .projects-header-compact {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 1rem;
+        height: auto;
+        padding: 1rem 0;
+    }
+
+    .projects-header-right {
+        width: 100%;
+        justify-content: flex-start;
+        flex-wrap: wrap;
+        gap: 1rem;
+    }
+
+    .view-toggle-compact {
+        margin-left: auto;
+        /* Push view toggle to the right */
+    }
+
+    /* Kanban Board Responsiveness */
+    .kanban-board {
+        display: flex;
+        flex-direction: column;
+        /* Stack columns vertically on mobile */
+        gap: 2rem;
+        padding-bottom: 2rem;
+    }
+
+    .kanban-column {
+        min-width: 100%;
+        /* Full width columns */
+    }
+
+    /* Ensure scroll container for list view */
+    .asana-list-view {
+        padding: 0 5px !important;
+        overflow-x: auto;
+    }
+
+    /* Adjust modal width */
+    .task-filter-modal {
+        width: 95%;
+        max-height: 90vh;
+        overflow-y: auto;
+    }
+
+    .checkbox-group {
+        grid-template-columns: 1fr;
+        /* Stack checkboxes */
+    }
+}

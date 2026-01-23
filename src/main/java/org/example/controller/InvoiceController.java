@@ -77,8 +77,29 @@ public class InvoiceController {
             Page<Invoice> invoicePage = invoiceService.getInvoicesByOrganizationWithFilters(
                 organizationId, pageable, status, search, projectId, overdue);
             
+            // Manual mapping to DTOs to avoid LazyInitializationException on items/relations
+            List<Map<String, Object>> mappedInvoices = new ArrayList<>();
+            for (Invoice i : invoicePage.getContent()) {
+                Map<String, Object> map = new HashMap<>();
+                map.put("id", i.getId());
+                map.put("invoiceNumber", i.getInvoiceNumber());
+                map.put("clientName", i.getClientName());
+                map.put("issueDate", i.getIssueDate());
+                map.put("dueDate", i.getDueDate());
+                map.put("status", i.getStatus());
+                map.put("totalAmount", i.getTotalAmount());
+                map.put("balanceAmount", i.getBalanceAmount());
+                map.put("paidAmount", i.getPaidAmount());
+                // Safe access due to JOIN FETCH
+                if (i.getProject() != null) {
+                     map.put("projectName", i.getProject().getName());
+                     map.put("projectId", i.getProject().getId());
+                }
+                mappedInvoices.add(map);
+            }
+            
             Map<String, Object> response = new HashMap<>();
-            response.put("invoices", invoicePage.getContent());
+            response.put("invoices", mappedInvoices);
             response.put("currentPage", invoicePage.getNumber());
             response.put("totalItems", invoicePage.getTotalElements());
             response.put("totalPages", invoicePage.getTotalPages());

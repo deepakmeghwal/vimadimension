@@ -106,9 +106,10 @@ public class Project {
     @JsonIgnore // Prevent circular reference during JSON serialization
     private Set<User> accessibleByUsers = new HashSet<>();
 
-    @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
-    @JsonIgnore
-    private List<ProjectAttachment> attachments = new ArrayList<>();
+    // DISABLED: Temporarily disabled until project_attachments table exists
+    // @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    // @JsonIgnore
+    // private List<ProjectAttachment> attachments = new ArrayList<>();
 
     @OneToMany(mappedBy = "project", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     @JsonIgnore // Prevent lazy loading exception during JSON serialization
@@ -294,13 +295,14 @@ public class Project {
         this.phases = phases;
     }
 
-    public List<ProjectAttachment> getAttachments() {
-        return attachments;
-    }
+    // DISABLED: Temporarily disabled until project_attachments table exists
+    // public List<ProjectAttachment> getAttachments() {
+    //     return attachments;
+    // }
 
-    public void setAttachments(List<ProjectAttachment> attachments) {
-        this.attachments = attachments;
-    }
+    // public void setAttachments(List<ProjectAttachment> attachments) {
+    //     this.attachments = attachments;
+    // }
 
     public ProjectStatus getStatus() {
         return status;

@@ -7,8 +7,10 @@ import {
     Calendar,
     AlignLeft,
     Send,
-    ChevronRight
+    ChevronRight,
+    User
 } from 'lucide-react';
+import { AssigneeSelector } from './AsanaListComponents';
 import './ProjectDetails.css'; // Reusing existing styles where possible, will add specific ones
 
 const PriorityIcon = ({ priority }) => {
@@ -21,14 +23,37 @@ const PriorityIcon = ({ priority }) => {
     return <div className="priority-icon priority-low"></div>;
 };
 
-const TaskDetailPanel = ({ task, onClose, onSave, onUpdate }) => {
+const TaskDetailPanel = ({ task, onClose, onSave, onUpdate, teamMembers }) => {
     const [desc, setDesc] = useState(task.description || '');
     const [name, setName] = useState(task.name || '');
+    const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
+    const [showCheckedBySelector, setShowCheckedBySelector] = useState(false);
 
     useEffect(() => {
         setDesc(task.description || '');
         setName(task.name || '');
+        setShowAssigneeSelector(false);
+        setShowCheckedBySelector(false);
     }, [task]);
+
+    // Close selector when clicking outside is handled by the selector itself or we can add a ref here if needed for deeper control
+    // But AssigneeSelector in AsanaListComponents doesn't self-close on outside click effectively if not structured right.
+    // Let's rely on a simplified approach or reusable component logic.
+    // The previous AssigneeSelector implementation didn't have self-close logic embedded in itself strictly, 
+    // it was controlled by the parent. Let's wrap it or handle click outside here if needed, 
+    // but typically the dropdown is absolute.
+
+    const handleAssigneeClick = (e) => {
+        e.stopPropagation();
+        setShowAssigneeSelector(!showAssigneeSelector);
+        setShowCheckedBySelector(false); // Close other dropdown
+    };
+
+    const handleCheckedByClick = (e) => {
+        e.stopPropagation();
+        setShowCheckedBySelector(!showCheckedBySelector);
+        setShowAssigneeSelector(false); // Close other dropdown
+    };
 
     const handleNameBlur = () => {
         if (name !== task.name) {
@@ -70,9 +95,12 @@ const TaskDetailPanel = ({ task, onClose, onSave, onUpdate }) => {
                         />
 
                         <div className="task-panel-fields">
-                            <div className="task-field-row">
+                            <div className="task-field-row" style={{ position: 'relative' }}>
                                 <div className="task-field-label">Assignee</div>
-                                <div className="task-field-value">
+                                <div
+                                    className="task-field-value"
+                                    onClick={handleAssigneeClick}
+                                >
                                     {task.assignee ? (
                                         <div className="assignee-display">
                                             <div className="assignee-avatar-modal">
@@ -81,9 +109,79 @@ const TaskDetailPanel = ({ task, onClose, onSave, onUpdate }) => {
                                             <span>{task.assignee.name || task.assignee.username}</span>
                                         </div>
                                     ) : (
-                                        <span className="task-field-empty">Unassigned</span>
+                                        <div className="assignee-display">
+                                            <div className="assignee-avatar-modal" style={{ background: '#f1f5f9', color: '#94a3b8' }}>
+                                                <User size={14} />
+                                            </div>
+                                            <span className="task-field-empty">Unassigned</span>
+                                        </div>
                                     )}
                                 </div>
+                                {showAssigneeSelector && (
+                                    <div style={{ position: 'absolute', top: '100%', left: '130px', zIndex: 100 }}>
+                                        <AssigneeSelector
+                                            members={teamMembers}
+                                            onSelect={(user) => {
+                                                onUpdate(task.id, { assignee: user });
+                                                setShowAssigneeSelector(false);
+                                            }}
+                                            onClose={() => setShowAssigneeSelector(false)}
+                                        />
+                                        {/* Overlay to close on click outside */}
+                                        <div
+                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowAssigneeSelector(false);
+                                            }}
+                                        />
+                                    </div>
+                                )}
+                            </div>
+
+                            <div className="task-field-row" style={{ position: 'relative' }}>
+                                <div className="task-field-label">Checked By</div>
+                                <div
+                                    className="task-field-value"
+                                    onClick={handleCheckedByClick}
+                                >
+                                    {task.checkedBy ? (
+                                        <div className="assignee-display">
+                                            <div className="assignee-avatar-modal">
+                                                {task.checkedBy.name ? task.checkedBy.name.charAt(0).toUpperCase() : 'U'}
+                                            </div>
+                                            <span>{task.checkedBy.name || task.checkedBy.username}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="assignee-display">
+                                            <div className="assignee-avatar-modal" style={{ background: '#f1f5f9', color: '#94a3b8' }}>
+                                                <User size={14} />
+                                            </div>
+                                            <span className="task-field-empty">Unassigned</span>
+                                        </div>
+                                    )}
+                                </div>
+                                {showCheckedBySelector && (
+                                    <div style={{ position: 'absolute', top: '100%', left: '130px', zIndex: 100 }}>
+                                        <AssigneeSelector
+                                            members={teamMembers}
+                                            onSelect={(user) => {
+                                                console.log('Selected user for Checked By:', user);
+                                                console.log('Task ID:', task.id);
+                                                onUpdate(task.id, { checkedBy: user });
+                                                setShowCheckedBySelector(false);
+                                            }}
+                                            onClose={() => setShowCheckedBySelector(false)}
+                                        />
+                                        <div
+                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowCheckedBySelector(false);
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
                             <div className="task-field-row">
@@ -106,11 +204,11 @@ const TaskDetailPanel = ({ task, onClose, onSave, onUpdate }) => {
                                 <div className="task-field-label">Status</div>
                                 <div className="task-field-value">
                                     <span className={`status-badge-modal ${task.status === 'TO_DO' ? 'status-badge-todo' :
-                                            task.status === 'IN_PROGRESS' ? 'status-badge-in-progress' :
-                                                task.status === 'IN_REVIEW' ? 'status-badge-in-review' :
-                                                    task.status === 'DONE' ? 'status-badge-done' :
-                                                        task.status === 'CHECKED' ? 'status-badge-checked' :
-                                                            'status-badge-on-hold'
+                                        task.status === 'IN_PROGRESS' ? 'status-badge-in-progress' :
+                                            task.status === 'IN_REVIEW' ? 'status-badge-in-review' :
+                                                task.status === 'DONE' ? 'status-badge-done' :
+                                                    task.status === 'CHECKED' ? 'status-badge-checked' :
+                                                        'status-badge-on-hold'
                                         }`}>
                                         {task.status?.replace(/_/g, ' ') || 'To Do'}
                                     </span>

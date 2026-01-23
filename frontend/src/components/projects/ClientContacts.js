@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, MoreHorizontal, Phone, Mail, User, Trash2 } from 'lucide-react';
+import { SkeletonLoader } from '../common/SkeletonLoader';
 
 const ClientContacts = ({ clientId, clientName }) => {
     const [contacts, setContacts] = useState([]);
@@ -112,9 +113,25 @@ const ClientContacts = ({ clientId, clientName }) => {
                 </div>
 
                 {loading ? (
-                    <div className="loading-state">
-                        <div className="loading-spinner"></div>
-                    </div>
+                    <>
+                        {[1, 2, 3].map(i => (
+                            <div key={i} className="asana-task-row skeleton-row" style={gridStyle}>
+                                <div className="asana-task-name-cell">
+                                    <SkeletonLoader type="circle" width="24px" height="24px" style={{ marginRight: '0.75rem' }} />
+                                    <SkeletonLoader type="text" width="120px" height="1rem" />
+                                </div>
+                                <div className="asana-task-date">
+                                    <SkeletonLoader type="text" width="80px" height="1rem" />
+                                </div>
+                                <div className="asana-task-date">
+                                    <SkeletonLoader type="text" width="150px" height="1rem" />
+                                </div>
+                                <div className="asana-task-date">
+                                    <SkeletonLoader type="text" width="100px" height="1rem" />
+                                </div>
+                            </div>
+                        ))}
+                    </>
                 ) : (
                     <>
                         {contacts.map(contact => (

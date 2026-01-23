@@ -487,6 +487,7 @@ public class TaskService {
                                      Optional<String> newDescriptionOpt,
                                      Optional<Long> newPhaseIdOpt,
                                      Optional<Long> newAssigneeIdOpt, // Use Optional<Optional<Long>> or a flag for unassigning if null means "no change"
+                                     Optional<Long> newCheckedByIdOpt,
                                      Optional<TaskStatus> newStatusOpt,
                                      Optional<TaskPriority> newPriorityOpt,
                                      Optional<LocalDate> newDueDateOpt) {
@@ -547,6 +548,20 @@ public class TaskService {
 
         if (newDueDateOpt.isPresent()) {
             taskToUpdate.setDueDate(newDueDateOpt.get());
+            updated = true;
+        }
+
+        // Handling checkedBy update:
+        // Use -1L to explicit unassign
+        if (newCheckedByIdOpt.isPresent()) {
+            Long checkedById = newCheckedByIdOpt.get();
+            if (checkedById == -1L) { // Explicitly unassign
+                taskToUpdate.setCheckedBy(null);
+            } else {
+                User checker = userRepository.findById(checkedById)
+                        .orElseThrow(() -> new IllegalArgumentException("Checker user with ID " + checkedById + " not found for task update."));
+                taskToUpdate.setCheckedBy(checker);
+            }
             updated = true;
         }
 

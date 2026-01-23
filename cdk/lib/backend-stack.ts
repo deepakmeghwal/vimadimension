@@ -85,7 +85,7 @@ export class BackendStack extends cdk.Stack {
 
         // ==================== DOCKER IMAGE ====================
         // Dynamic ECR URI based on current account and region
-        const imageUri = `${this.account}.dkr.ecr.${this.region}.amazonaws.com/cdk-hnb659fds-container-assets-${this.account}-${this.region}:v20260117-fix-lazy-v2`;
+        const imageUri = `${this.account}.dkr.ecr.${this.region}.amazonaws.com/cdk-hnb659fds-container-assets-${this.account}-${this.region}:v20260122-deploy-bom`;
 
         // ==================== AMI ====================
         const ami = new ec2.AmazonLinuxImage({
@@ -101,6 +101,16 @@ export class BackendStack extends cdk.Stack {
             'yum install -y docker jq aws-cli',
             'service docker start',
             'usermod -a -G docker ec2-user',
+
+            // ==================== MEMORY OPTIMIZATION START ====================
+            // 1. Create a 2GB Swap File (Virtual RAM from Disk)
+            'fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048',
+            'chmod 600 /swapfile',
+            'mkswap /swapfile',
+            'swapon /swapfile',
+            // 2. Make it permanent across reboots
+            'echo "/swapfile swap swap defaults 0 0" >> /etc/fstab',
+            // ==================== MEMORY OPTIMIZATION END ====================
 
             // Login to ECR
             `aws ecr get-login-password --region ${this.region} | docker login --username AWS --password-stdin ${imageUri.split('/')[0]}`,
@@ -186,21 +196,21 @@ PYEOF
 
             // Run Container
             `docker run -d --restart always -p 8080:8080 \\
-                -m 1536m \\
-                -e JAVA_OPTS="-Xmx1024m -Xms512m" \\
+                -m 1280m \\
+                -e JAVA_OPTS="-Xmx768m -Xms256m -XX:+UseSerialGC" \\
                 -e SPRING_PROFILES_ACTIVE=prod \\
                 -e SPRING_DATASOURCE_URL="jdbc:mysql://\${DB_HOST}:\${DB_PORT}/\${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" \\
                 -e SPRING_DATASOURCE_USERNAME="\${DB_USER}" \\
                 -e SPRING_DATASOURCE_PASSWORD="\${DB_PASS}" \\
                 -e SERVER_PORT=8080 \\
                 -e SPRING_JPA_HIBERNATE_DDL_AUTO=validate \\
-                -e APP_CORS_ALLOWED_ORIGINS="https://${CLOUDFRONT_DOMAIN}" \\
+                -e APP_CORS_ALLOWED_ORIGINS="https://${CLOUDFRONT_DOMAIN},https://archiease.com,https://www.archiease.com" \\
                 -e MAIL_HOST="\${MAIL_HOST}" \\
                 -e MAIL_PORT="\${MAIL_PORT}" \\
                 -e MAIL_USERNAME="\${SES_ACCESS_KEY}" \\
                 -e MAIL_PASSWORD="\${MAIL_PASSWORD}" \\
                 -e MAIL_FROM="\${MAIL_FROM}" \\
-                -e APP_FRONTEND_URL="https://${CLOUDFRONT_DOMAIN}" \\
+                -e APP_FRONTEND_URL="https://www.archiease.com" \\
                 -e APP_NAME="ArchiEase" \\
                 -e AWS_S3_BUCKET="${this.uploadsBucket.bucketName}" \\
                 -e AWS_REGION="${this.region}" \\
@@ -227,7 +237,7 @@ PYEOF
         // });
 
         // ==================== EC2 INSTANCE ====================
-        this.instance = new ec2.Instance(this, 'BackendInstance', {
+        this.instance = new ec2.Instance(this, 'BackendInstanceFinal', {
             vpc: props.vpc,
             vpcSubnets: {
                 subnetType: ec2.SubnetType.PUBLIC,

@@ -1,0 +1,412 @@
+Resources:
+  UploadsBucket5E5E9B64:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+      BucketName: archiease-uploads-288833449200-ap-south-1
+      CorsConfiguration:
+        CorsRules:
+          - AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - PUT
+              - POST
+            AllowedOrigins:
+              - https://d3esaqi72ck9uv.cloudfront.net
+              - http://localhost:3000
+            MaxAge: 3000
+      LifecycleConfiguration:
+        Rules:
+          - AbortIncompleteMultipartUpload:
+              DaysAfterInitiation: 7
+            Status: Enabled
+            Transitions:
+              - StorageClass: STANDARD_IA
+                TransitionInDays: 90
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: true
+        BlockPublicPolicy: true
+        IgnorePublicAcls: true
+        RestrictPublicBuckets: true
+    UpdateReplacePolicy: Retain
+    DeletionPolicy: Retain
+    Metadata:
+      aws:cdk:path: BackendStack/UploadsBucket/Resource
+  BackendInstanceRole9660A9CF:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: ec2.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonSSMManagedInstanceCore
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/SecretsManagerReadWrite
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/AmazonEC2ContainerRegistryReadOnly
+    Metadata:
+      aws:cdk:path: BackendStack/BackendInstanceRole/Resource
+  BackendInstanceRoleDefaultPolicy5C2C7813:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyDocument:
+        Statement:
+          - Action:
+              - s3:Abort*
+              - s3:DeleteObject*
+              - s3:GetBucket*
+              - s3:GetObject*
+              - s3:List*
+              - s3:PutObject
+              - s3:PutObjectLegalHold
+              - s3:PutObjectRetention
+              - s3:PutObjectTagging
+              - s3:PutObjectVersionTagging
+            Effect: Allow
+            Resource:
+              - Fn::GetAtt:
+                  - UploadsBucket5E5E9B64
+                  - Arn
+              - Fn::Join:
+                  - ""
+                  - - Fn::GetAtt:
+                        - UploadsBucket5E5E9B64
+                        - Arn
+                    - /*
+          - Action: s3:DeleteObject*
+            Effect: Allow
+            Resource:
+              Fn::Join:
+                - ""
+                - - Fn::GetAtt:
+                      - UploadsBucket5E5E9B64
+                      - Arn
+                  - /*
+          - Action:
+              - ses:SendEmail
+              - ses:SendRawEmail
+            Effect: Allow
+            Resource: "*"
+          - Action:
+              - secretsmanager:DescribeSecret
+              - secretsmanager:GetSecretValue
+            Effect: Allow
+            Resource:
+              Fn::ImportValue: SesStack:ExportsOutputRefSmtpCredentialsSecretA75C626E44AB065E
+        Version: "2012-10-17"
+      PolicyName: BackendInstanceRoleDefaultPolicy5C2C7813
+      Roles:
+        - Ref: BackendInstanceRole9660A9CF
+    Metadata:
+      aws:cdk:path: BackendStack/BackendInstanceRole/DefaultPolicy/Resource
+  InstanceSG2AE1100C:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Security Group for Backend EC2 Instance
+      SecurityGroupEgress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow all outbound traffic by default
+          IpProtocol: "-1"
+      SecurityGroupIngress:
+        - CidrIp: 0.0.0.0/0
+          Description: Allow SSH
+          FromPort: 22
+          IpProtocol: tcp
+          ToPort: 22
+        - CidrIp: 0.0.0.0/0
+          Description: Allow HTTP from CloudFront
+          FromPort: 8080
+          IpProtocol: tcp
+          ToPort: 8080
+      VpcId:
+        Fn::ImportValue: NetworkStack:ExportsOutputRefVimaDimensionVpc680BBD2B19D6D9BD
+    Metadata:
+      aws:cdk:path: BackendStack/InstanceSG/Resource
+  BackendInstanceFinalInstanceProfile07F69F16:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles:
+        - Ref: BackendInstanceRole9660A9CF
+    Metadata:
+      aws:cdk:path: BackendStack/BackendInstanceFinal/InstanceProfile
+  BackendInstanceFinal3D4CDEFF:
+    Type: AWS::EC2::Instance
+    Properties:
+      AvailabilityZone: ap-south-1a
+      IamInstanceProfile:
+        Ref: BackendInstanceFinalInstanceProfile07F69F16
+      ImageId:
+        Ref: SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter
+      InstanceType: t3.small
+      SecurityGroupIds:
+        - Fn::GetAtt:
+            - InstanceSG2AE1100C
+            - GroupId
+      SubnetId:
+        Fn::ImportValue: NetworkStack:ExportsOutputRefVimaDimensionVpcPublicSubnet1SubnetE125A697CABC275D
+      Tags:
+        - Key: Name
+          Value: BackendStack/BackendInstanceFinal
+      UserData:
+        Fn::Base64:
+          Fn::Join:
+            - ""
+            - - |-
+                #!/bin/bash
+                yum update -y
+                echo "Deployment timestamp: 2026-01-21T22:20:45.631Z - LAZY FIX"
+                yum install -y docker jq aws-cli
+                service docker start
+                usermod -a -G docker ec2-user
+                fallocate -l 2G /swapfile || dd if=/dev/zero of=/swapfile bs=1M count=2048
+                chmod 600 /swapfile
+                mkswap /swapfile
+                swapon /swapfile
+                echo "/swapfile swap swap defaults 0 0" >> /etc/fstab
+                aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin 288833449200.dkr.ecr.ap-south-1.amazonaws.com
+                SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id 
+              - Fn::Join:
+                  - "-"
+                  - - Fn::Select:
+                        - 0
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 6
+                                - Fn::Split:
+                                    - ":"
+                                    - Fn::ImportValue: DatabaseStack:ExportsOutputRefMySQLInstanceSecret8B5AA6945755C7BB
+                    - Fn::Select:
+                        - 1
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 6
+                                - Fn::Split:
+                                    - ":"
+                                    - Fn::ImportValue: DatabaseStack:ExportsOutputRefMySQLInstanceSecret8B5AA6945755C7BB
+              - |-2
+                 --query SecretString --output text --region ap-south-1)
+                DB_HOST=$(echo $SECRET_JSON | jq -r .host)
+                DB_PORT=$(echo $SECRET_JSON | jq -r .port)
+                DB_USER=$(echo $SECRET_JSON | jq -r .username)
+                DB_PASS=$(echo $SECRET_JSON | jq -r .password)
+                DB_NAME=$(echo $SECRET_JSON | jq -r .dbname)
+                SES_SECRET_JSON=$(aws secretsmanager get-secret-value --secret-id 
+              - Fn::Join:
+                  - "-"
+                  - - Fn::Select:
+                        - 0
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 6
+                                - Fn::Split:
+                                    - ":"
+                                    - Fn::ImportValue: SesStack:ExportsOutputRefSmtpCredentialsSecretA75C626E44AB065E
+                    - Fn::Select:
+                        - 1
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 6
+                                - Fn::Split:
+                                    - ":"
+                                    - Fn::ImportValue: SesStack:ExportsOutputRefSmtpCredentialsSecretA75C626E44AB065E
+                    - Fn::Select:
+                        - 2
+                        - Fn::Split:
+                            - "-"
+                            - Fn::Select:
+                                - 6
+                                - Fn::Split:
+                                    - ":"
+                                    - Fn::ImportValue: SesStack:ExportsOutputRefSmtpCredentialsSecretA75C626E44AB065E
+              - |-2
+                 --query SecretString --output text --region ap-south-1)
+                SES_ACCESS_KEY=$(echo $SES_SECRET_JSON | jq -r .accessKeyId)
+                export SES_SECRET_KEY=$(echo $SES_SECRET_JSON | jq -r .secretAccessKey)
+                MAIL_HOST=$(echo $SES_SECRET_JSON | jq -r .smtpHost)
+                MAIL_PORT=$(echo $SES_SECRET_JSON | jq -r .smtpPort)
+                MAIL_FROM="no-reply@archiease.com"
+                MAIL_PASSWORD=$(python3 <<'PYEOF'
+                import hmac
+                import hashlib
+                import base64
+                import os
+                import sys
+
+                SMTP_REGIONS = [
+                    'us-east-2', 'us-east-1', 'us-west-2', 'ap-south-1',
+                    'ap-northeast-2', 'ap-southeast-1', 'ap-southeast-2', 'ap-northeast-1',
+                    'ca-central-1', 'eu-central-1', 'eu-west-1', 'eu-west-2', 'eu-west-3',
+                    'sa-east-1', 'us-gov-west-1', 'af-south-1', 'ap-east-1', 'me-south-1'
+                ]
+
+                DATE = "11111111"
+                SERVICE = "ses"
+                MESSAGE = "SendRawEmail"
+                TERMINAL = "aws4_request"
+                VERSION = 0x04
+
+                def sign(key, msg):
+                    return hmac.new(key, msg.encode('utf-8'), hashlib.sha256).digest()
+
+                def calculate_key(secret_access_key, region):
+                    if region not in SMTP_REGIONS:
+                        raise ValueError(f'Region {region} is not supported')
+                    
+                    signature = sign(('AWS4' + secret_access_key).encode('utf-8'), DATE)
+                    signature = sign(signature, region)
+                    signature = sign(signature, SERVICE)
+                    signature = sign(signature, TERMINAL)
+                    signature = sign(signature, MESSAGE)
+                    
+                    signature_and_version = bytes([VERSION]) + signature
+                    return base64.b64encode(signature_and_version).decode('utf-8')
+
+                secret_key = os.environ.get('SES_SECRET_KEY', '')
+                region = 'ap-south-1'
+
+                try:
+                    if not secret_key:
+                        print('ERROR: SES_SECRET_KEY is empty', file=sys.stderr)
+                        sys.exit(1)
+                    if not region:
+                        print('ERROR: Region is empty', file=sys.stderr)
+                        sys.exit(1)
+                    smtp_password = calculate_key(secret_key, region)
+                    if not smtp_password:
+                        print('ERROR: Failed to generate SMTP password', file=sys.stderr)
+                        sys.exit(1)
+                    print(smtp_password)
+                except Exception as e:
+                    print(f'ERROR generating SMTP password: {e}', file=sys.stderr)
+                    sys.exit(1)
+                PYEOF
+                )
+                if [ -z "$MAIL_PASSWORD" ]; then
+                  echo "ERROR: Failed to generate SMTP password. Check logs above."
+                  exit 1
+                fi
+                echo "SMTP password generated successfully"
+                docker run -d --restart always -p 8080:8080 \
+                                -m 1280m \
+                                -e JAVA_OPTS="-Xmx768m -Xms256m -XX:+UseSerialGC" \
+                                -e SPRING_PROFILES_ACTIVE=prod \
+                                -e SPRING_DATASOURCE_URL="jdbc:mysql://${DB_HOST}:${DB_PORT}/${DB_NAME}?useSSL=false&allowPublicKeyRetrieval=true&serverTimezone=UTC" \
+                                -e SPRING_DATASOURCE_USERNAME="${DB_USER}" \
+                                -e SPRING_DATASOURCE_PASSWORD="${DB_PASS}" \
+                                -e SERVER_PORT=8080 \
+                                -e SPRING_JPA_HIBERNATE_DDL_AUTO=validate \
+                                -e APP_CORS_ALLOWED_ORIGINS="https://d3esaqi72ck9uv.cloudfront.net,https://archiease.com,https://www.archiease.com" \
+                                -e MAIL_HOST="${MAIL_HOST}" \
+                                -e MAIL_PORT="${MAIL_PORT}" \
+                                -e MAIL_USERNAME="${SES_ACCESS_KEY}" \
+                                -e MAIL_PASSWORD="${MAIL_PASSWORD}" \
+                                -e MAIL_FROM="${MAIL_FROM}" \
+                                -e APP_FRONTEND_URL="https://www.archiease.com" \
+                                -e APP_NAME="ArchiEase" \
+                                -e AWS_S3_BUCKET="
+              - Ref: UploadsBucket5E5E9B64
+              - |-
+                " \
+                                -e AWS_REGION="ap-south-1" \
+                                -e APP_STORAGE_TYPE="s3" \
+                                288833449200.dkr.ecr.ap-south-1.amazonaws.com/cdk-hnb659fds-container-assets-288833449200-ap-south-1:v20260117-fix-lazy-v8
+    DependsOn:
+      - BackendInstanceRoleDefaultPolicy5C2C7813
+      - BackendInstanceRole9660A9CF
+    Metadata:
+      aws:cdk:path: BackendStack/BackendInstanceFinal/Resource
+  BackendEIP:
+    Type: AWS::EC2::EIP
+    Properties:
+      Domain: vpc
+    Metadata:
+      aws:cdk:path: BackendStack/BackendEIP
+  EIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      AllocationId:
+        Fn::GetAtt:
+          - BackendEIP
+          - AllocationId
+      InstanceId:
+        Ref: BackendInstanceFinal3D4CDEFF
+    Metadata:
+      aws:cdk:path: BackendStack/EIPAssociation
+  AllowInstanceToDb:
+    Type: AWS::EC2::SecurityGroupIngress
+    Properties:
+      Description: Allow MySQL from Backend Instance
+      FromPort: 3306
+      GroupId:
+        Fn::ImportValue: NetworkStack:ExportsOutputFnGetAttDbSG0BE6ACB3GroupIdE6F8FAFE
+      IpProtocol: tcp
+      SourceSecurityGroupId:
+        Fn::GetAtt:
+          - InstanceSG2AE1100C
+          - GroupId
+      ToPort: 3306
+    Metadata:
+      aws:cdk:path: BackendStack/AllowInstanceToDb
+  CDKMetadata:
+    Type: AWS::CDK::Metadata
+    Properties:
+      Analytics: v2:deflate64:H4sIAAAAAAAA/7VVTU8bMRD9LeyxMtsSxIXb8iG6UoEoCSeEkNeeBBOvvfVHaLTa/96x106DQEgV7SVrvRnPvJl5nkzKydFJ+e2AvthDxteHUjRlP3eUrQlCj709Lvszz9bg7vuiiYcb2kJxWnwpSNFIzdZT30jBKsbA2oSDYmbbOaEVAvPjx+vqprq6vEDLBoxFGHhxuqTSAikMtHpD5VRjkC26G3BUKHRl2mA8TEul1C/Ar8E9aR6g4upygQ7Tu/h7O18UDyR73RqxEioTSeB3oBxMBlv6q1qNJQx4UYolsC2TMPMSxozOUGVF4L8L1GjjasV020lwcO2lEx017q6TmvJq6cCkgANBxpyfI/sQ8L9XQCLypciJf+yX89lq/gR/IOdLNSphIIK2ZT/TEkJt1voW+BnOri86IxTDUBLloL1yOV/0CRcqllQRg7dU0RXwOHuRer+PbSuTff/akPux0NNMKmvsvk9Wh0J/qpUUCna2XSs/NH4cN1rfBT++8q41dj70joxwILHjt9DB8ob2W5hzfNUOWlDOvkr7STiyG4mFU62so4rB1OilkDAQYBNcKMC8EW57ZbTvcMabjiVlcLDMiG4niiT4Sspb7xqUEC4KZzyk9LVaGVwzO2kzqsYJjUjwDItDKWD7evdK/PRQ8yyZYf/B/NuYsR+v6iW5J68Kx9PcNwpCI/vCxuNi24VHPS7U8D5EupkM49NnT8itbukqQ3Y/W8JMHP9I1IK5oI7mhbc3pXC+rKfpU1mrmaChyDdFpCYNQ7DgaDrvyAys9gbrCoVHGVCD/w24PAaiNIfy2X7dTE7KSXl08GyFODS4EUQL5Wz8/gbav0mBfAYAAA==
+    Metadata:
+      aws:cdk:path: BackendStack/CDKMetadata/Default
+Outputs:
+  UploadsBucketName:
+    Description: S3 bucket for file uploads
+    Value:
+      Ref: UploadsBucket5E5E9B64
+    Export:
+      Name: UploadsBucketName
+  BackendPublicDnsName:
+    Description: Public DNS name of the backend instance
+    Value:
+      Fn::GetAtt:
+        - BackendInstanceFinal3D4CDEFF
+        - PublicDnsName
+    Export:
+      Name: BackendPublicDnsName
+  BackendInstanceId:
+    Description: Instance ID of the backend EC2
+    Value:
+      Ref: BackendInstanceFinal3D4CDEFF
+  ExportsOutputFnGetAttBackendInstanceFinal3D4CDEFFPublicDnsName0758B287:
+    Value:
+      Fn::GetAtt:
+        - BackendInstanceFinal3D4CDEFF
+        - PublicDnsName
+    Export:
+      Name: BackendStack:ExportsOutputFnGetAttBackendInstanceFinal3D4CDEFFPublicDnsName0758B287
+Parameters:
+  SsmParameterValueawsserviceamiamazonlinuxlatestal2023amikernel61x8664C96584B6F00A464EAD1953AFF4B05118Parameter:
+    Type: AWS::SSM::Parameter::Value<AWS::EC2::Image::Id>
+    Default: /aws/service/ami-amazon-linux-latest/al2023-ami-kernel-6.1-x86_64
+  BootstrapVersion:
+    Type: AWS::SSM::Parameter::Value<String>
+    Default: /cdk-bootstrap/hnb659fds/version
+    Description: Version of the CDK Bootstrap resources in this environment, automatically retrieved from SSM Parameter Store. [cdk:skip]
+

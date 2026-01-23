@@ -14,7 +14,7 @@ public interface ResourceAssignmentRepository extends JpaRepository<ResourceAssi
     List<ResourceAssignment> findByPhase_Id(Long phaseId);
     List<ResourceAssignment> findByUser_Id(Long userId);
     
-    @Query("SELECT ra FROM ResourceAssignment ra WHERE ra.phase.project.id = :projectId")
+    @Query("SELECT ra FROM ResourceAssignment ra JOIN FETCH ra.phase LEFT JOIN FETCH ra.user WHERE ra.phase.project.id = :projectId")
     List<ResourceAssignment> findByProjectId(@Param("projectId") Long projectId);
     
     Optional<ResourceAssignment> findByPhase_IdAndUser_Id(Long phaseId, Long userId);

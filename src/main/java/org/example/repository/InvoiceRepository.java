@@ -54,7 +54,7 @@ public interface InvoiceRepository extends JpaRepository<Invoice, Long> {
     Page<Invoice> findByOrganizationAndStatusAndClientNameContaining(@Param("organization") Organization organization, @Param("status") InvoiceStatus status, @Param("clientName") String clientName, Pageable pageable);
 
     // Unified filter query
-    @Query("SELECT i FROM Invoice i WHERE i.organization = :organization " +
+    @Query("SELECT i FROM Invoice i LEFT JOIN FETCH i.project LEFT JOIN FETCH i.organization LEFT JOIN FETCH i.template WHERE i.organization = :organization " +
            "AND (:status IS NULL OR i.status = :status) " +
            "AND (:projectId IS NULL OR i.project.id = :projectId) " +
            "AND (:overdue IS FALSE OR (i.dueDate < :currentDate AND i.status NOT IN ('PAID', 'CANCELLED'))) " +

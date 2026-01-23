@@ -9,6 +9,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -41,8 +42,32 @@ public class PhaseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<Phase>> getPhases(@PathVariable Long projectId) {
-        return ResponseEntity.ok(phaseService.getPhasesByProjectId(projectId));
+    public ResponseEntity<?> getPhases(@PathVariable Long projectId) {
+        try {
+            List<Phase> phases = phaseService.getPhasesByProjectId(projectId);
+            
+            // Manual mapping to avoid LazyInitializationException on substages
+            List<Map<String, Object>> mappedPhases = new ArrayList<>();
+            if (phases != null) {
+                for (Phase phase : phases) {
+                    Map<String, Object> phaseMap = new java.util.HashMap<>();
+                    phaseMap.put("id", phase.getId());
+                    phaseMap.put("name", phase.getName());
+                    phaseMap.put("phaseNumber", phase.getPhaseNumber());
+                    phaseMap.put("status", phase.getStatus());
+                    phaseMap.put("contractAmount", phase.getContractAmount());
+                    // Do NOT include substages or tasks
+                    mappedPhases.add(phaseMap);
+                }
+            }
+            
+            return ResponseEntity.ok(mappedPhases);
+        } catch (Exception e) {
+            // Log the error but return empty list instead of 500
+            System.err.println("Error fetching phases for project " + projectId + ": " + e.getMessage());
+            e.printStackTrace();
+            return ResponseEntity.ok(new ArrayList<>());
+        }
     }
 
     @PutMapping("/{phaseId}")

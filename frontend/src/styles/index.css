@@ -17472,3 +17472,33 @@ body {
     display: none;
   }
 }
+
+/* Mobile Responsiveness for Page Headers */
+@media (max-width: 768px) {
+  .page-header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .page-header-actions {
+    width: 100%;
+    overflow-x: auto;
+    padding-bottom: 0.5rem;
+    justify-content: flex-start;
+  }
+
+  .page-title {
+    font-size: 1.25rem;
+  }
+
+  .content-header {
+    padding: 0 1rem;
+  }
+
+  /* Sidebar tweaks for mobile */
+  .app-layout {
+    height: 100vh;
+    /* Ensure full viewport height */
+  }
+}

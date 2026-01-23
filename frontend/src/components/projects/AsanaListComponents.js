@@ -77,14 +77,21 @@ export const AssigneeSelector = ({ members, onSelect, onClose }) => {
 
     return (
         <div className="asana-dropdown-menu assignee-dropdown">
-            <input
-                ref={inputRef}
-                type="text"
-                className="asana-dropdown-search"
-                placeholder="Name or email"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-            />
+            <div className="assignee-search-container">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className="search-icon">
+                    <circle cx="11" cy="11" r="8"></circle>
+                    <line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+                </svg>
+                <input
+                    ref={inputRef}
+                    type="text"
+                    className="asana-dropdown-search"
+                    placeholder="Search people..."
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                />
+            </div>
+            <div className="dropdown-divider"></div>
             <div className="asana-dropdown-list">
                 {filteredMembers.map(member => (
                     <div
@@ -92,17 +99,20 @@ export const AssigneeSelector = ({ members, onSelect, onClose }) => {
                         className="asana-dropdown-item user-item"
                         onClick={() => onSelect(member)}
                     >
-                        <div className="asana-avatar-small">
+                        <div className="asana-avatar-medium">
                             {member.name ? member.name.charAt(0).toUpperCase() : member.username.charAt(0).toUpperCase()}
                         </div>
                         <div className="user-info">
                             <span className="user-name">{member.name || member.username}</span>
                             <span className="user-email">{member.email}</span>
                         </div>
+                        {/* Optional: Add a checkmark if selected, but we don't have selected state passed in right now */}
                     </div>
                 ))}
                 {filteredMembers.length === 0 && (
-                    <div className="asana-dropdown-empty">No members found</div>
+                    <div className="asana-dropdown-empty">
+                        <p>No members found</p>
+                    </div>
                 )}
             </div>
         </div>

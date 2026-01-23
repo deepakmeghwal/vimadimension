@@ -493,11 +493,50 @@ public class TaskController {
                         finalAssigneeIdOpt = Optional.of(Long.parseLong((String) val));
                     }
                 }
-                // If val is null, we leave finalAssigneeIdOpt as empty (no change), 
-                // because we can't signal "unassign" to the current service method.
+            }
+            
+            // Also adding robust fallback for assignee if it comes as object
+            if (!finalAssigneeIdOpt.isPresent() && updates.containsKey("assignee")) {
+                 Object val = updates.get("assignee");
+                 if (val instanceof Map) {
+                    Map<?, ?> userMap = (Map<?, ?>) val;
+                    Object idObj = userMap.get("id");
+                    if (idObj instanceof Number) {
+                        finalAssigneeIdOpt = Optional.of(((Number) idObj).longValue());
+                    }
+                 } else if (val == null) {
+                     finalAssigneeIdOpt = Optional.of(-1L);
+                 }
             }
 
-            Optional<Task> task = taskService.updateTask(taskId, nameOpt, descriptionOpt, phaseIdOpt, finalAssigneeIdOpt, statusOpt, priorityOpt, dueDateOpt);
+            Optional<Long> finalCheckedByIdOpt = Optional.empty();
+            if (updates.containsKey("checkedBy")) {
+                Object val = updates.get("checkedBy");
+                if (val instanceof Map) {
+                    Map<?, ?> userMap = (Map<?, ?>) val;
+                    Object idObj = userMap.get("id");
+                    if (idObj instanceof Number) {
+                        finalCheckedByIdOpt = Optional.of(((Number) idObj).longValue());
+                    }
+                } else if (val instanceof Number) {
+                     finalCheckedByIdOpt = Optional.of(((Number) val).longValue());
+                } else if (val == null) {
+                    finalCheckedByIdOpt = Optional.of(-1L);
+                }
+            } else if (updates.containsKey("checkedById")) {
+                 Object val = updates.get("checkedById");
+                 if (val != null) {
+                     if (val instanceof Number) {
+                        finalCheckedByIdOpt = Optional.of(((Number) val).longValue());
+                    } else if (val instanceof String) {
+                        finalCheckedByIdOpt = Optional.of(Long.parseLong((String) val));
+                    }
+                 } else {
+                     finalCheckedByIdOpt = Optional.of(-1L);
+                 }
+            }
+
+            Optional<Task> task = taskService.updateTask(taskId, nameOpt, descriptionOpt, phaseIdOpt, finalAssigneeIdOpt, finalCheckedByIdOpt, statusOpt, priorityOpt, dueDateOpt);
             
             if (task.isPresent()) {
                 Map<String, Object> response = new HashMap<>();

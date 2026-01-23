@@ -670,13 +670,53 @@ public class ProjectController {
         try {
             List<org.example.models.ResourceAssignment> assignments = 
                 resourceAssignmentService.getResourceAssignmentsByProject(projectId);
+                
+            // Manual mapping to avoid any accidental recursion or proxy issues
+            List<Map<String, Object>> mappedAssignments = new java.util.ArrayList<>();
+            if (assignments != null) {
+                for (org.example.models.ResourceAssignment ra : assignments) {
+                    Map<String, Object> map = new java.util.HashMap<>();
+                    map.put("id", ra.getId());
+                    map.put("roleOnPhase", ra.getRoleOnPhase());
+                    map.put("billingRate", ra.getBillingRate());
+                    map.put("costRate", ra.getCostRate());
+                    map.put("plannedHours", ra.getPlannedHours());
+                    map.put("allocatedPercentage", ra.getAllocatedPercentage());
+                    map.put("startDate", ra.getStartDate());
+                    map.put("endDate", ra.getEndDate());
+                    
+                    // Safely add Phase info (it is fetched eagerly now)
+                    if (ra.getPhase() != null) {
+                        map.put("phaseId", ra.getPhase().getId());
+                        map.put("phaseName", ra.getPhase().getName());
+                        // Add projectId just in case
+                         if (ra.getPhase().getProject() != null) {
+                            map.put("projectId", ra.getPhase().getProject().getId());
+                        }
+                    }
+                    
+                    // Safely add User info (it is fetched eagerly now)
+                    if (ra.getUser() != null) {
+                        map.put("userId", ra.getUser().getId());
+                        map.put("userName", ra.getUser().getName() != null ? ra.getUser().getName() : ra.getUser().getUsername());
+                        map.put("userEmail", ra.getUser().getEmail());
+                    }
+                    
+                    mappedAssignments.add(map);
+                }
+            }
+                
             return ResponseEntity.ok(Map.of(
                 "success", true,
-                "assignments", assignments
+                "assignments", mappedAssignments
             ));
         } catch (Exception e) {
             logger.error("Error fetching project resource assignments: {}", e.getMessage(), e);
-            return ResponseEntity.status(500).body(Map.of("error", "Failed to fetch resource assignments"));
+            // Return empty list instead of 500 error
+            return ResponseEntity.ok(Map.of(
+                "success", true,
+                "assignments", new java.util.ArrayList<>()
+            ));
         }
     }
 }

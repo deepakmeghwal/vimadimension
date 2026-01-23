@@ -6,6 +6,7 @@ import TaskDetailPanel from '../projects/TaskDetailPanel';
 import { AsanaSection, AsanaTaskRow } from '../projects/AsanaListComponents';
 import '../projects/ProjectDetails.css';
 import './MyApprovals.css';
+import { SkeletonTaskRow } from '../common/SkeletonLoader';
 
 const MyApprovals = ({ user }) => {
     const [tasks, setTasks] = useState([]);
@@ -21,6 +22,28 @@ const MyApprovals = ({ user }) => {
     });
 
     const [selectedTaskForPanel, setSelectedTaskForPanel] = useState(null);
+
+    const [availableUsers, setAvailableUsers] = useState([]);
+
+    useEffect(() => {
+        const fetchUsers = async () => {
+            try {
+                const response = await fetch('/api/tasks/users', { credentials: 'include' });
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.users) {
+                        setAvailableUsers(data.users);
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching users:', error);
+            }
+        };
+
+        if (user) {
+            fetchUsers();
+        }
+    }, [user]);
 
     useEffect(() => {
         if (user) {
@@ -109,8 +132,34 @@ const MyApprovals = ({ user }) => {
 
     if (loading) {
         return (
-            <div className="main-content">
-                <div className="loading-spinner">Loading approval tasks...</div>
+            <div className="main-content approvals-page">
+                <PageHeader
+                    title="My Approvals"
+                    subtitle="Tasks assigned to you for review and approval"
+                    user={user}
+                />
+                <div className="asana-list-view" style={{ padding: '0 20px' }}>
+                    <div className="asana-list-header" style={{ gridTemplateColumns: 'minmax(400px, 1fr) 150px 150px 120px 120px 80px' }}>
+                        <div className="header-cell">Task name</div>
+                        <div className="header-cell">Assignee</div>
+                        <div className="header-cell">Due date</div>
+                        <div className="header-cell">Priority</div>
+                        <div className="header-cell">Status</div>
+                        <div className="header-cell"></div>
+                    </div>
+                    <div className="asana-list-body">
+                        <div className="asana-section">
+                            <div className="asana-section-header">
+                                <span style={{ width: '100px', height: '1.2em', background: '#f1f5f9', borderRadius: '4px' }}></span>
+                            </div>
+                            <div className="asana-section-body">
+                                {[1, 2, 3, 4, 5].map(i => (
+                                    <SkeletonTaskRow key={i} />
+                                ))}
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         );
     }
@@ -155,7 +204,7 @@ const MyApprovals = ({ user }) => {
                                     <AsanaTaskRow
                                         key={task.id}
                                         task={task}
-                                        teamMembers={[]}
+                                        teamMembers={availableUsers}
                                         onUpdate={handleTaskUpdate}
                                         onOpenDetails={() => setSelectedTaskForPanel(task)}
                                         gridTemplateColumns="minmax(400px, 1fr) 150px 150px 120px 120px 80px"
@@ -200,6 +249,7 @@ const MyApprovals = ({ user }) => {
                     task={selectedTaskForPanel}
                     onClose={() => setSelectedTaskForPanel(null)}
                     onUpdate={handleTaskUpdate}
+                    teamMembers={availableUsers}
                 />
             )}
         </div>

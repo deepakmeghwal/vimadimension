@@ -69,6 +69,7 @@ public class RoleController {
      * Get a single role by ID
      */
     @GetMapping("/{id}")
+    @org.springframework.transaction.annotation.Transactional(readOnly = true)
     public ResponseEntity<RoleDTO> getRoleById(@PathVariable Long id, Authentication authentication) {
         // Get current admin user to determine organization
         String adminUsername = authentication.getName();

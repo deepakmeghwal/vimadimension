@@ -50,20 +50,26 @@ public class ProjectService {
     private final ClientRepository clientRepository;
     private final AuditService auditService;
     private final PhaseService phaseService;
-    private final org.example.repository.ProjectAttachmentRepository projectAttachmentRepository;
+    // DISABLED: Temporarily disabled until project_attachments table exists
+    // private org.example.repository.ProjectAttachmentRepository projectAttachmentRepository;
     private final FileStorageService fileStorageService;
 
     @Autowired
-    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository, ClientRepository clientRepository, AuditService auditService, PhaseService phaseService, org.example.repository.ProjectAttachmentRepository projectAttachmentRepository, FileStorageService fileStorageService) {
+    public ProjectService(ProjectRepository projectRepository, UserRepository userRepository, TaskRepository taskRepository, ClientRepository clientRepository, AuditService auditService, PhaseService phaseService, FileStorageService fileStorageService) {
         this.projectRepository = projectRepository;
         this.userRepository = userRepository;
         this.taskRepository = taskRepository; // Initialize TaskRepository
         this.clientRepository = clientRepository;
         this.auditService = auditService;
         this.phaseService = phaseService;
-        this.projectAttachmentRepository = projectAttachmentRepository;
         this.fileStorageService = fileStorageService;
     }
+
+    // DISABLED: Optional setter for when the repository is enabled
+    // @Autowired(required = false)
+    // public void setProjectAttachmentRepository(org.example.repository.ProjectAttachmentRepository projectAttachmentRepository) {
+    //     this.projectAttachmentRepository = projectAttachmentRepository;
+    // }
 
     private User getCurrentAuthenticatedUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
@@ -740,9 +746,21 @@ public class ProjectService {
             project.getAccessibleByUsers().size(); // Force load
         }
         
-        return new ArrayList<>(project.getAccessibleByUsers());
+        List<User> team = new ArrayList<>(project.getAccessibleByUsers());
+
+        // Fallback: If team is empty, return all users in the organization
+        // This ensures the Assignee dropdown is populated for new projects or when team members haven't been explicitly added
+        if (team.isEmpty() && project.getOrganization() != null) {
+            return userRepository.findByOrganization_IdAndEnabled(project.getOrganization().getId(), true);
+        }
+        
+        return team;
     }
 
+    // ========== DISABLED: Project Attachment Methods ==========
+    // TODO: Re-enable when project_attachments table is created in production
+    
+    /*
     @Transactional(readOnly = true)
     public List<org.example.models.ProjectAttachment> getAttachments(Long projectId) {
         Project project = projectRepository.findById(projectId)
@@ -839,4 +857,5 @@ public class ProjectService {
 
          return fileStorageService.generatePresignedDownloadUrl("/api/files/" + attachment.getFileUrl());
     }
+    */
 }

@@ -132,6 +132,10 @@ public class UserService {
             if (user.getAccessibleProjects() != null) {
                 user.getAccessibleProjects().size();
             }
+            // Initialize Organization
+            if (user.getOrganization() != null) {
+                user.getOrganization().getName(); // Force load
+            }
         });
         return userOptional;
     }
@@ -144,7 +148,14 @@ public class UserService {
      */
     @Transactional(readOnly = true)
     public Optional<User> findByEmail(String email) {
-        return userRepository.findByEmail(email.trim().toLowerCase());
+        Optional<User> userOptional = userRepository.findByEmail(email.trim().toLowerCase());
+        userOptional.ifPresent(user -> {
+             // Initialize Organization
+             if (user.getOrganization() != null) {
+                 user.getOrganization().getName(); // Force load
+             }
+        });
+        return userOptional;
     }
 
     /**
@@ -159,6 +170,10 @@ public class UserService {
         userOptional.ifPresent(user -> {
             if (user.getRoles() != null) user.getRoles().size();
             if (user.getAccessibleProjects() != null) user.getAccessibleProjects().size();
+            // Initialize Organization
+            if (user.getOrganization() != null) {
+                user.getOrganization().getName(); // Force load
+            }
         });
         return userOptional;
     }

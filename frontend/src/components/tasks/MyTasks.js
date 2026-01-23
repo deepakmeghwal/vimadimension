@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { CheckCircle2, ChevronRight } from 'lucide-react';
 import LoadingSpinner from '../common/LoadingSpinner';
+import { SkeletonTaskRow } from '../common/SkeletonLoader';
 import TaskDetailPanel from '../projects/TaskDetailPanel';
 import { AsanaSection, AsanaTaskRow, formatStatus, formatPriority } from '../projects/AsanaListComponents';
 import '../projects/ProjectDetails.css';
@@ -35,6 +36,27 @@ const MyTasks = ({ user }) => {
   });
 
   const [selectedTaskForPanel, setSelectedTaskForPanel] = useState(null);
+  const [availableUsers, setAvailableUsers] = useState([]);
+
+  useEffect(() => {
+    const fetchUsers = async () => {
+      try {
+        const response = await fetch('/api/tasks/users', { credentials: 'include' });
+        if (response.ok) {
+          const data = await response.json();
+          if (data.success && data.users) {
+            setAvailableUsers(data.users);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching users:', error);
+      }
+    };
+
+    if (user) {
+      fetchUsers();
+    }
+  }, [user]);
 
   // Fetch tasks with filters via API call
   const fetchTasks = async (page = 0, currentFilters = null) => {
@@ -238,7 +260,7 @@ const MyTasks = ({ user }) => {
               <AsanaTaskRow
                 key={task.id}
                 task={task}
-                teamMembers={[]} // We might need to fetch all users for assignee selector to work fully
+                teamMembers={availableUsers} // Pass fetched users here
                 onUpdate={handleTaskUpdate}
                 onOpenDetails={() => setSelectedTaskForPanel(task)}
                 gridTemplateColumns={gridTemplateColumns}
@@ -446,9 +468,39 @@ const MyTasks = ({ user }) => {
   };
 
   if (loading && allTasks.length === 0) {
+    const gridTemplateColumns = 'minmax(400px, 1fr) 150px 150px 120px 120px 80px';
     return (
       <div className="main-content my-tasks-page">
-        <LoadingSpinner message="Loading your tasks..." size="large" />
+        <div className="projects-header-compact">
+          <div className="projects-header-left">
+            <h1 className="projects-title-compact">Tasks</h1>
+          </div>
+        </div>
+
+        {viewMode === 'list' && (
+          <div className="asana-list-view" style={{ padding: '0 20px' }}>
+            <div className="asana-list-header" style={{ gridTemplateColumns }}>
+              <div className="header-cell">Task name</div>
+              <div className="header-cell">Assignee</div>
+              <div className="header-cell">Due date</div>
+              <div className="header-cell">Priority</div>
+              <div className="header-cell">Status</div>
+              <div className="header-cell"></div>
+            </div>
+            <div className="asana-list-body">
+              <div className="asana-section">
+                <div className="asana-section-header">
+                  <span style={{ width: '100px', height: '1.2em', background: '#f1f5f9', borderRadius: '4px' }}></span>
+                </div>
+                <div className="asana-section-body">
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <SkeletonTaskRow key={i} />
+                  ))}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   }
@@ -544,6 +596,7 @@ const MyTasks = ({ user }) => {
           task={selectedTaskForPanel}
           onClose={() => setSelectedTaskForPanel(null)}
           onUpdate={handleTaskUpdate}
+          teamMembers={availableUsers}
         />
       )}
     </div>

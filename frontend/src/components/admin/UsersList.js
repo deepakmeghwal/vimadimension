@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import UserDetailsModal from './UserDetailsModal';
+import { SkeletonUserRow } from '../common/SkeletonLoader';
 
 const UsersList = ({ isPeopleContext = false }) => {
   const [users, setUsers] = useState([]);
@@ -269,10 +270,23 @@ const UsersList = ({ isPeopleContext = false }) => {
         <div className="project-card-body" style={{ padding: 0 }}>
           <div className="data-table-container">
             {loading ? (
-              <div className="loading-spinner-container">
-                <div className="loading-spinner"></div>
-                <p>Loading users...</p>
-              </div>
+              <table className="data-table">
+                <thead>
+                  <tr>
+                    <th>Name</th>
+                    <th>Username</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th className="text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {[1, 2, 3, 4, 5, 6].map(i => (
+                    <SkeletonUserRow key={i} />
+                  ))}
+                </tbody>
+              </table>
             ) : users.length === 0 ? (
               <div className="empty-state-modern">
                 <div className="empty-state-icon">

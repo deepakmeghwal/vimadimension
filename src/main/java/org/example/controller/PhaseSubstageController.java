@@ -38,9 +38,18 @@ public class PhaseSubstageController {
     public ResponseEntity<?> getSubstages(@PathVariable Long phaseId) {
         try {
             List<PhaseSubstage> substages = substageService.getSubstagesByPhaseId(phaseId);
+            
+            // Manual mapping to avoid lazy loading issues
+            List<Map<String, Object>> mappedSubstages = new java.util.ArrayList<>();
+            if (substages != null) {
+                for (PhaseSubstage s : substages) {
+                    mappedSubstages.add(mapSubstage(s));
+                }
+            }
+            
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
-            response.put("substages", substages);
+            response.put("substages", mappedSubstages);
             response.put("completionStatus", substageService.getCompletionStatus(phaseId));
             return ResponseEntity.ok(response);
         } catch (Exception e) {
@@ -64,19 +73,33 @@ public class PhaseSubstageController {
             // Check if substages already exist
             List<PhaseSubstage> existing = substageService.getSubstagesByPhaseId(phaseId);
             if (!existing.isEmpty()) {
+                // Map existing ones too
+                List<Map<String, Object>> mappedExisting = new java.util.ArrayList<>();
+                for (PhaseSubstage s : existing) {
+                    mappedExisting.add(mapSubstage(s));
+                }
+                
                 Map<String, Object> response = new HashMap<>();
                 response.put("success", false);
                 response.put("error", "Substages already exist for this phase");
-                response.put("substages", existing);
+                response.put("substages", mappedExisting);
                 return ResponseEntity.badRequest().body(response);
             }
             
             List<PhaseSubstage> created = substageService.createDefaultSubstages(phase);
             
+            // Map created ones
+            List<Map<String, Object>> mappedCreated = new java.util.ArrayList<>();
+            if (created != null) {
+                for (PhaseSubstage s : created) {
+                    mappedCreated.add(mapSubstage(s));
+                }
+            }
+            
             Map<String, Object> response = new HashMap<>();
             response.put("success", true);
             response.put("message", "Created " + created.size() + " substages");
-            response.put("substages", created);
+            response.put("substages", mappedCreated);
             return ResponseEntity.ok(response);
         } catch (Exception e) {
             Map<String, Object> error = new HashMap<>();
@@ -84,6 +107,22 @@ public class PhaseSubstageController {
             error.put("error", e.getMessage());
             return ResponseEntity.badRequest().body(error);
         }
+    }
+    
+    // Helper to map substage safely
+    private Map<String, Object> mapSubstage(PhaseSubstage s) {
+        Map<String, Object> map = new HashMap<>();
+        map.put("id", s.getId());
+        map.put("name", s.getName());
+        map.put("description", s.getDescription());
+        map.put("displayOrder", s.getDisplayOrder());
+        map.put("isCompleted", s.getIsCompleted());
+        if (s.getCompletedAt() != null) {
+            map.put("completedAt", s.getCompletedAt());
+        }
+        // Don't access completedBy to avoid lazy recursion
+        map.put("phaseId", s.getPhase() != null ? s.getPhase().getId() : null);
+        return map;
     }
 
     /**

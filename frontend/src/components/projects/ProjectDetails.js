@@ -35,6 +35,7 @@ import ProjectFinancialsTab from './ProjectFinancialsTab';
 import ProjectInvoicesTab from './ProjectInvoicesTab';
 import LoadingSpinner from '../common/LoadingSpinner';
 import ProjectDetailsSkeleton from './ProjectDetailsSkeleton';
+
 import TaskDetailPanel from './TaskDetailPanel';
 import { AsanaSection, AsanaTaskRow, formatStatus, formatPriority, PriorityIcon } from './AsanaListComponents';
 import { PROJECT_STAGES, PROJECT_STATUSES, PROJECT_PRIORITIES, PROJECT_CHARGE_TYPES, DRAWING_TYPES } from '../../constants/projectEnums';
@@ -822,10 +823,17 @@ const ProjectDetails = ({ user }) => {
   const handleTaskUpdate = async (taskId, updates) => {
     // 1. Optimistic Update
     const previousTasks = [...tasks];
+    const previousSelected = selectedTaskForPanel ? { ...selectedTaskForPanel } : null;
+
     const updatedTasks = tasks.map(t =>
       t.id === taskId ? { ...t, ...updates } : t
     );
     setTasks(updatedTasks);
+
+    // Also update the selected task panel state if it's the one being updated
+    if (selectedTaskForPanel && selectedTaskForPanel.id === taskId) {
+      setSelectedTaskForPanel(prev => ({ ...prev, ...updates }));
+    }
 
     try {
       // 2. Prepare API Payload
@@ -837,6 +845,14 @@ const ProjectDetails = ({ user }) => {
         delete apiPayload.assignee;
       } else if (updates.assignee === null) {
         apiPayload.assigneeId = null;
+      }
+
+      // Transform checkedBy object to checkedById for backend
+      if (updates.checkedBy) {
+        apiPayload.checkedById = updates.checkedBy.id;
+        delete apiPayload.checkedBy;
+      } else if (updates.checkedBy === null) {
+        apiPayload.checkedById = null;
       }
 
       // Transform phase object to phaseId if present (though usually we pass phaseId directly)
@@ -862,6 +878,9 @@ const ProjectDetails = ({ user }) => {
       // 4. Rollback on Error
       console.error('Task update failed:', error);
       setTasks(previousTasks);
+      if (previousSelected && previousSelected.id === taskId) {
+        setSelectedTaskForPanel(previousSelected);
+      }
       // Show error toast
       const toast = document.createElement('div');
       toast.className = 'toast-error';
@@ -1205,7 +1224,7 @@ const ProjectDetails = ({ user }) => {
             zIndex: 10,
             borderRadius: '12px'
           }}>
-            <LoadingSpinner size="medium" />
+            <ProjectDetailsSkeleton activeTab={activeTab} />
           </div>
         )}
 
@@ -1957,6 +1976,7 @@ const ProjectDetails = ({ user }) => {
           task={selectedTaskForPanel}
           onClose={() => setSelectedTaskForPanel(null)}
           onUpdate={handleTaskUpdate}
+          teamMembers={teamMembers}
         />
       )}
 
