@@ -100,6 +100,11 @@ const MyApprovals = ({ user }) => {
             t.id === taskId ? { ...t, ...updates } : t
         ));
 
+        // Also update the selected task panel state if it's the one being updated
+        if (selectedTaskForPanel && selectedTaskForPanel.id === taskId) {
+            setSelectedTaskForPanel(prev => ({ ...prev, ...updates }));
+        }
+
         try {
             const apiPayload = { ...updates };
             if (updates.assignee) {
@@ -107,6 +112,14 @@ const MyApprovals = ({ user }) => {
                 delete apiPayload.assignee;
             } else if (updates.assignee === null) {
                 apiPayload.assigneeId = null;
+            }
+
+            // Transform checkedBy object to checkedById for backend
+            if (updates.checkedBy) {
+                apiPayload.checkedById = updates.checkedBy.id;
+                delete apiPayload.checkedBy;
+            } else if (updates.checkedBy === null) {
+                apiPayload.checkedById = null;
             }
 
             const response = await fetch(`/api/tasks/${taskId}`, {

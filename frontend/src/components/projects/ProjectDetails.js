@@ -1578,7 +1578,7 @@ const ProjectDetails = ({ user }) => {
                             key={task.id}
                             draggable
                             onDragStart={(e) => handleDragStart(e, { taskId: task.id, columnId: column.status, index })}
-                            onClick={() => setSelectedTask(task)}
+                            onClick={() => setSelectedTaskForPanel(task)}
                             className={`board-task-card ${draggingId === task.id ? 'dragging' : ''}`}
                           >
                             <div className="task-card-row-1">

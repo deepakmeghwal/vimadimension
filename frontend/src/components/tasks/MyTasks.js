@@ -85,8 +85,13 @@ const MyTasks = ({ user }) => {
       }
 
       // Apply status and priority filters to the API call
+      // If user has selected specific statuses, use those
+      // Otherwise, exclude DONE tasks by default (users can filter to see Done tasks if needed)
       if (activeFilters.status && activeFilters.status.length > 0) {
         activeFilters.status.forEach(s => params.append('status', s));
+      } else {
+        // Default: fetch all statuses except DONE
+        ['TO_DO', 'IN_PROGRESS', 'IN_REVIEW', 'CHECKED', 'ON_HOLD'].forEach(s => params.append('status', s));
       }
       if (activeFilters.priority && activeFilters.priority.length > 0) {
         activeFilters.priority.forEach(p => params.append('priority', p));
@@ -160,6 +165,11 @@ const MyTasks = ({ user }) => {
       t.id === taskId ? { ...t, ...updates } : t
     ));
 
+    // Also update the selected task panel state if it's the one being updated
+    if (selectedTaskForPanel && selectedTaskForPanel.id === taskId) {
+      setSelectedTaskForPanel(prev => ({ ...prev, ...updates }));
+    }
+
     try {
       const apiPayload = { ...updates };
       if (updates.assignee) {
@@ -167,6 +177,14 @@ const MyTasks = ({ user }) => {
         delete apiPayload.assignee;
       } else if (updates.assignee === null) {
         apiPayload.assigneeId = null;
+      }
+
+      // Transform checkedBy object to checkedById for backend
+      if (updates.checkedBy) {
+        apiPayload.checkedById = updates.checkedBy.id;
+        delete apiPayload.checkedBy;
+      } else if (updates.checkedBy === null) {
+        apiPayload.checkedById = null;
       }
 
       const response = await fetch(`/api/tasks/${taskId}`, {

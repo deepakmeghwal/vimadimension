@@ -23,17 +23,28 @@ const PriorityIcon = ({ priority }) => {
     return <div className="priority-icon priority-low"></div>;
 };
 
+const PRIORITY_OPTIONS = ['LOW', 'MEDIUM', 'HIGH', 'URGENT'];
+const STATUS_OPTIONS = ['TO_DO', 'IN_PROGRESS', 'IN_REVIEW', 'DONE', 'CHECKED', 'ON_HOLD'];
+
 const TaskDetailPanel = ({ task, onClose, onSave, onUpdate, teamMembers }) => {
     const [desc, setDesc] = useState(task.description || '');
     const [name, setName] = useState(task.name || '');
     const [showAssigneeSelector, setShowAssigneeSelector] = useState(false);
     const [showCheckedBySelector, setShowCheckedBySelector] = useState(false);
+    const [showDatePicker, setShowDatePicker] = useState(false);
+    const [showPrioritySelector, setShowPrioritySelector] = useState(false);
+    const [showStatusSelector, setShowStatusSelector] = useState(false);
+    const [dueDate, setDueDate] = useState(task.dueDate || '');
 
     useEffect(() => {
         setDesc(task.description || '');
         setName(task.name || '');
+        setDueDate(task.dueDate || '');
         setShowAssigneeSelector(false);
         setShowCheckedBySelector(false);
+        setShowDatePicker(false);
+        setShowPrioritySelector(false);
+        setShowStatusSelector(false);
     }, [task]);
 
     // Close selector when clicking outside is handled by the selector itself or we can add a ref here if needed for deeper control
@@ -184,25 +195,142 @@ const TaskDetailPanel = ({ task, onClose, onSave, onUpdate, teamMembers }) => {
                                 )}
                             </div>
 
-                            <div className="task-field-row">
+                            <div className="task-field-row" style={{ position: 'relative' }}>
                                 <div className="task-field-label">Due date</div>
-                                <div className="task-field-value">
+                                <div
+                                    className="task-field-value"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowDatePicker(!showDatePicker);
+                                        setShowPrioritySelector(false);
+                                        setShowStatusSelector(false);
+                                        setShowAssigneeSelector(false);
+                                        setShowCheckedBySelector(false);
+                                    }}
+                                >
                                     <Calendar size={16} className="field-icon" />
                                     {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'No due date'}
                                 </div>
+                                {showDatePicker && (
+                                    <div style={{ position: 'absolute', top: '100%', left: '130px', zIndex: 100 }}>
+                                        <div className="asana-dropdown-menu" style={{ padding: '0.75rem' }}>
+                                            <input
+                                                type="date"
+                                                value={dueDate ? dueDate.split('T')[0] : ''}
+                                                onChange={(e) => {
+                                                    const newDate = e.target.value;
+                                                    setDueDate(newDate);
+                                                    onUpdate(task.id, { dueDate: newDate });
+                                                    setShowDatePicker(false);
+                                                }}
+                                                style={{
+                                                    padding: '0.5rem',
+                                                    border: '1px solid #e2e8f0',
+                                                    borderRadius: '6px',
+                                                    fontSize: '0.875rem'
+                                                }}
+                                            />
+                                            {task.dueDate && (
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setDueDate('');
+                                                        onUpdate(task.id, { dueDate: null });
+                                                        setShowDatePicker(false);
+                                                    }}
+                                                    style={{
+                                                        marginTop: '0.5rem',
+                                                        padding: '0.375rem 0.75rem',
+                                                        background: '#fee2e2',
+                                                        color: '#dc2626',
+                                                        border: 'none',
+                                                        borderRadius: '4px',
+                                                        fontSize: '0.75rem',
+                                                        cursor: 'pointer',
+                                                        width: '100%'
+                                                    }}
+                                                >
+                                                    Clear date
+                                                </button>
+                                            )}
+                                        </div>
+                                        <div
+                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowDatePicker(false);
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="task-field-row">
+                            <div className="task-field-row" style={{ position: 'relative' }}>
                                 <div className="task-field-label">Priority</div>
-                                <div className="task-field-value">
+                                <div
+                                    className="task-field-value"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowPrioritySelector(!showPrioritySelector);
+                                        setShowDatePicker(false);
+                                        setShowStatusSelector(false);
+                                        setShowAssigneeSelector(false);
+                                        setShowCheckedBySelector(false);
+                                    }}
+                                >
                                     <PriorityIcon priority={task.priority} />
                                     <span>{task.priority || 'None'}</span>
                                 </div>
+                                {showPrioritySelector && (
+                                    <div style={{ position: 'absolute', top: '100%', left: '130px', zIndex: 100 }}>
+                                        <div className="asana-dropdown-menu">
+                                            {PRIORITY_OPTIONS.map(priority => (
+                                                <div
+                                                    key={priority}
+                                                    className="asana-dropdown-item"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onUpdate(task.id, { priority });
+                                                        setShowPrioritySelector(false);
+                                                    }}
+                                                    style={{
+                                                        display: 'flex',
+                                                        alignItems: 'center',
+                                                        gap: '0.5rem',
+                                                        padding: '0.5rem 0.75rem',
+                                                        cursor: 'pointer',
+                                                        background: task.priority === priority ? '#f1f5f9' : 'transparent'
+                                                    }}
+                                                >
+                                                    <PriorityIcon priority={priority} />
+                                                    <span>{priority}</span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div
+                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowPrioritySelector(false);
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
 
-                            <div className="task-field-row">
+                            <div className="task-field-row" style={{ position: 'relative' }}>
                                 <div className="task-field-label">Status</div>
-                                <div className="task-field-value">
+                                <div
+                                    className="task-field-value"
+                                    onClick={(e) => {
+                                        e.stopPropagation();
+                                        setShowStatusSelector(!showStatusSelector);
+                                        setShowDatePicker(false);
+                                        setShowPrioritySelector(false);
+                                        setShowAssigneeSelector(false);
+                                        setShowCheckedBySelector(false);
+                                    }}
+                                >
                                     <span className={`status-badge-modal ${task.status === 'TO_DO' ? 'status-badge-todo' :
                                         task.status === 'IN_PROGRESS' ? 'status-badge-in-progress' :
                                             task.status === 'IN_REVIEW' ? 'status-badge-in-review' :
@@ -213,6 +341,45 @@ const TaskDetailPanel = ({ task, onClose, onSave, onUpdate, teamMembers }) => {
                                         {task.status?.replace(/_/g, ' ') || 'To Do'}
                                     </span>
                                 </div>
+                                {showStatusSelector && (
+                                    <div style={{ position: 'absolute', top: '100%', left: '130px', zIndex: 100 }}>
+                                        <div className="asana-dropdown-menu">
+                                            {STATUS_OPTIONS.map(status => (
+                                                <div
+                                                    key={status}
+                                                    className="asana-dropdown-item"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        onUpdate(task.id, { status });
+                                                        setShowStatusSelector(false);
+                                                    }}
+                                                    style={{
+                                                        padding: '0.5rem 0.75rem',
+                                                        cursor: 'pointer',
+                                                        background: task.status === status ? '#f1f5f9' : 'transparent'
+                                                    }}
+                                                >
+                                                    <span className={`status-badge-modal ${status === 'TO_DO' ? 'status-badge-todo' :
+                                                        status === 'IN_PROGRESS' ? 'status-badge-in-progress' :
+                                                            status === 'IN_REVIEW' ? 'status-badge-in-review' :
+                                                                status === 'DONE' ? 'status-badge-done' :
+                                                                    status === 'CHECKED' ? 'status-badge-checked' :
+                                                                        'status-badge-on-hold'
+                                                        }`}>
+                                                        {status.replace(/_/g, ' ')}
+                                                    </span>
+                                                </div>
+                                            ))}
+                                        </div>
+                                        <div
+                                            style={{ position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, zIndex: -1 }}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                setShowStatusSelector(false);
+                                            }}
+                                        />
+                                    </div>
+                                )}
                             </div>
                         </div>
 
