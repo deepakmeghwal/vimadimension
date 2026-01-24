@@ -215,7 +215,16 @@ public class TaskService {
     }
 
     public Optional<Task> findTaskById(Long taskId) {
-        return taskRepository.findByIdWithDetails(taskId);
+        Optional<Task> task = taskRepository.findByIdWithDetails(taskId);
+        if (task.isPresent()) {
+            try {
+                User currentUser = getCurrentAuthenticatedUser();
+                validateTaskOrganizationAccess(task.get(), currentUser);
+            } catch (Exception e) {
+                return Optional.empty();
+            }
+        }
+        return task;
     }
 
     public List<Task> getAllTasks() {
@@ -266,9 +275,17 @@ public class TaskService {
         if (projectId == null) {
             throw new IllegalArgumentException("Project ID cannot be null.");
         }
-        if (!projectRepository.existsById(projectId)) {
-            throw new IllegalArgumentException("Project with ID " + projectId + " not found.");
+        
+        Project project = projectRepository.findById(projectId)
+             .orElseThrow(() -> new IllegalArgumentException("Project with ID " + projectId + " not found."));
+             
+        // Security check
+        User currentUser = getCurrentAuthenticatedUser();
+        if (currentUser.getOrganization() == null || project.getOrganization() == null || 
+            !project.getOrganization().getId().equals(currentUser.getOrganization().getId())) {
+             throw new org.springframework.security.access.AccessDeniedException("Access denied: You cannot view tasks for a project in another organization.");
         }
+        
         return taskRepository.findByProjectId(projectId);
     }
 
@@ -283,8 +300,14 @@ public class TaskService {
             throw new IllegalArgumentException("Page size must be greater than zero.");
         }
 
-        if (!projectRepository.existsById(projectId)) {
-            throw new IllegalArgumentException("Project with ID " + projectId + " not found.");
+        Project project = projectRepository.findById(projectId)
+             .orElseThrow(() -> new IllegalArgumentException("Project with ID " + projectId + " not found."));
+
+        // Security check
+        User currentUser = getCurrentAuthenticatedUser();
+        if (currentUser.getOrganization() == null || project.getOrganization() == null || 
+            !project.getOrganization().getId().equals(currentUser.getOrganization().getId())) {
+             throw new org.springframework.security.access.AccessDeniedException("Access denied: You cannot view tasks for a project in another organization.");
         }
 
         // Use eager fetch query to load all related entities and avoid LazyInitializationException
@@ -798,22 +821,22 @@ public class TaskService {
 
     @Transactional
     public boolean deleteTask(Long taskId) {
-        if (!taskRepository.existsById(taskId)) {
-            // Consider throwing a TaskNotFoundException here for better error handling upstream
+        Task task = taskRepository.findById(taskId)
+                .orElse(null);
+                
+        if (task == null) {
             return false;
         }
-        // CRITICAL: Implement logic for handling TimeLog entries associated with this task.
-        // Option 1: Delete associated TimeLog entries.
-        //   List<TimeLog> timeLogs = timeLogRepository.findByTaskId(taskId);
-        //   timeLogRepository.deleteAll(timeLogs);
-        // Option 2: Prevent deletion if TimeLog entries exist.
-        //   if (timeLogRepository.existsByTaskId(taskId)) { // Assuming existsByTaskId method in TimeLogRepository
-        //       throw new IllegalStateException("Cannot delete task with ID " + taskId + " as it has associated time entries.");
-        //   }
-        // Option 3: Set task_id to null in TimeLog entries (if your schema allows and makes sense).
-        //   This would require iterating and updating TimeLog entities.
+        
+        // Security Check
+        User currentUser = getCurrentAuthenticatedUser();
+        validateTaskOrganizationAccess(task, currentUser);
+
+        // Allow deletion if user has permission (Manager/Admin check handled by PreAuthorize, but double check ownership logic if needed)
+        // Here we just ensure Org boundary is respected.
 
         taskRepository.deleteById(taskId);
+        logger.info("Task with ID: {} deleted successfully by user: {}", taskId, currentUser.getUsername());
         return true;
     }
 

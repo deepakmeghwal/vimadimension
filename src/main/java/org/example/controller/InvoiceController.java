@@ -60,7 +60,7 @@ public class InvoiceController {
 
     // Get all invoices for the user's organization
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.view')")
     public ResponseEntity<Map<String, Object>> getAllInvoices(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
@@ -118,7 +118,7 @@ public class InvoiceController {
 
     // Get invoice by ID
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.view')")
     public ResponseEntity<InvoiceResponseDto> getInvoiceById(@PathVariable Long id) {
         try {
             User currentUser = getCurrentUser();
@@ -138,7 +138,7 @@ public class InvoiceController {
 
     // Create new invoice
     @PostMapping
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.create')")
     public ResponseEntity<Map<String, Object>> createInvoice(@RequestBody Map<String, Object> requestData) {
         Map<String, Object> response = new HashMap<>();
         
@@ -196,7 +196,7 @@ public class InvoiceController {
 
     // Update invoice
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.edit')")
     public ResponseEntity<Map<String, Object>> updateInvoice(@PathVariable Long id, @RequestBody Map<String, Object> requestData) {
         Map<String, Object> response = new HashMap<>();
         
@@ -238,7 +238,7 @@ public class InvoiceController {
 
     // Update invoice status
     @PatchMapping("/{id}/status")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.edit')")
     public ResponseEntity<Map<String, Object>> updateInvoiceStatus(
             @PathVariable Long id, 
             @RequestParam InvoiceStatus status) {
@@ -271,7 +271,7 @@ public class InvoiceController {
 
     // Send invoice email with PDF attachment
     @PostMapping("/{id}/send-email")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.edit')")
     public ResponseEntity<Map<String, Object>> sendInvoiceEmail(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
         
@@ -327,7 +327,7 @@ public class InvoiceController {
 
     // Record payment
     @PostMapping("/{id}/payments")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.edit')")
     public ResponseEntity<Map<String, Object>> recordPayment(
             @PathVariable Long id,
             @RequestParam BigDecimal amount,
@@ -362,7 +362,7 @@ public class InvoiceController {
 
     // Delete invoice
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('invoices.delete')")
     public ResponseEntity<Map<String, Object>> deleteInvoice(@PathVariable Long id) {
         Map<String, Object> response = new HashMap<>();
         
@@ -396,7 +396,7 @@ public class InvoiceController {
 
     // Generate and download PDF
     @GetMapping("/{id}/pdf")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.view')")
     public ResponseEntity<byte[]> generateInvoicePdf(@PathVariable Long id) {
         try {
             User currentUser = getCurrentUser();
@@ -427,7 +427,7 @@ public class InvoiceController {
      */
     @Deprecated
     @GetMapping("/status/{status}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.view')")
     public ResponseEntity<List<Invoice>> getInvoicesByStatus(@PathVariable InvoiceStatus status) {
         try {
             User currentUser = getCurrentUser();
@@ -446,7 +446,7 @@ public class InvoiceController {
      */
     @Deprecated
     @GetMapping("/project/{projectId}")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.view')")
     public ResponseEntity<List<Invoice>> getInvoicesByProject(@PathVariable Long projectId) {
         try {
             User currentUser = getCurrentUser();
@@ -465,7 +465,7 @@ public class InvoiceController {
      */
     @Deprecated
     @GetMapping("/overdue")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.view')")
     public ResponseEntity<List<Invoice>> getOverdueInvoices() {
         try {
             User currentUser = getCurrentUser();
@@ -481,7 +481,7 @@ public class InvoiceController {
 
     // Get invoice statistics
     @GetMapping("/statistics")
-    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @PreAuthorize("hasAuthority('invoices.view')")
     public ResponseEntity<InvoiceService.InvoiceStatistics> getInvoiceStatistics() {
         try {
             User currentUser = getCurrentUser();

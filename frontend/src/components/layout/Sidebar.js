@@ -151,7 +151,7 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar, onUserUpdate }) =
                         </Link>
                     )}
 
-                    {isAdmin() && (
+                    {hasPermission('clients.view') && (
                         <Link
                             to="/admin/clients"
                             className={`nav-item ${isActiveLink('/admin/clients') ? 'active' : ''}`}
@@ -258,7 +258,7 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar, onUserUpdate }) =
                     {/* Studio Section */}
                     <div className="nav-group">
                         {!isCollapsed && <p className="nav-label">Studio</p>}
-                        {(isAdmin() || isManager()) && (
+                        {hasPermission('invoices.view') && (
                             <Link
                                 to="/finance/dashboard"
                                 className={`nav-item ${isActiveLink('/finance/dashboard') ? 'active' : ''}`}
@@ -274,7 +274,7 @@ const Sidebar = ({ user, onLogout, isCollapsed, toggleSidebar, onUserUpdate }) =
                                 {!isCollapsed && <span>Dashboard</span>}
                             </Link>
                         )}
-                        {(isAdmin() || isManager()) && (
+                        {hasPermission('invoices.view') && (
                             <Link
                                 to="/finance/resource-planning"
                                 className={`nav-item ${isActiveLink('/finance/resource-planning') ? 'active' : ''}`}

@@ -37,7 +37,7 @@ public class TimeLogController {
 
     // --- Show form to log time for a task ---
     @GetMapping("/task/{taskId}/new")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('timeentries.create')")
     public String showLogTimeForm(@PathVariable Long taskId, Model model) {
         Task task = taskService.findTaskById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid task ID: " + taskId));
@@ -52,7 +52,7 @@ public class TimeLogController {
 
     // --- Process time log submission ---
     @PostMapping("/task/{taskId}/log")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('timeentries.create')")
     public String logTime(@PathVariable Long taskId,
                           // @Valid @ModelAttribute("timeLogDto") TimeLogDto timeLogDto, // Uncomment for validation
                           @ModelAttribute("timeLogDto") TimeLogDto timeLogDto,
@@ -92,7 +92,7 @@ public class TimeLogController {
 
     // --- View/Edit a specific time log (Optional - often managed within task view) ---
     @GetMapping("/{timeLogId}/edit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('timeentries.edit')")
     public String showEditTimeLogForm(@PathVariable Long timeLogId, Model model, RedirectAttributes redirectAttributes) {
         TimeLog timeLog = timeLogService.findTimeLogById(timeLogId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid time log ID: " + timeLogId));
@@ -114,7 +114,7 @@ public class TimeLogController {
     }
 
     @PostMapping("/{timeLogId}/update")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('timeentries.edit')")
     public String updateTimeLog(@PathVariable Long timeLogId,
                                 // @Valid @ModelAttribute("timeLogDto") TimeLogDto timeLogDto, // Uncomment for validation
                                 @ModelAttribute("timeLogDto") TimeLogDto timeLogDto,
@@ -148,7 +148,7 @@ public class TimeLogController {
 
     // --- Delete a time log ---
     @PostMapping("/{timeLogId}/delete")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('timeentries.delete')")
     public String deleteTimeLog(@PathVariable Long timeLogId, RedirectAttributes redirectAttributes) {
         TimeLog timeLog = timeLogService.findTimeLogById(timeLogId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid time log ID: " + timeLogId));
@@ -167,6 +167,7 @@ public class TimeLogController {
 
     // --- List time logs for a task (often part of task details view) ---
     @GetMapping("/task/{taskId}")
+    @PreAuthorize("hasAuthority('timeentries.view')")
     public String listTimeLogsForTask(@PathVariable Long taskId, Model model) {
         Task task = taskService.findTaskById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Invalid task ID: " + taskId));

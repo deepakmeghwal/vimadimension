@@ -57,12 +57,20 @@ public class UserDetailsServiceImpl implements UserDetailsService {
 
         // --- The Key Change is Here ---
         // Assuming your Role entity has a getName() method that returns the role string (e.g., "ROLE_USER")
-        Set<GrantedAuthority> authorities = user.getRoles().stream()
-                .map(role -> {
-                    logger.debug("Mapping role: {} for user: {}", role.getName(), username); // Log the role name
-                    return new SimpleGrantedAuthority(role.getName()); // Use role.getName()
-                })
-                .collect(Collectors.toSet());
+        Set<GrantedAuthority> authorities = new java.util.HashSet<>();
+        
+        user.getRoles().forEach(role -> {
+            logger.debug("Mapping role: {} for user: {}", role.getName(), username);
+            authorities.add(new SimpleGrantedAuthority(role.getName()));
+            
+            // Map permissions associated with this role
+            if (role.getPermissions() != null) {
+                role.getPermissions().forEach(permission -> {
+                     logger.debug("Mapping permission: {} for role: {}", permission.getName(), role.getName());
+                     authorities.add(new SimpleGrantedAuthority(permission.getName()));
+                });
+            }
+        });
 
         if (authorities.isEmpty()) {
             logger.warn("User {} has no roles assigned. This might be intended or an issue depending on security configuration.", username);

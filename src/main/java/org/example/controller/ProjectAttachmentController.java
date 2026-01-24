@@ -15,9 +15,14 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 @RestController
 @RequestMapping("/api/projects/{projectId}/attachments")
 public class ProjectAttachmentController {
+
+    private static final Logger logger = LoggerFactory.getLogger(ProjectAttachmentController.class);
 
     @Autowired
     private ProjectService projectService;
@@ -26,13 +31,13 @@ public class ProjectAttachmentController {
     private UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("hasAuthority('attachments.view')")
     public ResponseEntity<List<ProjectAttachment>> getAttachments(@PathVariable Long projectId) {
         return ResponseEntity.ok(projectService.getAttachments(projectId));
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')") // Further checked in service for project access
+    @PreAuthorize("hasAuthority('attachments.upload')")
     public ResponseEntity<ProjectAttachment> uploadAttachment(
             @PathVariable Long projectId,
             @RequestParam("file") MultipartFile file,
@@ -40,6 +45,9 @@ public class ProjectAttachmentController {
             @RequestParam(value = "drawingType", required = false) org.example.models.enums.DrawingType drawingType,
             @AuthenticationPrincipal UserDetails userDetails) throws IOException {
         
+        logger.info("Received upload request for project: {} from user: {}", projectId, userDetails.getUsername());
+        logger.info("File: {}, Size: {}, Stage: {}, Type: {}", file.getOriginalFilename(), file.getSize(), stage, drawingType);
+
         User user = userService.findByUsername(userDetails.getUsername())
                 .orElseThrow(() -> new RuntimeException("User not found"));
         
@@ -47,7 +55,7 @@ public class ProjectAttachmentController {
     }
 
     @DeleteMapping("/{attachmentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("hasAuthority('attachments.delete')")
     public ResponseEntity<Void> deleteAttachment(
             @PathVariable Long projectId,
             @PathVariable Long attachmentId) {
@@ -56,7 +64,7 @@ public class ProjectAttachmentController {
     }
 
     @GetMapping("/{attachmentId}/sign-url")
-    @PreAuthorize("hasAnyRole('ADMIN', 'USER')")
+    @PreAuthorize("hasAuthority('attachments.view')")
     public ResponseEntity<Map<String, String>> getDownloadUrl(
             @PathVariable Long projectId,
             @PathVariable Long attachmentId) {

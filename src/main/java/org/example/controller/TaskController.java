@@ -38,7 +38,7 @@ public class TaskController {
     }
 
     @GetMapping("/{taskId}/details")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.view')")
     public ResponseEntity<?> getTaskDetails(@PathVariable Long taskId) {
         try {
             Optional<Task> taskOptional = taskService.findTaskById(taskId);
@@ -125,7 +125,7 @@ public class TaskController {
      */
     @Deprecated
     @GetMapping("/list")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.view')")
     public ResponseEntity<List<Task>> getAllTasks() {
         logger.info("[DEPRECATED] /api/tasks/list is deprecated. Use GET /api/tasks with pagination.");
         try {
@@ -146,7 +146,7 @@ public class TaskController {
      * Example: GET /api/tasks?filter=assigned&status=TO_DO,IN_PROGRESS&priority=HIGH&page=0&size=10
      */
     @GetMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.view')")
     public ResponseEntity<Map<String, Object>> getTasksWithFilters(
             @RequestParam(required = false, defaultValue = "all") String filter,
             @RequestParam(required = false) Long assigneeId,
@@ -189,7 +189,7 @@ public class TaskController {
      */
     @Deprecated
     @GetMapping("/paginated")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.view')")
     public ResponseEntity<Map<String, Object>> getAllTasksPaginated(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
@@ -208,7 +208,7 @@ public class TaskController {
      */
     @Deprecated
     @GetMapping("/assigned-to-me")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.view')")
     public ResponseEntity<Map<String, Object>> getTasksAssignedToCurrentUser(
             @RequestParam(required = false) List<String> status,
             @RequestParam(required = false) List<String> priority,
@@ -251,7 +251,7 @@ public class TaskController {
      */
     @Deprecated
     @GetMapping("/reported-by-me")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.view')")
     public ResponseEntity<Map<String, Object>> getTasksReportedByCurrentUser(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
@@ -288,7 +288,7 @@ public class TaskController {
      */
     @Deprecated
     @GetMapping("/to-check")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.approve')")
     public ResponseEntity<Map<String, Object>> getTasksToCheckByCurrentUser(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size) {
@@ -317,7 +317,7 @@ public class TaskController {
     }
 
     @PostMapping("/{taskId}/update")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.edit')")
     public ResponseEntity<?> updateTask(@PathVariable Long taskId,
                                        @RequestParam("name") String name,
                                        @RequestParam("description") String description,
@@ -370,7 +370,7 @@ public class TaskController {
      * Allows updating individual fields without sending the full payload.
      */
     @PatchMapping("/{taskId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.edit')")
     public ResponseEntity<?> partialUpdateTask(@PathVariable Long taskId, @RequestBody Map<String, Object> updates) {
         try {
             logger.info("Received partial update request for task ID: {} with updates: {}", taskId, updates);
@@ -555,7 +555,7 @@ public class TaskController {
     }
 
     @PutMapping("/{taskId}/status")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.edit')")
     public ResponseEntity<?> updateTaskStatus(@PathVariable Long taskId,
                                              @RequestBody Map<String, String> statusRequest) {
         try {
@@ -604,7 +604,7 @@ public class TaskController {
     }
 
     @PutMapping("/{taskId}/mark-checked")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.approve')")
     public ResponseEntity<?> markTaskAsChecked(@PathVariable Long taskId, Authentication authentication) {
         try {
             String username = authentication.getName();
@@ -640,7 +640,7 @@ public class TaskController {
     }
 
     @DeleteMapping("/{taskId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.delete')")
     public ResponseEntity<?> deleteTask(@PathVariable Long taskId) {
         try {
             boolean deleted = taskService.deleteTask(taskId);
@@ -667,7 +667,7 @@ public class TaskController {
 
     // --- REST API endpoint for creating time logs ---
     @PostMapping("/{taskId}/timelogs")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('timeentries.create')")
     public ResponseEntity<?> createTimeLog(@PathVariable Long taskId,
                                          @RequestParam("hoursWorked") Double hoursWorked,
                                          @RequestParam("description") String description,
@@ -700,7 +700,7 @@ public class TaskController {
 
 
     @GetMapping("/users")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.view')")
     public ResponseEntity<?> getUsersForTaskAssignment() {
         try {
             // Get users for task assignment from the same organization as current user

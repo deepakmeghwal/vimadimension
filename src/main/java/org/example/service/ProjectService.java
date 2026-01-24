@@ -140,11 +140,30 @@ public class ProjectService {
     }
 
     public Optional<Project> findById(Long projectId) { // Renamed for consistency
-        return projectRepository.findById(projectId);
+        Optional<Project> project = projectRepository.findById(projectId);
+        if (project.isPresent()) {
+            try {
+                User currentUser = getCurrentAuthenticatedUser();
+                validateProjectAccess(project.get(), currentUser);
+            } catch (Exception e) {
+                // Return empty if access is denied or user not found (e.g. valid ID but wrong org)
+                return Optional.empty();
+            }
+        }
+        return project;
     }
     
     public Optional<Project> findByIdWithClient(Long projectId) {
-        return projectRepository.findByIdWithClient(projectId);
+        Optional<Project> project = projectRepository.findByIdWithClient(projectId);
+        if (project.isPresent()) {
+            try {
+                 User currentUser = getCurrentAuthenticatedUser();
+                 validateProjectAccess(project.get(), currentUser);
+            } catch (Exception e) {
+                 return Optional.empty();
+            }
+        }
+        return project;
     }
 
     // Removed unsafe findByName and findByNameContaining methods
@@ -478,13 +497,17 @@ public class ProjectService {
 
     @Transactional
     public boolean deleteProject(Long projectId) {
-        Optional<Project> projectOptional = projectRepository.findById(projectId);
-        if (projectOptional.isEmpty()) {
+        Project project = projectRepository.findById(projectId)
+                .orElse(null);
+                
+        if (project == null) {
             logger.warn("Attempt to delete non-existent project with ID: {}", projectId);
-            return false; // Or throw ProjectNotFoundException
+            return false;
         }
 
-        Project project = projectOptional.get();
+        // Security Check: Verify project belongs to user's organization
+        User currentUser = getCurrentAuthenticatedUser();
+        validateProjectAccess(project, currentUser);
 
         // Check if there are any tasks associated with this project
         if (taskRepository.existsByProjectId(projectId)) {
@@ -505,13 +528,35 @@ public class ProjectService {
         projectRepository.save(project);
 
         projectRepository.deleteById(projectId);
-        logger.info("Project with ID: {} deleted successfully.", projectId);
+        logger.info("Project with ID: {} deleted successfully by user: {}", projectId, currentUser.getUsername());
         return true;
     }
 
     // Helper method to check existence, can be useful in controllers
     public boolean existsById(Long projectId) {
         return projectRepository.existsById(projectId);
+    }
+    
+    /**
+     * Validates that the current user has permission to access the project.
+     * Throws AccessDeniedException if the user belongs to a different organization.
+     */
+    private void validateProjectAccess(Project project, User currentUser) {
+        if (currentUser.getOrganization() == null) {
+             throw new IllegalStateException("User " + currentUser.getUsername() + " is not associated with any organization.");
+        }
+        if (project.getOrganization() == null) {
+             // In rare cases where project has no org, we might allow or deny. 
+             // safest is to deny unless super admin, but for now we enforce org match.
+             throw new IllegalStateException("Project " + project.getId() + " is not associated with any organization.");
+        }
+        
+        if (!project.getOrganization().getId().equals(currentUser.getOrganization().getId())) {
+            logger.warn("Security Alert: User {} (Org {}) attempted to access Project {} (Org {})", 
+                    currentUser.getUsername(), currentUser.getOrganization().getId(), 
+                    project.getId(), project.getOrganization().getId());
+            throw new org.springframework.security.access.AccessDeniedException("Access Denied: You do not have permission to access this project.");
+        }
     }
 
     /**

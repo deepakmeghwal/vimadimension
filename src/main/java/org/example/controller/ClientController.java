@@ -25,7 +25,7 @@ public class ClientController {
     private UserService userService;
 
     @GetMapping("/search")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('clients.view')")
     public ResponseEntity<?> searchClients(@RequestParam(value = "query", required = false) String query) {
         User currentUser = getCurrentUser();
         List<Client> clients = clientService.searchClients(currentUser.getOrganization().getId(), query);
@@ -33,7 +33,7 @@ public class ClientController {
     }
 
     @GetMapping("/paginated")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('clients.view')")
     public ResponseEntity<?> searchClientsPaginated(
             @RequestParam(value = "query", required = false) String query,
             @RequestParam(value = "page", defaultValue = "0") int page,
@@ -44,7 +44,7 @@ public class ClientController {
     }
 
     @PostMapping
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('clients.create')")
     public ResponseEntity<?> createClient(@RequestBody Map<String, Object> payload) {
         User currentUser = getCurrentUser();
         String name = (String) payload.get("name");
@@ -81,14 +81,14 @@ public class ClientController {
         }
     }
     @GetMapping("/{clientId}/contacts")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('clients.view')")
     public ResponseEntity<?> getClientContacts(@PathVariable Long clientId) {
         // TODO: Add security check to ensure user belongs to the same organization as the client
         return ResponseEntity.ok(clientService.getClientContacts(clientId));
     }
 
     @PostMapping("/{clientId}/contacts")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('clients.create')")
     public ResponseEntity<?> createClientContact(@PathVariable Long clientId, @RequestBody Map<String, String> payload) {
         String name = payload.get("name");
         String email = payload.get("email");
@@ -108,7 +108,7 @@ public class ClientController {
     }
 
     @PutMapping("/{clientId}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('clients.edit')")
     public ResponseEntity<?> updateClient(@PathVariable Long clientId, @RequestBody Map<String, Object> payload) {
         User currentUser = getCurrentUser();
         String email = (String) payload.get("email");

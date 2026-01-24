@@ -25,7 +25,7 @@ public class PhaseController {
     }
 
     @PostMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('phases.create')")
     public ResponseEntity<?> createPhase(@PathVariable Long projectId, @RequestBody Map<String, Object> payload) {
         try {
             String phaseNumber = (String) payload.get("phaseNumber");
@@ -42,6 +42,7 @@ public class PhaseController {
     }
 
     @GetMapping
+    @PreAuthorize("hasAuthority('phases.view')")
     public ResponseEntity<?> getPhases(@PathVariable Long projectId) {
         try {
             List<Phase> phases = phaseService.getPhasesByProjectId(projectId);
@@ -71,7 +72,7 @@ public class PhaseController {
     }
 
     @PutMapping("/{phaseId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('phases.edit')")
     public ResponseEntity<?> updatePhase(@PathVariable Long projectId, @PathVariable Long phaseId, @RequestBody Map<String, Object> payload) {
         try {
             String phaseNumber = (String) payload.get("phaseNumber");
@@ -89,7 +90,7 @@ public class PhaseController {
     }
 
     @DeleteMapping("/{phaseId}")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAuthority('phases.delete')")
     public ResponseEntity<?> deletePhase(@PathVariable Long projectId, @PathVariable Long phaseId) {
         if (phaseService.deletePhase(phaseId)) {
             return ResponseEntity.ok().build();
@@ -102,7 +103,7 @@ public class PhaseController {
      * This creates all standard phases based on COA standards
      */
     @PostMapping("/standard")
-    @PreAuthorize("hasAnyRole('ADMIN', 'MANAGER')")
+    @PreAuthorize("hasAuthority('phases.create')")
     public ResponseEntity<?> createStandardPhases(@PathVariable Long projectId) {
         try {
             java.util.List<Phase> phases = phaseService.createStandardPhases(projectId);
@@ -123,7 +124,7 @@ public class PhaseController {
      * Get list of available standard phase types
      */
     @GetMapping("/types")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('phases.view')")
     public ResponseEntity<?> getPhaseTypes() {
         org.example.models.enums.PhaseType[] phaseTypes = org.example.models.enums.PhaseType.values();
         java.util.List<java.util.Map<String, Object>> typesList = new java.util.ArrayList<>();

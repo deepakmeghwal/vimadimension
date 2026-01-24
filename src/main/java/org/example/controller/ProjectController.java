@@ -143,7 +143,7 @@ public class ProjectController {
     }
 
     @GetMapping("/new")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('projects.create')")
     public ResponseEntity<Map<String, Object>> showCreateProjectForm() {
         Map<String, Object> response = new HashMap<>();
         response.put("projectCreateDto", new ProjectCreateDto());
@@ -151,6 +151,7 @@ public class ProjectController {
     }
 
     @PostMapping("/save")
+    @PreAuthorize("hasAuthority('projects.create')")
     public ResponseEntity<?> saveProject(@ModelAttribute("projectCreateDto") ProjectCreateDto projectDto,
                               BindingResult result,
                               Authentication authentication) {
@@ -190,7 +191,7 @@ public class ProjectController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('projects.view')")
     public ResponseEntity<?> getProjectById(@PathVariable("id") Long projectId) {
         Optional<Project> projectOptional = projectService.findById(projectId);
         if (projectOptional.isEmpty()) {
@@ -267,7 +268,7 @@ public class ProjectController {
     }
 
     @GetMapping("/{id}/edit")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<?> showUpdateProjectForm(@PathVariable("id") Long projectId) {
         // Use the new method to fetch project with client eagerly
         Optional<Project> projectOptional = projectService.findByIdWithClient(projectId);
@@ -319,7 +320,7 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/update")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('projects.edit')")
     public ResponseEntity<?> updateProject(@PathVariable("id") Long projectId,
                                 @ModelAttribute("projectUpdateDto") ProjectUpdateDto projectUpdateDto,
                                 BindingResult result) {
@@ -342,7 +343,7 @@ public class ProjectController {
     }
 
     @PostMapping("/{id}/delete")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('projects.delete')")
     public ResponseEntity<?> deleteProject(@PathVariable("id") Long projectId) {
         try {
             boolean deleted = projectService.deleteProject(projectId);
@@ -370,7 +371,7 @@ public class ProjectController {
 
     // Task creation endpoints
     @PostMapping("/{projectId}/tasks")
-    @PreAuthorize("isAuthenticated()")
+    @PreAuthorize("hasAuthority('tasks.create')")
     public ResponseEntity<?> createTaskForProject(@PathVariable Long projectId,
                                                  @RequestBody Map<String, Object> payload) {
         logger.info("Received task creation request for project {}: name='{}'", 

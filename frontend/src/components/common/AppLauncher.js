@@ -123,7 +123,8 @@ const AppLauncher = ({ user }) => {
             path: '/invoices',
             description: 'Create and manage client invoices.',
             color: '#f59e0b', // Amber
-            category: 'FINANCE'
+            category: 'FINANCE',
+            requiredPermissions: ['invoices.view']
         }
     ];
 
